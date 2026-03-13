@@ -1,0 +1,46 @@
+# release.yml
+name: Automatic Release
+run-name: ${{ github.actor }} is automatically releasing 🚀
+
+on:
+  # Run automatically on main pushes
+  push:
+    branches:
+      - main
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    environment:
+      name: CI # This is the name of your env created under https://github.com/{user}/{repo_name}/settings/environments/
+    steps:
+      - name: 'Generate token'
+        id: generate_token
+        uses: tibdex/github-app-token@v1
+        with:
+          app_id: ${{ secrets.GH_APP_ID }}
+          private_key: ${{ secrets.GH_APP_KEY }}
+      # Check out the code to be able to deploy
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.base.ref }}
+      # Setting up Node LTS
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+      # Make sure all the dependencies are ok and installed
+      - name: 'Installing dependencies'
+        run: npm ci
+      - name: 'Verifying the signatures'
+        run: npm audit signatures
+      # Install semantic release
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v4
+        env:
+          GITHUB_TOKEN: ${{ steps.generate_token.outputs.token }}
