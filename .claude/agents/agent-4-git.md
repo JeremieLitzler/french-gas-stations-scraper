@@ -86,9 +86,7 @@ git -C .. fetch origin
 
 ### Task 2: Create new branch and worktree
 
-Read the user request file at `[task-folder]/README.md` to understand the nature of the change (feature, fix, or docs).
-
-Determine `<type>` (e.g. `feat`, `fix`, `ci`, `docs`) and `<slug>` from the issue title.
+The orchestrator passes `Type: <type>` and `Slug: <slug>` directly — use these values. Do NOT read any file or create any directory to determine them.
 
 Run from the `develop/` worktree (bare repo root is `..`):
 
