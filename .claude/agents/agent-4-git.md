@@ -52,7 +52,7 @@ Use `rtk` for all supported git and gh commands — it compresses output and red
 | `git log` | `rtk git log` |
 | `git add <files>` | `rtk git add <files>` |
 | `git commit -m "msg"` | `rtk git commit -m "msg"` |
-| `git push` | `rtk git push` |
+| `git push origin <branch>` | `rtk git push origin <branch>` |
 | `git pull` | `rtk git pull` |
 | `gh pr list` | `rtk gh pr list` |
 | `gh pr view <n>` | `rtk gh pr view <n>` |
@@ -137,7 +137,7 @@ If the last line is `status: passed`:
 - Stage the test files introduced or modified and `[task-folder]/test-results.md`.
 - Write a meaningful commit message that summarises the change based on `[task-folder]/business-specifications.md` within Git recommended message length. Put anything beyond the commit message limit into the commit description.
 - Commit on the current feature branch — never commit directly to develop or main.
-- Push the branch to origin.
+- Push the branch to origin: `rtk git push origin <branch-name>`. Worktree branches have no upstream set, so always specify the remote and branch name explicitly.
 
 ### Task 6: Create pull request
 
