@@ -36,3 +36,21 @@ Starting list of stations:
 - name: "à SUPER U APPRIEU" ; link: https://www.prix-carburants.gouv.fr/station/38690006
 - name: "à INTERMARCHE TAIN L'HERMITAGE" ; link: https://www.prix-carburants.gouv.fr/station/26600007
 - name: "à SUPER U SAINT-DONAT" ; link: https://www.prix-carburants.gouv.fr/station/26260001
+
+## Development
+
+### Claude Code
+
+After cloning, create the `develop` worktree if it doesn't exist yet:
+
+```bash
+git worktree add develop develop
+```
+
+Then always open Claude Code from it, not the bare repo root:
+
+```bash
+cd develop && claude
+```
+
+Opening from the bare repo root means project instructions and skills are not loaded.
