@@ -80,7 +80,10 @@ git -C .. remote add origin https://github.com/<owner>/<repo>.git
 
 Then fetch to update all remote refs. The bare repo has no working tree to pull into — do **not** use `git pull`.
 
+First ensure the fetch refspec is configured (bare repos often lack it, causing `fetch` to update only `FETCH_HEAD` and leaving `refs/remotes/origin/*` stale):
+
 ```bash
+git -C .. config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
 git -C .. fetch origin
 ```
 
