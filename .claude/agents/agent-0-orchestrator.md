@@ -24,6 +24,10 @@ When the user reports a problem with an agent's behaviour or instructions, use t
 
 **Important — agent invocation from the main conversation:** Custom `subagent_type` names are only resolvable when Claude Code natively invokes a `.claude/agents/` agent. From the main conversation (or from a general-purpose subagent), the `Agent` tool only accepts built-in types. Always use `Agent(subagent_type="general-purpose")` and pass the specialist agent's file content as the prompt.
 
+## Handling subagent questions
+
+If any subagent's output contains a question or request for clarification (i.e. it does not end with a `status:` line), use `AskUserQuestion` to relay the question to the human. Pass the human's answer back to the subagent by re-invoking it (counts toward MAX_RETRIES). Never return a subagent question as your own final output to the main conversation.
+
 ## Pipeline
 
 ### Step 0 — Task Folder and Branching
