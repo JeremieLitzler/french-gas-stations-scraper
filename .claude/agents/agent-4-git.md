@@ -154,12 +154,13 @@ gh pr create --base develop --title "<title>" --body "<body>"
 
 ### Task 7: Merge pull request
 
-Run:
+Run from inside `<repo>.git/` (the bare repository root — **not** from inside the worktree):
 
 ```bash
-gh pr merge <pr-url> --rebase --delete-branch
+cd <repo>.git && gh pr merge <pr-url> --rebase --delete-branch
 ```
 
+- Always run from the bare repo root. Running from a worktree causes `gh` to attempt a local `git switch develop` after merging, which fails because `develop` is already checked out in its own worktree.
 - Always rebase-merge to keep `develop` history linear (the repository does not allow squash or merge commits).
 - `--delete-branch` removes the remote branch automatically.
 
@@ -169,14 +170,15 @@ Run from inside `<repo>.git/` (the bare repository root):
 
 ```bash
 git fetch origin
+git worktree remove --force <type>_<slug>
 git worktree prune
-git worktree remove <type>_<slug>
 git branch -D <type>/<slug>
 ```
 
 Notes:
-- `git worktree prune` must run before `git worktree remove` to clear stale refs when the worktree directory is already empty.
-- Use `-D` (force) instead of `-d` because GitHub squash-merges do not create a merge commit, so git never considers the local branch "fully merged".
+- Run `git worktree remove --force` **before** `git worktree prune`. Prune deregisters stale entries first; if the worktree directory still exists but is deregistered, a subsequent `remove` will fail with a permission error.
+- `--force` handles Windows file-lock edge cases where git would otherwise refuse to delete the directory.
+- Use `-D` (force) instead of `-d` on `git branch` because GitHub rebase-merges do not create a merge commit, so git never considers the local branch "fully merged".
 
 Then run `git -C <repo>.git/develop pull origin develop` to ensure `develop` reflects the merged commit.
 
