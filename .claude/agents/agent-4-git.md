@@ -91,8 +91,10 @@ The orchestrator passes `Type: <type>` and `Slug: <slug>` directly — use these
 Run from the `develop/` worktree (bare repo root is `..`):
 
 ```bash
-git -C .. worktree add ../<type>_<slug> -b <type>/<slug> origin/develop
+git -C .. worktree add <type>_<slug> -b <type>/<slug> origin/develop
 ```
+
+The path `<type>_<slug>` is relative to the bare repo root (the `-C ..` directory), so the worktree lands at `<bare-repo>/<type>_<slug>` — i.e. a sibling of `develop/`. Do NOT prefix with `../` (that would place it one level above the bare repo).
 
 Resolve the absolute path of the new worktree and report it back to the orchestrator as `Worktree: <absolute-path>` so every subsequent agent can use it.
 
