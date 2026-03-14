@@ -38,3 +38,6 @@ deno.lock
 # auto-imports.d.ts
 # components.d.ts
 # typed-router.d.ts
+
+tests/fixtures/INTERMARCHE-AOSTE_files
+tests/fixtures/INTERMARCHE-APPRIEU_files
