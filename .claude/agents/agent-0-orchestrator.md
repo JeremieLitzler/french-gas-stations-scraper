@@ -1,6 +1,6 @@
 ---
 name: agent-0-orchestrator
-description: Orchestrates the full pipeline, delegates to specialist agents via Task tool
+description: Use when the user says "tackle", "work on", "implement", "fix", or "start" a GitHub issue. Orchestrates the full pipeline — specs, security, coding, review, tests, versioning — by delegating to specialist agents via the Task tool.
 model: claude-sonnet-4-6
 tools: Read, Write, Task, AskUserQuestion
 ---

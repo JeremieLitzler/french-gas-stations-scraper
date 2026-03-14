@@ -6,6 +6,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 A web app that scrapes fuel price data from French government gas station pages (`prix-carburants.gouv.fr`) via a **Netlify serverless function**, then displays prices in a **Vue.js SPA**.
 
+## Critical Rules
+
+1. **Pipeline-first**: When asked to tackle/work on/implement/fix a GitHub issue, always invoke `agent-0-orchestrator`. Never do git operations (branch, checkout, worktree) directly from the main conversation. All code changes go through the pipeline in a worktree.
+2. **Spec-first**: Before implementing anything, read the relevant spec files.
+3. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
+4. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
+
+## Context to Read
+
+Always read before starting any task:
+
+- `docs/prompts/workspace-context.md` — current phase, completed work, open decisions
+
+Read when relevant:
+
+- ADR in `docs/decisions/` — before touching a decided area
+
 ## Architecture
 
 ### Data flow
@@ -20,6 +37,7 @@ A web app that scrapes fuel price data from French government gas station pages 
 - Accepts a station URL as a query parameter
 - Fetches and parses the HTML from `prix-carburants.gouv.fr`
 - Returns structured JSON: `{ stationName, fuels: [{ type, price }] }`
+- HTML fetching goes through `/.netlify/functions/fetch-page` — do NOT fetch station URLs directly from the browser (see ADR-006)
 
 **Vue.js frontend (`/src/`)**
 
@@ -28,10 +46,61 @@ A web app that scrapes fuel price data from French government gas station pages 
 - Derives the set of available fuel types from all responses
 - Lets the user pick a fuel type; renders a sorted price table for that fuel
 - Station management UI: textarea to view URLs, form to add a new `{ name, url }` entry saved to IndexedDB
+- Use singleton composable pattern for shared state (see ADR-002)
+- No Pinia — it has been removed (see ADR-002)
 
 ### Persistence
 
 IndexedDB (client-side only) stores the list of station objects `{ name, url }`. The default seed list is defined in the README.
+
+## Code Conventions
+
+- Vue 3 Composition API with `<script setup lang="ts">` always
+- Composables in `src/composables/` prefixed with `use`
+- Utility functions in `src/utils/` — pure functions, no Vue dependencies
+
+## Naming Conventions
+
+- Components: PascalCase (`StationTable.vue`)
+- Composables: camelCase with `use` prefix (`useStationPrices.ts`)
+- Types/Interfaces: PascalCase (`Station`, `FuelPrice`)
+- Utils: camelCase (`stationScraper.ts`, `priceFormatter.ts`)
+- Constants: UPPER_SNAKE_CASE (`DEFAULT_STATION_LIST`)
+- Test files: `*.spec.ts` suffix
+
+## Testing Conventions
+
+- Use Vitest + @vue/test-utils (see ADR-005)
+- Co-locate test files next to source files or in `src/__tests__/`
+- Naming: `*.spec.ts` for all tests
+- Coverage targets:
+  - Composables: 100% (critical state management)
+  - Utils: 100% (pure functions, easy to test)
+  - Components: 80%+ (focus on logic, not styling)
+- All tests must pass before merging
+
+### HTML Fixtures
+
+When saving HTML files for test fixtures, always clean them up:
+- Remove all `<link rel="stylesheet">` tags
+- Remove all `<script>` tags and their content
+- Keep metadata tags like `<link rel="canonical">` and `<link rel="shortcut icon">`
+
+```bash
+cd tests/fixtures && for file in *.html; do
+  sed -i '/<link rel="stylesheet"/d' "$file"
+  sed -i '/<script/d; /<\/script>/d' "$file"
+done
+```
+
+This prevents happy-dom from fetching external resources during tests (ECONNREFUSED in CI).
+
+## When You Are Unsure
+
+- Flag it explicitly rather than assuming
+- Propose two options with trade-offs and ask for a decision
+- If a spec is ambiguous, quote the ambiguous part and ask for clarification
+- Never silently make a decision that affects architecture or data shape
 
 ## Development commands
 
@@ -45,7 +114,7 @@ npx netlify dev
 # Build for production
 npx netlify build
 
-# Run tests (once configured)
+# Run tests
 npm test
 ```
 
