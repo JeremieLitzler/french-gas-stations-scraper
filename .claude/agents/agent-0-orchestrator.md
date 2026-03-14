@@ -35,11 +35,11 @@ Build:
 - `slug` = a short (≤ 30 characters) kebab-case summary of the issue title (e.g. `back-button-fix`, `article-extract-error`). Do NOT use the full issue title — long slugs cause path-length failures on Windows (MINGW64) that break subagents running shell commands.
 - `task-folder` = `docs/prompts/tasks/issue-[id of issue]-[slug]/`
 
-Save the user request to `[task-folder]/README.md`.
-
 Invoke agent-4-git using the Task tool, instructing it to perform **Task 1 and Task 2 only** (fetch latest from origin and create the branch + worktree). Do not ask it to commit or push yet.
 
 Wait for the agent to report back the worktree path (`Worktree: <absolute-path>`). Store this path as `[worktree]` — pass it in the `Worktree:` field of every subsequent subagent task handoff.
+
+Save the user request to `[worktree]/[task-folder]/README.md`.
 
 ### Step 1 — Specs
 
