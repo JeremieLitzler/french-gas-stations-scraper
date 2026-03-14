@@ -48,3 +48,61 @@ npx netlify build
 # Run tests (once configured)
 npm test
 ```
+
+## Shell commands — use `rtk` wrappers
+
+Prefer `rtk` over raw commands for token-efficient output.
+
+### Git
+
+```bash
+rtk git status          # compact status
+rtk git log -n 10       # one-line commits
+rtk git diff            # condensed diff
+rtk git add             # -> "ok"
+rtk git commit -m "msg" # -> "ok abc1234"
+rtk git push            # -> "ok main"
+rtk git pull            # -> "ok 3 files +10 -2"
+```
+
+### GitHub CLI
+
+```bash
+rtk gh pr list          # compact PR listing
+rtk gh pr view 42       # PR details + checks
+rtk gh issue list       # compact issue listing
+rtk gh run list         # workflow run status
+```
+
+### Build & lint
+
+```bash
+rtk tsc                 # TypeScript errors grouped by file
+rtk lint                # ESLint grouped by rule/file
+rtk err npm run build   # errors/warnings only
+rtk vitest run          # failures only
+rtk playwright test     # E2E failures only
+```
+
+### Files & search
+
+```bash
+rtk ls .                # token-optimized directory tree
+rtk read file.ts        # smart file reading
+rtk find "*.ts" .       # compact find results
+rtk grep "pattern" .    # grouped search results
+rtk diff file1 file2    # condensed diff
+```
+
+### Package managers
+
+```bash
+rtk pnpm list           # compact dependency tree
+```
+
+### Token savings
+
+```bash
+rtk gain                # summary stats
+rtk discover            # find missed savings opportunities
+```
