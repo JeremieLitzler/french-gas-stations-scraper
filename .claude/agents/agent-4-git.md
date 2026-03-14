@@ -96,6 +96,12 @@ git -C .. worktree add <type>_<slug> -b <type>/<slug> origin/develop
 
 The path `<type>_<slug>` is relative to the bare repo root (the `-C ..` directory), so the worktree lands at `<bare-repo>/<type>_<slug>` — i.e. a sibling of `develop/`. Do NOT prefix with `../` (that would place it one level above the bare repo).
 
+Then install dependencies inside the new worktree so subsequent agents can run lint, type-check, and tests:
+
+```bash
+cd <type>_<slug> && npm install
+```
+
 Resolve the absolute path of the new worktree and report it back to the orchestrator as `Worktree: <absolute-path>` so every subsequent agent can use it.
 
 ### Task 3: Commit specs output
