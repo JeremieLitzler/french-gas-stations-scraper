@@ -20,9 +20,9 @@ Applies to the orchestrator and all sub agents. Do not execute more than **3 fai
 
 ## Agent Pipeline Issue Handling
 
-When the user reports a problem with an agent's behaviour or instructions, follow `CLAUDE-AGENT-WORFLOW-ISSUES-HANDLING.md`.
+When the user reports a problem with an agent's behaviour or instructions, use the `/fix-pipeline` skill.
 
-**Important — agent invocation from the main conversation:** Custom `subagent_type` names (e.g. `"agent-7-pipeline-maintainer"`) are only resolvable when Claude Code natively invokes a `.claude/agents/` agent. From the main conversation (or from a general-purpose subagent), the `Agent` tool only accepts built-in types. Always use `Agent(subagent_type="general-purpose")` and pass the specialist agent's file content as the prompt. See `CLAUDE-ISSUE-TRIGGERING-PIPELINE-MAINTAINER-FROM-MAIN-CONVERSATION.md` for the full procedure.
+**Important — agent invocation from the main conversation:** Custom `subagent_type` names are only resolvable when Claude Code natively invokes a `.claude/agents/` agent. From the main conversation (or from a general-purpose subagent), the `Agent` tool only accepts built-in types. Always use `Agent(subagent_type="general-purpose")` and pass the specialist agent's file content as the prompt.
 
 ## Pipeline
 

@@ -9,9 +9,10 @@ A web app that scrapes fuel price data from French government gas station pages 
 ## Critical Rules
 
 1. **Pipeline-first**: When asked to tackle/work on/implement/fix a GitHub issue, always invoke `agent-0-orchestrator`. Never do git operations (branch, checkout, worktree) directly from the main conversation. All code changes go through the pipeline in a worktree.
-2. **Spec-first**: Before implementing anything, read the relevant spec files.
-3. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
-4. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
+2. **No hardcoded paths**: Never hardcode absolute paths or worktree-specific paths (e.g. `develop/`, `feat_foo/`) in any `.md` file under `.claude/`. Absolute paths break portability across machines; worktree paths are runtime values passed by the orchestrator, not constants. Always use placeholders (`[worktree]`, `[task-folder]`) or derive paths at runtime.
+3. **Spec-first**: Before implementing anything, read the relevant spec files.
+4. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
+5. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
 
 ## Context to Read
 
