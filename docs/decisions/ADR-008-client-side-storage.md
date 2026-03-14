@@ -5,7 +5,7 @@
 
 ## Context
 
-The application may need to persist data (such as extracted article state) on the client side across browser sessions. Two primary browser-native options exist: `localStorage` and `IndexedDB`.
+The application needs to persist the user's station list (`{ name, url }` objects) on the client side across browser sessions. Two primary browser-native options exist: `localStorage` and `IndexedDB`.
 
 `localStorage` is synchronous, string-only, and shared across all tabs of the same origin with a typical quota of 5 MB.
 
@@ -22,7 +22,7 @@ The wrapper exposes three operations only: `get(key)`, `set(key, value)`, `del(k
 ### Positive
 
 - Async API does not block the main thread, keeping the UI responsive during reads and writes.
-- Stores JavaScript objects natively — no JSON serialisation round-trip required for complex types such as `Article`.
+- Stores JavaScript objects natively — no JSON serialisation round-trip required for station objects.
 - Significantly larger storage quota than `localStorage`.
 - Transactional model reduces the risk of partial writes corrupting stored data.
 - No additional dependency.

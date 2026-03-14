@@ -36,7 +36,7 @@ Before reviewing Vue/TypeScript-specific issues, fetch the following reference p
 - `https://vuejs.org/guide/essentials/reactivity-fundamentals` — reactivity model
 - `https://vuejs.org/guide/reusability/composables` — composable conventions
 - `https://vuejs.org/guide/typescript/composition-api` — TypeScript + Vue patterns
-- `https://developer.mozilla.org/en-US/docs/Web/API/URL` — URL API (used in `utm.ts`)
+- `https://developer.mozilla.org/en-US/docs/Web/API/URL` — URL API (used for URL construction and validation)
 
 ## Review checklist
 
@@ -50,7 +50,7 @@ Before reviewing Vue/TypeScript-specific issues, fetch the following reference p
 - Vue/TypeScript-specific issues:
 
   Reactivity pitfalls:
-  - Destructuring a reactive object loses reactivity: `const { title } = useArticleState()` silently breaks; use `toRefs()` or access as `state.title`
+  - Destructuring a reactive object loses reactivity: `const { value } = useMyComposable()` silently breaks; use `toRefs()` or access as `state.value`
   - Watching a reactive property directly: `watch(state.count, ...)` never triggers; use a getter `watch(() => state.count, ...)`
   - Mutating a prop in-place instead of emitting an event
   - Calling `reactive()` on a primitive value

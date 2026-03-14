@@ -5,15 +5,15 @@
 
 ## Context
 
-The app needs to share extracted article data across multiple components
-(X, LinkedIn, Medium, Substack sections all read from the same extraction).
+The app needs to share fetched station price data across multiple components
+(the fuel-type selector and the price table both read from the same fetch results).
 
 Pinia was included in the boilerplate template but was used there for
 Supabase auth and database and multi-page error management — neither of which apply here.
 
 ## Decision
 
-Use a singleton composable pattern for shared article state.
+Use a singleton composable pattern for shared application state.
 
 A module-level `ref()` is declared **outside** the composable function,
 making it shared across all consumers without needing a store.
@@ -21,11 +21,11 @@ making it shared across all consumers without needing a store.
 Example pattern:
 
 ```ts
-// composables/useArticleState.ts
-const article = ref<Article | null>(null)
+// composables/useStationState.ts
+const stations = ref<Station[]>([])
 
-export function useArticleState() {
-  return { article }
+export function useStationState() {
+  return { stations }
 }
 ```
 
@@ -49,8 +49,7 @@ export function useArticleState() {
 
 - **Pinia**: Already installed but overkill for a single shared state object
   on a single-page app with no auth or server sync
-- **Prop drilling**: Too verbose given the number of platform components
-  all needing the same article data
+- **Prop drilling**: Too verbose given multiple components needing the same station data
 - **Provide/Inject**: Valid but less explicit than a named composable
 
 ## Notes

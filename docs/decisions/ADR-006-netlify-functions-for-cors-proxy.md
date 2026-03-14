@@ -4,15 +4,9 @@
 **Status:** Accepted
 **Implemented:** 2026-02-18
 
-**Related:** [Task-009](../prompts/tasks/task-009-backend-proxy-for-cors.md)
-
 ## Context
 
-The Vue SPA cannot fetch HTML from blog URLs due to browser CORS restrictions. As documented in Task-009:
-
-> "A pure client-side SPA **won't work** for fetching HTML from your blog URLs due to CORS restrictions. Browsers block cross-origin requests unless the target server (your blog) explicitly allows it with CORS headers."
-
-We don't control CORS headers on `iamjeremie.me` or `jeremielitzler.fr`, making client-side fetching impossible.
+The Vue SPA cannot fetch HTML from gas station pages on `prix-carburants.gouv.fr` due to browser CORS restrictions. Browsers block cross-origin requests unless the target server explicitly allows it with CORS headers, and we do not control CORS headers on `www.prix-carburants.gouv.fr`.
 
 ## Decision
 
@@ -20,29 +14,25 @@ We don't control CORS headers on `iamjeremie.me` or `jeremielitzler.fr`, making 
 
 ### High-Level Architecture
 
-From Task-009:
-
 ```mermaid
 sequenceDiagram
     participant Browser
     participant API as Backend API<br/>(Serverless Function)
-    participant BlogServer as Blog Server<br/>(iamjeremie.me)
+    participant GovServer as Government Server<br/>(prix-carburants.gouv.fr)
 
-    Browser->>API: fetch('/.netlify/functions/fetch-article?url=...')
+    Browser->>API: fetch('/.netlify/functions/fetch-page?url=...')
     Note over Browser,API: ✅ Same origin - No CORS
-    API->>BlogServer: Server-to-server fetch
-    Note over API,BlogServer: ✅ No CORS restrictions
-    BlogServer-->>API: HTML response
+    API->>GovServer: Server-to-server fetch
+    Note over API,GovServer: ✅ No CORS restrictions
+    GovServer-->>API: HTML response
     API-->>Browser: HTML response (proxied)
 ```
 
 **Key points:**
 
-- Function endpoint: `/.netlify/functions/fetch-article?url=<encoded-url>`
-- Domain whitelist: `['iamjeremie.me', 'jeremielitzler.fr']`
+- Function endpoint: `/.netlify/functions/fetch-page?url=<encoded-url>`
+- Domain whitelist: `['www.prix-carburants.gouv.fr']`
 - Response format: `{ success: true, html: "..." }`
-
-See [Task-009](../prompts/tasks/task-009-backend-proxy-for-cors.md) for complete implementation details.
 
 ## Rationale
 
@@ -70,30 +60,14 @@ See [Task-009](../prompts/tasks/task-009-backend-proxy-for-cors.md) for complete
 
 ## Alternatives Considered
 
-From Task-009, these alternatives were evaluated and rejected:
-
 1. **CORS Proxy Service** - Rejected: Privacy concerns, reliability, not production-ready
 2. **Express Backend** - Rejected: Unnecessarily complex, requires hosting/costs
 3. **Browser Extension** - Rejected: Changes product nature, limited audience
 4. **Electron Desktop App** - Rejected: Complete architecture pivot
 
-See [Task-009 § Alternatives](../prompts/tasks/task-009-backend-proxy-for-cors.md#alternative-express-backend-same-repo-monorepo) for detailed analysis.
-
-## Implementation
-
-Refer to [Task-009 § Implementation Tasks](../prompts/tasks/task-009-backend-proxy-for-cors.md#implementation-tasks) for:
-
-- Complete function code example
-- SPA integration changes
-- Security implementation
-- Testing strategy
-- Deployment process
-
-**Estimated effort:** 3-5 hours
-
 ## Acceptance Criteria
 
-- [x] User can fetch HTML from blog URLs without CORS errors
+- [x] User can fetch HTML from station URLs without CORS errors
 - [x] Only whitelisted domains allowed
 - [x] All existing tests pass
 - [x] Works locally with `netlify dev`
@@ -101,6 +75,5 @@ Refer to [Task-009 § Implementation Tasks](../prompts/tasks/task-009-backend-pr
 
 ## References
 
-- [Task-009: Backend Proxy for CORS](../prompts/tasks/task-009-backend-proxy-for-cors.md)
 - [Netlify Functions Documentation](https://docs.netlify.com/functions/overview/)
 - [CORS on MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS)

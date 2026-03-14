@@ -6,8 +6,8 @@
 ## Context
 
 The app needs a UI layer for building a clean, functional single-page
-interface with copy-to-clipboard buttons, tabs per platform, text areas,
-and general layout components.
+interface with sortable price tables, fuel-type selectors, station management
+forms, and general layout components.
 
 The boilerplate template came with Tailwind CSS v4 and radix-vue already
 configured. shadcn-vue provides pre-built accessible components built on
@@ -51,4 +51,4 @@ Key supporting libraries:
 
 - Unused shadcn/radix components to be removed as part of TR-1 cleanup
 - `@tanstack/vue-table` confirmed unused — remove in cleanup
-- Components we expect to use: Button, Tabs, Textarea, Badge, Separator, Toast
+- Components we expect to use: Button, Select, Input, Table, Badge, Separator, Toast

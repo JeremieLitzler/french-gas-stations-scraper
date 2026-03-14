@@ -5,7 +5,7 @@
 
 ## Context
 
-Starting a new web application for social media sharing automation. Need a modern frontend framework to build a single-page interface with dynamic content generation and clipboard operations.
+Starting a new web application to display French gas station fuel prices scraped from `prix-carburants.gouv.fr`. Need a modern frontend framework to build a single-page interface with dynamic data fetching and reactive table rendering.
 
 Project started from a Vue 3 template.
 
