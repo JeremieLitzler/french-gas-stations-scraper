@@ -24,6 +24,10 @@ When the user reports a problem with an agent's behaviour or instructions, use t
 
 **Important — agent invocation from the main conversation:** Custom `subagent_type` names are only resolvable when Claude Code natively invokes a `.claude/agents/` agent. From the main conversation (or from a general-purpose subagent), the `Agent` tool only accepts built-in types. Always use `Agent(subagent_type="general-purpose")` and pass the specialist agent's file content as the prompt.
 
+## Handling subagent questions
+
+If any subagent's output contains a question or request for clarification (i.e. it does not end with a `status:` line), use `AskUserQuestion` to relay the question to the human. Pass the human's answer back to the subagent by re-invoking it (counts toward MAX_RETRIES). Never return a subagent question as your own final output to the main conversation.
+
 ## Pipeline
 
 ### Step 0 — Task Folder and Branching
@@ -35,11 +39,16 @@ Build:
 - `slug` = a short (≤ 30 characters) kebab-case summary of the issue title (e.g. `back-button-fix`, `article-extract-error`). Do NOT use the full issue title — long slugs cause path-length failures on Windows (MINGW64) that break subagents running shell commands.
 - `task-folder` = `docs/prompts/tasks/issue-[id of issue]-[slug]/`
 
-Invoke agent-4-git using the Task tool, instructing it to perform **Task 1 and Task 2 only** (fetch latest from origin and create the branch + worktree). Do not ask it to commit or push yet.
+Determine `type` from the issue label or nature (e.g. `feat`, `fix`, `docs`, `refactor`).
+
+Invoke agent-4-git using the Task tool, instructing it to perform **Task 1 and Task 2 only** (fetch latest from origin and create the branch + worktree). Do not ask it to commit or push yet. Pass:
+
+- `Type: [type]`
+- `Slug: [slug]`
 
 Wait for the agent to report back the worktree path (`Worktree: <absolute-path>`). Store this path as `[worktree]` — pass it in the `Worktree:` field of every subsequent subagent task handoff.
 
-Save the user request to `[worktree]/[task-folder]/README.md`.
+**Only after receiving `[worktree]`**, save the user request to `[worktree]/[task-folder]/README.md`. Do NOT create this file or its parent directories before the worktree path is confirmed.
 
 ### Step 1 — Specs
 

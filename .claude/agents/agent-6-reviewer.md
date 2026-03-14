@@ -18,7 +18,7 @@ The orchestrator passes:
 - `Task folder: [task-folder]` — directory where all pipeline artifacts are written
 - `Worktree: [worktree]` — absolute path to the active worktree
 
-Run **only** the following two commands from the worktree root. The bare repo root has no `node_modules` — always `cd` to the worktree path before running any shell command. Include their output in your findings.
+Run **only** the following two commands from the worktree root. The bare repo root has no `node_modules` — always `cd` to the worktree path before running any shell command. Include their output in your findings. Do NOT inspect `package.json` or verify scripts exist first — run them directly.
 
 ```bash
 cd [worktree] && rtk lint          # ESLint — grouped by rule/file, token-optimized

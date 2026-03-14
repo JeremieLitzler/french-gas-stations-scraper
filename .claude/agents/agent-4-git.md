@@ -86,14 +86,20 @@ git -C .. fetch origin
 
 ### Task 2: Create new branch and worktree
 
-Read the user request file at `[task-folder]/README.md` to understand the nature of the change (feature, fix, or docs).
-
-Determine `<type>` (e.g. `feat`, `fix`, `ci`, `docs`) and `<slug>` from the issue title.
+The orchestrator passes `Type: <type>` and `Slug: <slug>` directly — use these values. Do NOT read any file or create any directory to determine them.
 
 Run from the `develop/` worktree (bare repo root is `..`):
 
 ```bash
-git -C .. worktree add ../<type>_<slug> -b <type>/<slug> origin/develop
+git -C .. worktree add <type>_<slug> -b <type>/<slug> origin/develop
+```
+
+The path `<type>_<slug>` is relative to the bare repo root (the `-C ..` directory), so the worktree lands at `<bare-repo>/<type>_<slug>` — i.e. a sibling of `develop/`. Do NOT prefix with `../` (that would place it one level above the bare repo).
+
+Then install dependencies inside the new worktree so subsequent agents can run lint, type-check, and tests:
+
+```bash
+cd <type>_<slug> && npm install
 ```
 
 Resolve the absolute path of the new worktree and report it back to the orchestrator as `Worktree: <absolute-path>` so every subsequent agent can use it.
