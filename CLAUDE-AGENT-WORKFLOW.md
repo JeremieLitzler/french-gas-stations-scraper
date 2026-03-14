@@ -1,6 +1,7 @@
-# Agent Workflow Alignment Plan
+# Agent Workflow Alignment Plan — ARCHIVED
 
-**Claude Code, DO NOT READ FILE PAST March 2, 2026**.
+> **Status: Archived — March 2026.**
+> All changes described in this document have been applied. This file is kept as a historical record only. Do not act on its instructions.
 
 This file documents the changes to be applied to `.claude/agents/`, `.claude/settings.local.json`, and `CLAUDE.md` to align the multi-agent pipeline with this project (TypeScript / Vue / Vitest — not Python).
 
