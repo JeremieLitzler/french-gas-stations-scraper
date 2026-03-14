@@ -20,14 +20,14 @@ Record the issue number as `[id]` and derive a slug (≤ 30 chars, kebab-case).
 
 ## Step 2 — Create a dedicated worktree
 
-From the bare repo root:
+The session runs from `develop/`. The bare repo root is `..`.
 
 ```bash
-git fetch origin
-git worktree add ci_<slug> -b ci/<slug> origin/develop
+git -C .. fetch origin
+git -C .. worktree add ../ci_<slug> -b ci/<slug> origin/develop
 ```
 
-Record the resulting worktree path as `[worktree]`.
+Record the resulting worktree absolute path as `[worktree]`.
 
 ## Step 3 — Apply the fix
 
@@ -65,20 +65,23 @@ Show the user the PR URL and ask for approval to merge.
 
 ## Step 6 — Merge and clean up
 
-Once approved:
+Once approved, run from the bare repo root (not from inside any worktree) to avoid `gh` attempting a local branch switch:
 
 ```bash
-gh pr merge <pr-url> --rebase --delete-branch
+cd .. && gh pr merge <pr-url> --rebase --delete-branch
 ```
 
-Run from the bare repo root (not from inside the worktree) to avoid `gh` attempting a local branch switch.
-
-Then clean up:
+Then clean up from the bare repo root:
 
 ```bash
-git fetch origin
-git worktree remove --force ci_<slug>
-git worktree prune
-git branch -D ci/<slug>
-git -C develop pull origin develop
+git -C .. fetch origin
+git -C .. worktree remove --force ci_<slug>
+git -C .. worktree prune
+git -C .. branch -D ci/<slug>
+```
+
+Then pull latest into `develop/`:
+
+```bash
+git pull origin develop
 ```

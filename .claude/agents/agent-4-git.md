@@ -64,19 +64,25 @@ Commands without an rtk equivalent (`git worktree`, `git fetch`, `git remote`, `
 
 ### Task 1: Make Sure Local Repository Is Up-to-date
 
+The session runs from the `develop/` worktree. The bare repo root is `..` relative to the CWD.
+
 First verify the bare repo has `origin` configured:
 
 ```bash
-git -C <repo>.git remote -v
+git -C .. remote -v
 ```
 
 If `origin` is missing, add it before fetching:
 
 ```bash
-git -C <repo>.git remote add origin https://github.com/<owner>/<repo>.git
+git -C .. remote add origin https://github.com/<owner>/<repo>.git
 ```
 
-Then run `git fetch origin` to update all remote refs. The bare repo has no working tree to pull into — do **not** use `git pull`.
+Then fetch to update all remote refs. The bare repo has no working tree to pull into — do **not** use `git pull`.
+
+```bash
+git -C .. fetch origin
+```
 
 ### Task 2: Create new branch and worktree
 
@@ -84,13 +90,13 @@ Read the user request file at `[task-folder]/README.md` to understand the nature
 
 Determine `<type>` (e.g. `feat`, `fix`, `ci`, `docs`) and `<slug>` from the issue title.
 
-From inside `<repo>.git/` (the bare repository root), run:
+Run from the `develop/` worktree (bare repo root is `..`):
 
 ```bash
-git worktree add <type>_<slug> -b <type>/<slug>
+git -C .. worktree add ../<type>_<slug> -b <type>/<slug> origin/develop
 ```
 
-The resulting worktree path is `<repo>.git/<type>_<slug>/`. Report this path back to the orchestrator as `Worktree: <absolute-path>` so every subsequent agent can use it.
+Resolve the absolute path of the new worktree and report it back to the orchestrator as `Worktree: <absolute-path>` so every subsequent agent can use it.
 
 ### Task 3: Commit specs output
 
@@ -154,25 +160,24 @@ gh pr create --base develop --title "<title>" --body "<body>"
 
 ### Task 7: Merge pull request
 
-Run from inside `<repo>.git/` (the bare repository root — **not** from inside the worktree):
+Must run from the bare repo root (not from inside any worktree) to avoid `gh` attempting a local `git switch develop` after merging, which fails because `develop` is already checked out in its own worktree.
 
 ```bash
-cd <repo>.git && gh pr merge <pr-url> --rebase --delete-branch
+cd .. && gh pr merge <pr-url> --rebase --delete-branch
 ```
 
-- Always run from the bare repo root. Running from a worktree causes `gh` to attempt a local `git switch develop` after merging, which fails because `develop` is already checked out in its own worktree.
 - Always rebase-merge to keep `develop` history linear (the repository does not allow squash or merge commits).
 - `--delete-branch` removes the remote branch automatically.
 
 ### Task 8: Remove worktree (post-merge cleanup)
 
-Run from inside `<repo>.git/` (the bare repository root):
+Run from the bare repo root (`..` relative to the `develop/` worktree):
 
 ```bash
-git fetch origin
-git worktree remove --force <type>_<slug>
-git worktree prune
-git branch -D <type>/<slug>
+git -C .. fetch origin
+git -C .. worktree remove --force <type>_<slug>
+git -C .. worktree prune
+git -C .. branch -D <type>/<slug>
 ```
 
 Notes:
@@ -180,7 +185,11 @@ Notes:
 - `--force` handles Windows file-lock edge cases where git would otherwise refuse to delete the directory.
 - Use `-D` (force) instead of `-d` on `git branch` because GitHub rebase-merges do not create a merge commit, so git never considers the local branch "fully merged".
 
-Then run `git -C <repo>.git/develop pull origin develop` to ensure `develop` reflects the merged commit.
+Then pull latest into `develop/` to ensure it reflects the merged commit:
+
+```bash
+git pull origin develop
+```
 
 ## Shell Command Retry Limit
 

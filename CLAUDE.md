@@ -14,6 +14,15 @@ A web app that scrapes fuel price data from French government gas station pages 
 4. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
 5. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
 
+## Setup
+
+Claude Code must be opened from the `develop/` worktree, not the bare repo root. If you detect the working directory is the bare repo root (i.e. no `src/`, `package.json`, or `.claude/commands/` at the root), warn the user:
+
+> You appear to have opened Claude Code from the bare repo root. Skills and agents may not be discovered correctly. Please restart from the `develop/` directory:
+> ```
+> cd develop && claude
+> ```
+
 ## Context to Read
 
 Always read before starting any task:
