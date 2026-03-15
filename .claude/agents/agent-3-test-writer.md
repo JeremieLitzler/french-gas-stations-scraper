@@ -33,6 +33,8 @@ Cover:
 
 Do NOT reference implementation details (function names, file paths, variable names). Write scenarios against observable behaviour only.
 
+If a spec describes a structural or cleanup task with no runtime observable behaviour (e.g. deleting files, renaming types), do not invent test cases for it. Instead add a note: "No runtime tests — verified by `vue-tsc`."
+
 End the file with `status: ready` as the last line.
 
 ## Pass 2 — After Coding
@@ -48,6 +50,10 @@ Translate each scenario in `test-cases.md` into a `.spec.ts` test using Vitest. 
 Each test must import only from paths confirmed to exist in the implementation files.
 
 Do NOT write tests for scenarios not in `test-cases.md`.
+
+Do NOT write `@ts-expect-error` tests or tests whose sole assertion is `toBeDefined()` on a value that cannot be undefined by construction. Type correctness is the responsibility of `vue-tsc`, not Vitest.
+
+Do NOT write tests that assert the presence or absence of files on disk, verify import resolution, or duplicate what `vue-tsc --build` already catches statically.
 
 End your report with `status: ready`.
 
