@@ -17,6 +17,7 @@ declare global {
   const CardHeader: typeof import('./src/components/ui/card/index').CardHeader
   const CardTitle: typeof import('./src/components/ui/card/index').CardTitle
   const EffectScope: typeof import('vue').EffectScope
+  const FuelType: typeof import('./src/types/index').FuelType
   const Input: typeof import('./src/components/ui/input/index').Input
   const Label: typeof import('./src/components/ui/label/index').Label
   const RouterPathEnum: typeof import('./src/types/RouterPathEnum').RouterPathEnum
@@ -93,6 +94,7 @@ declare global {
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
+  const useStationStorage: typeof import('./src/composables/useStationStorage').useStationStorage
   const useTemplateRef: typeof import('vue').useTemplateRef
   const watch: typeof import('vue').watch
   const watchEffect: typeof import('vue').watchEffect
@@ -111,21 +113,12 @@ declare global {
   export type { ButtonVariants } from './src/components/ui/button/index'
   import('./src/components/ui/button/index')
   // @ts-ignore
-  export type { ErrorExtended } from './src/types/ErrorExtended'
-  import('./src/types/ErrorExtended')
+  export type { FuelPrice } from './src/types/index'
+  import('./src/types/index')
   // @ts-ignore
-  export type { ErrorNextPage } from './src/types/ErrorNextPage'
-  import('./src/types/ErrorNextPage')
+  export type { StationData } from './src/types/station-data'
+  import('./src/types/station-data')
   // @ts-ignore
-  export type { LinkProp } from './src/types/LinkProp'
-  import('./src/types/LinkProp')
-  // @ts-ignore
-  export type { RouterPathEnum } from './src/types/RouterPathEnum'
-  import('./src/types/RouterPathEnum')
-  // @ts-ignore
-  export type { SideBarActionsEnum } from './src/types/SideBarActionsEnum'
-  import('./src/types/SideBarActionsEnum')
-  // @ts-ignore
-  export type { SideBarLinkAction } from './src/types/SideBarLinkAction'
-  import('./src/types/SideBarLinkAction')
+  export type { Station } from './src/types/station'
+  import('./src/types/station')
 }
