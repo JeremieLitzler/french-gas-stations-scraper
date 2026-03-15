@@ -55,6 +55,11 @@ Do NOT write `@ts-expect-error` tests or tests whose sole assertion is `toBeDefi
 
 Do NOT write tests that assert the presence or absence of files on disk, verify import resolution, or duplicate what `vue-tsc --build` already catches statically.
 
+Do NOT use `node:fs`, `node:path`, or `__dirname` to load test fixtures. The test environment is browser-like (happy-dom) and Node built-ins are unavailable. Load HTML or text fixtures using Vite's `?raw` suffix instead:
+```ts
+import fixtureHtml from '../../tests/fixtures/MY-FIXTURE.html?raw'
+```
+
 End your report with `status: ready`.
 
 ## Shell Command Retry Limit
