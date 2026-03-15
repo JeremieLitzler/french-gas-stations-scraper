@@ -94,6 +94,7 @@ declare global {
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
+  const useStationPrices: typeof import('./src/composables/useStationPrices').useStationPrices
   const useStationStorage: typeof import('./src/composables/useStationStorage').useStationStorage
   const useTemplateRef: typeof import('vue').useTemplateRef
   const watch: typeof import('vue').watch
