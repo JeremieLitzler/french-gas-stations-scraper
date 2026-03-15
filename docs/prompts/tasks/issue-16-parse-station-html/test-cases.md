@@ -1,11 +1,13 @@
 # Test Cases — Issue #16
-## Parse Station HTML and Return Structured JSON
+## Parse Station HTML in the Browser and Return Structured JSON
+
+All parser tests run in the Vitest + happy-dom environment, which provides native `DOMParser` — no extra dependencies needed.
 
 ## TC-01: Parse valid fixture with mixed prices (AOSTE)
 
 **Precondition:** The HTML fixture for INTERMARCHE-AOSTE is loaded as a string. It contains 6 fuel rows: 4 have valid prices and 2 have empty price cells.
 
-**Action:** The parser utility is called with the AOSTE HTML string.
+**Action:** `stationHtmlParser` is called with the AOSTE HTML string.
 
 **Expected outcome:**
 - The returned station name equals `"SAS CYRQUEN"`.
@@ -17,7 +19,7 @@
 
 **Precondition:** The HTML fixture for INTERMARCHE-APPRIEU is loaded as a string. It contains fuel rows, all with valid prices.
 
-**Action:** The parser utility is called with the APPRIEU HTML string.
+**Action:** `stationHtmlParser` is called with the APPRIEU HTML string.
 
 **Expected outcome:**
 - The returned station name is a non-empty string matching the `#details_pdv .fr-h2` text in the fixture.
@@ -28,7 +30,7 @@
 
 **Precondition:** An HTML string is constructed containing one fuel row whose second cell contains only whitespace characters.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The fuels array contains one entry with `price: null`.
@@ -37,7 +39,7 @@
 
 **Precondition:** An HTML string is constructed containing one fuel row whose second cell contains only `&nbsp;`.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The fuels array contains one entry with `price: null`.
@@ -46,7 +48,7 @@
 
 **Precondition:** An HTML string is constructed containing one fuel row whose second cell contains `<strong>N/A</strong>`.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The fuels array contains one entry with `price: null`.
@@ -55,7 +57,7 @@
 
 **Precondition:** An HTML string is constructed containing one fuel row whose first cell has plain text (no `<strong>` wrapper) and a valid price in the second cell.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The fuels array contains one entry whose type is the trimmed text content of the first cell.
@@ -65,7 +67,7 @@
 
 **Precondition:** An empty string is provided as input.
 
-**Action:** The parser utility is called with the empty string.
+**Action:** `stationHtmlParser` is called with the empty string.
 
 **Expected outcome:**
 - The parser signals a failure with the code `"selector_not_found"`.
@@ -75,7 +77,7 @@
 
 **Precondition:** A valid HTML string is provided that contains no `.details_pdv` table.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The parser signals a failure with the code `"selector_not_found"`.
@@ -84,81 +86,10 @@
 
 **Precondition:** An HTML string is constructed containing a valid `.details_pdv tbody tr` section but no `#details_pdv .fr-h2` element.
 
-**Action:** The parser utility is called with that HTML string.
+**Action:** `stationHtmlParser` is called with that HTML string.
 
 **Expected outcome:**
 - The parsing succeeds (fuels are returned normally).
 - The station name is an empty string `""`.
-
-## TC-10: Netlify function returns structured JSON on success (AOSTE fixture)
-
-**Precondition:** The Netlify function handler is called with a GET request and a valid station URL. The upstream fetch is mocked to return the AOSTE HTML fixture.
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `200`.
-- The response body is valid JSON with `{ success: true, data: { stationName, fuels } }`.
-- No `html` field is present in the response body.
-
-## TC-11: Netlify function returns 422 when selector not found
-
-**Precondition:** The Netlify function handler is called with a GET request and a valid station URL. The upstream fetch is mocked to return HTML with no `.details_pdv tbody tr` elements.
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `422`.
-- The response body is `{ success: false, error: "selector_not_found" }`.
-
-## TC-12: Netlify function rejects POST requests (guard unchanged)
-
-**Precondition:** The Netlify function handler is called with an HTTP POST request.
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `405`.
-- The response body contains `{ success: false, error: "Method not allowed" }`.
-
-## TC-13: Netlify function rejects missing URL parameter (guard unchanged)
-
-**Precondition:** The Netlify function handler is called with a GET request and no `url` query parameter.
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `400`.
-- The response body contains `{ success: false, error: "Missing url parameter" }`.
-
-## TC-14: Netlify function rejects invalid URL format (guard unchanged)
-
-**Precondition:** The Netlify function handler is called with a GET request and `url=not-a-url`.
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `400`.
-- The response body contains `{ success: false, error: "Invalid URL format" }`.
-
-## TC-15: Netlify function rejects disallowed domain (guard unchanged)
-
-**Precondition:** The Netlify function handler is called with a GET request and a URL pointing to a domain not in the allowlist (e.g. `https://evil.com/station`).
-
-**Action:** The handler processes the request.
-
-**Expected outcome:**
-- The response has HTTP status `403`.
-- The response body contains `{ success: false }` and an error describing domain rejection.
-
-## TC-16: Response body never contains raw HTML
-
-**Precondition:** The Netlify function handler is called with a valid request. The upstream fetch is mocked to return any HTML.
-
-**Action:** The handler processes the request (whether it succeeds or fails parsing).
-
-**Expected outcome:**
-- The response body, when parsed as JSON, contains no field named `html`.
-- The response body contains no field whose value is a string longer than a reasonable structured-data threshold (i.e. not raw HTML).
 
 status: ready
