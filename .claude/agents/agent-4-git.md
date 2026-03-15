@@ -192,6 +192,7 @@ git -C .. branch -D <type>/<slug>
 Notes:
 - Run `git worktree remove --force` **before** `git worktree prune`. Prune deregisters stale entries first; if the worktree directory still exists but is deregistered, a subsequent `remove` will fail with a permission error.
 - `--force` handles Windows file-lock edge cases where git would otherwise refuse to delete the directory.
+- If the worktree directory still exists on disk after `git worktree remove --force` (e.g. because git already deregistered it in a prior run), delete it manually: `rm -rf <absolute-worktree-path>`.
 - Use `-D` (force) instead of `-d` on `git branch` because GitHub rebase-merges do not create a merge commit, so git never considers the local branch "fully merged".
 
 Then pull latest into `develop/` to ensure it reflects the merged commit:
