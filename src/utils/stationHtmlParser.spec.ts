@@ -7,6 +7,9 @@
  *
  * Fixtures in tests/fixtures/ are used for TC-01 and TC-02.
  * All other test cases use minimal inline HTML strings.
+ *
+ * Station name is NOT parsed from HTML — it is provided by the user
+ * and stored in IndexedDB. No stationName assertions here.
  */
 
 import { describe, expect, it } from 'vitest'
@@ -22,7 +25,6 @@ function buildRowHtml(firstCellContent: string, secondCellContent: string): stri
   return `
     <html><body>
       <div id="details_pdv">
-        <p class="fr-h2">Test Station</p>
         <table class="details_pdv">
           <tbody>
             <tr>
@@ -40,40 +42,21 @@ function buildNoTableHtml(): string {
   return '<html><body><p>No fuel table here</p></body></html>'
 }
 
-function buildNoNameHtml(): string {
-  return `
-    <html><body>
-      <div id="details_pdv">
-        <table class="details_pdv">
-          <tbody>
-            <tr>
-              <td><strong>SP95-E10 (E10)</strong></td>
-              <td class="prix"><strong>1.829</strong></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </body></html>
-  `
-}
-
 // ---------------------------------------------------------------------------
 // TC-01: Full AOSTE fixture — mixed prices
 // ---------------------------------------------------------------------------
 
 describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
-  it('extracts station name and 6 fuel rows, 2 of which have null prices', () => {
-    const html = aostHtml
-    const result = parseStationHtml(html)
+  it('extracts 6 fuel rows, 2 of which have null prices', () => {
+    const result = parseStationHtml(aostHtml)
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.stationName).toBe('SAS CYRQUEN')
-    expect(result.data.fuels).toHaveLength(6)
+    expect(result.fuels).toHaveLength(6)
 
-    const nullPrices = result.data.fuels.filter((fuel) => fuel.price === null)
-    const numericPrices = result.data.fuels.filter((fuel) => fuel.price !== null)
+    const nullPrices = result.fuels.filter((fuel) => fuel.price === null)
+    const numericPrices = result.fuels.filter((fuel) => fuel.price !== null)
 
     expect(nullPrices).toHaveLength(2)
     expect(numericPrices).toHaveLength(4)
@@ -84,13 +67,12 @@ describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
   })
 
   it('extracts correct numeric prices for rows that have them', () => {
-    const html = aostHtml
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(aostHtml)
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    const prices = result.data.fuels.map((fuel) => fuel.price)
+    const prices = result.fuels.map((fuel) => fuel.price)
     // AOSTE fixture prices in order: 1.829, 1.929, null, null, 1.969, 0.999
     expect(prices).toEqual([1.829, 1.929, null, null, 1.969, 0.999])
   })
@@ -101,27 +83,15 @@ describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
 // ---------------------------------------------------------------------------
 
 describe('TC-02: parse INTERMARCHE-APPRIEU fixture', () => {
-  it('extracts a non-empty station name matching the h2 element', () => {
-    const html = apprieuHtml
-    const result = parseStationHtml(html)
-
-    expect(result.success).toBe(true)
-    if (!result.success) return
-
-    expect(result.data.stationName).toBe('INTERMARCHE APPRIEU')
-    expect(result.data.stationName.length).toBeGreaterThan(0)
-  })
-
   it('extracts 6 fuel rows with the correct price values', () => {
-    const html = apprieuHtml
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(apprieuHtml)
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.fuels).toHaveLength(6)
+    expect(result.fuels).toHaveLength(6)
     // APPRIEU fixture: SP95-E10(1.869), SP98(1.989), SP95(null), E85(0.758), Gazole(2.069), GPLc(null)
-    const prices = result.data.fuels.map((fuel) => fuel.price)
+    const prices = result.fuels.map((fuel) => fuel.price)
     expect(prices).toEqual([1.869, 1.989, null, 0.758, 2.069, null])
   })
 })
@@ -132,14 +102,13 @@ describe('TC-02: parse INTERMARCHE-APPRIEU fixture', () => {
 
 describe('TC-03: row with whitespace-only price cell returns null price', () => {
   it('returns null for a price cell containing only spaces', () => {
-    const html = buildRowHtml('<strong>SP95</strong>', '   ')
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(buildRowHtml('<strong>SP95</strong>', '   '))
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.fuels).toHaveLength(1)
-    expect(result.data.fuels[0].price).toBeNull()
+    expect(result.fuels).toHaveLength(1)
+    expect(result.fuels[0].price).toBeNull()
   })
 })
 
@@ -149,14 +118,13 @@ describe('TC-03: row with whitespace-only price cell returns null price', () => 
 
 describe('TC-04: row with &nbsp; in price cell returns null price', () => {
   it('returns null for a price cell containing only a non-breaking space', () => {
-    const html = buildRowHtml('<strong>SP95</strong>', '&nbsp;')
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(buildRowHtml('<strong>SP95</strong>', '&nbsp;'))
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.fuels).toHaveLength(1)
-    expect(result.data.fuels[0].price).toBeNull()
+    expect(result.fuels).toHaveLength(1)
+    expect(result.fuels[0].price).toBeNull()
   })
 })
 
@@ -166,14 +134,13 @@ describe('TC-04: row with &nbsp; in price cell returns null price', () => {
 
 describe('TC-05: row with non-numeric price text returns null price', () => {
   it('returns null when price cell contains <strong>N/A</strong>', () => {
-    const html = buildRowHtml('<strong>Gazole</strong>', '<strong>N/A</strong>')
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(buildRowHtml('<strong>Gazole</strong>', '<strong>N/A</strong>'))
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.fuels).toHaveLength(1)
-    expect(result.data.fuels[0].price).toBeNull()
+    expect(result.fuels).toHaveLength(1)
+    expect(result.fuels[0].price).toBeNull()
   })
 })
 
@@ -183,15 +150,14 @@ describe('TC-05: row with non-numeric price text returns null price', () => {
 
 describe('TC-06: row whose first cell has no <strong> uses cell text as fuel type', () => {
   it('extracts the trimmed text content of the first cell as the fuel type', () => {
-    const html = buildRowHtml('Plain Fuel Type', '<strong>1.750</strong>')
-    const result = parseStationHtml(html)
+    const result = parseStationHtml(buildRowHtml('Plain Fuel Type', '<strong>1.750</strong>'))
 
     expect(result.success).toBe(true)
     if (!result.success) return
 
-    expect(result.data.fuels).toHaveLength(1)
-    expect(result.data.fuels[0].type).toBe('Plain Fuel Type')
-    expect(result.data.fuels[0].price).toBe(1.75)
+    expect(result.fuels).toHaveLength(1)
+    expect(result.fuels[0].type).toBe('Plain Fuel Type')
+    expect(result.fuels[0].price).toBe(1.75)
   })
 })
 
@@ -222,21 +188,5 @@ describe('TC-08: HTML with no .details_pdv table produces selector_not_found err
     if (result.success) return
 
     expect(result.error).toBe('selector_not_found')
-  })
-})
-
-// ---------------------------------------------------------------------------
-// TC-09: Missing #details_pdv .fr-h2 → stationName is empty string
-// ---------------------------------------------------------------------------
-
-describe('TC-09: HTML with fuel rows but no station name element returns empty stationName', () => {
-  it('returns success: true with stationName equal to empty string', () => {
-    const result = parseStationHtml(buildNoNameHtml())
-
-    expect(result.success).toBe(true)
-    if (!result.success) return
-
-    expect(result.data.stationName).toBe('')
-    expect(result.data.fuels).toHaveLength(1)
   })
 })

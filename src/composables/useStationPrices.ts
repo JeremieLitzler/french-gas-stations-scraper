@@ -4,6 +4,9 @@
  * Calls the fetch-page Netlify function to retrieve raw HTML, then passes
  * the result through stationHtmlParser to produce structured StationData.
  *
+ * The station name comes from the caller (stored in IndexedDB as Station.name)
+ * and is not extracted from the HTML.
+ *
  * Singleton pattern (ADR-002): shared reactive state is declared at module
  * level so all consumers share the same reference.
  *
@@ -15,7 +18,7 @@
 
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import type { StationData } from '@/types'
+import type { Station, StationData } from '@/types'
 import { parseStationHtml } from '@/utils/stationHtmlParser'
 
 const FETCH_PAGE_ENDPOINT = '/.netlify/functions/fetch-page'
@@ -41,26 +44,26 @@ async function fetchPageHtml(stationUrl: string): Promise<FetchPageResponse> {
   return response.json() as Promise<FetchPageResponse>
 }
 
-function applyParseResult(html: string): void {
+function applyParseResult(html: string, stationName: string): void {
   const result = parseStationHtml(html)
   if (!result.success) {
     error.value = result.error
     return
   }
-  stationData.value = result.data
+  stationData.value = { stationName, fuels: result.fuels }
 }
 
-async function loadStationPrices(stationUrl: string): Promise<void> {
+async function loadStationPrices(station: Station): Promise<void> {
   isLoading.value = true
   error.value = null
   stationData.value = null
   try {
-    const pageResponse = await fetchPageHtml(stationUrl)
+    const pageResponse = await fetchPageHtml(station.url)
     if (!pageResponse.success) {
       error.value = pageResponse.error
       return
     }
-    applyParseResult(pageResponse.html)
+    applyParseResult(pageResponse.html, station.name)
   } catch {
     error.value = 'fetch_failed'
   } finally {
@@ -69,7 +72,7 @@ async function loadStationPrices(stationUrl: string): Promise<void> {
 }
 
 export function useStationPrices(): StationPricesState & {
-  loadStationPrices: (stationUrl: string) => Promise<void>
+  loadStationPrices: (station: Station) => Promise<void>
 } {
   return {
     stationData,

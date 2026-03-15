@@ -8,25 +8,21 @@
  * Security: all text is extracted via textContent (never innerHTML) so
  * embedded markup from the external server is never forwarded as executable
  * content (security-guidelines.md rule 3).
+ *
+ * Station name is NOT extracted here — it is provided by the user when
+ * adding a station and stored in IndexedDB as Station.name.
  */
 
-import type { FuelPrice, StationData } from '@/types'
+import type { FuelPrice } from '@/types'
 
-const STATION_NAME_SELECTOR = '#details_pdv .fr-h2'
 const FUEL_ROW_SELECTOR = '.details_pdv tbody tr'
 
-type ParseSuccess = { success: true; data: StationData }
+type ParseSuccess = { success: true; fuels: FuelPrice[] }
 type ParseFailure = { success: false; error: 'selector_not_found' }
-type ParseResult = ParseSuccess | ParseFailure
+export type ParseResult = ParseSuccess | ParseFailure
 
 function parseHtmlDocument(htmlString: string): Document {
   return new DOMParser().parseFromString(htmlString, 'text/html')
-}
-
-function extractStationName(document: Document): string {
-  const nameElement = document.querySelector(STATION_NAME_SELECTOR)
-  if (nameElement === null) return ''
-  return nameElement.textContent?.trim() ?? ''
 }
 
 function extractFuelType(row: Element): string {
@@ -64,10 +60,10 @@ function fuelRowsToArray(rows: NodeListOf<Element>): FuelPrice[] {
 }
 
 /**
- * Parse a gas station HTML page into structured data.
+ * Parse fuel price rows from a gas station HTML page.
  *
  * @param htmlString - Raw HTML string returned by fetch-page
- * @returns ParseSuccess with StationData, or ParseFailure with error code
+ * @returns ParseSuccess with fuels array, or ParseFailure with error code
  */
 export function parseStationHtml(htmlString: string): ParseResult {
   const document = parseHtmlDocument(htmlString)
@@ -75,9 +71,6 @@ export function parseStationHtml(htmlString: string): ParseResult {
   if (fuelRows.length === 0) return { success: false, error: 'selector_not_found' }
   return {
     success: true,
-    data: {
-      stationName: extractStationName(document),
-      fuels: fuelRowsToArray(fuelRows),
-    },
+    fuels: fuelRowsToArray(fuelRows),
   }
 }
