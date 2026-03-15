@@ -10,19 +10,9 @@
  */
 
 import { describe, expect, it } from 'vitest'
-import * as fs from 'node:fs'
-import * as path from 'node:path'
+import aostHtml from '../../tests/fixtures/INTERMARCHE-AOSTE.html?raw'
+import apprieuHtml from '../../tests/fixtures/INTERMARCHE-APPRIEU.html?raw'
 import { parseStationHtml } from './stationHtmlParser'
-
-// ---------------------------------------------------------------------------
-// Fixture helpers
-// ---------------------------------------------------------------------------
-
-const FIXTURES_DIR = path.resolve(__dirname, '../../tests/fixtures')
-
-function loadFixture(filename: string): string {
-  return fs.readFileSync(path.join(FIXTURES_DIR, filename), 'utf-8')
-}
 
 // ---------------------------------------------------------------------------
 // Minimal HTML builders for targeted edge-case tests
@@ -73,7 +63,7 @@ function buildNoNameHtml(): string {
 
 describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
   it('extracts station name and 6 fuel rows, 2 of which have null prices', () => {
-    const html = loadFixture('INTERMARCHE-AOSTE.html')
+    const html = aostHtml
     const result = parseStationHtml(html)
 
     expect(result.success).toBe(true)
@@ -94,7 +84,7 @@ describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
   })
 
   it('extracts correct numeric prices for rows that have them', () => {
-    const html = loadFixture('INTERMARCHE-AOSTE.html')
+    const html = aostHtml
     const result = parseStationHtml(html)
 
     expect(result.success).toBe(true)
@@ -112,7 +102,7 @@ describe('TC-01: parse INTERMARCHE-AOSTE fixture with mixed prices', () => {
 
 describe('TC-02: parse INTERMARCHE-APPRIEU fixture', () => {
   it('extracts a non-empty station name matching the h2 element', () => {
-    const html = loadFixture('INTERMARCHE-APPRIEU.html')
+    const html = apprieuHtml
     const result = parseStationHtml(html)
 
     expect(result.success).toBe(true)
@@ -123,7 +113,7 @@ describe('TC-02: parse INTERMARCHE-APPRIEU fixture', () => {
   })
 
   it('extracts 6 fuel rows with the correct price values', () => {
-    const html = loadFixture('INTERMARCHE-APPRIEU.html')
+    const html = apprieuHtml
     const result = parseStationHtml(html)
 
     expect(result.success).toBe(true)
