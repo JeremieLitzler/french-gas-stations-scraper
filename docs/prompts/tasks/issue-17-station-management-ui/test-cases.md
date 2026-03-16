@@ -132,4 +132,46 @@
 **Action:** Trigger the condition that causes the error (e.g. blur on a valid new row).
 **Expected outcome:** The user sees a generic error message, not the raw error message text. The form remains usable.
 
+## TC-25: Successful name edit shows inline success message on that row
+
+**Precondition:** A station with name "Station A" is in the list. `updateStation` resolves successfully.
+**Action:** Change the name input of that row to "Station B" and trigger blur.
+**Expected outcome:** An inline success message (e.g. "Saved") is visible near that row after the save completes. The message is not visible on any other row.
+
+## TC-26: Successful URL edit shows inline success message on that row
+
+**Precondition:** A station with a valid URL is in the list. `updateStation` resolves successfully.
+**Action:** Change the URL input of that row to a different valid, non-duplicate URL and trigger blur.
+**Expected outcome:** An inline success message is visible near that row after the save completes.
+
+## TC-27: Success message auto-dismisses after approximately 2 seconds
+
+**Precondition:** A successful name or URL edit has just been saved and the inline success message is currently visible.
+**Action:** Advance fake timers by 2000ms.
+**Expected outcome:** The inline success message is no longer visible.
+
+## TC-28: Blur without change shows no success message
+
+**Precondition:** An existing row with name "Station A" and a valid URL.
+**Action:** Click into the name input and trigger blur without changing the value.
+**Expected outcome:** No success message is visible. `updateStation` is not called.
+
+## TC-29: Validation failure shows no success message
+
+**Precondition:** An existing row with name "Station A".
+**Action:** Clear the name input and trigger blur.
+**Expected outcome:** An inline error is visible. No success message is visible.
+
+## TC-30: Success message does not appear when saving a new station
+
+**Precondition:** The empty new-station row's name and URL inputs are both filled with valid values. `addStation` resolves successfully.
+**Action:** Trigger blur on the URL input of the new-station row.
+**Expected outcome:** `addStation` is called. The new station appears. No inline success message is shown anywhere in the table for the new-station operation.
+
+## TC-31: Success message is per-row — editing one row does not affect another
+
+**Precondition:** Two existing stations are in the list. `updateStation` resolves successfully.
+**Action:** Change the name of the first row and trigger blur.
+**Expected outcome:** A success message is visible on the first row only. The second row shows no success message.
+
 status: ready

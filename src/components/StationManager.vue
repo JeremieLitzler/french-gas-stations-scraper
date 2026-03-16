@@ -39,6 +39,7 @@
               ✕
             </button>
             <span v-if="draft.rowError" class="field-error">{{ draft.rowError }}</span>
+            <span v-if="rowSuccessMap[draft.originalUrl]" class="field-success">Saved</span>
           </TableCell>
         </TableRow>
         <TableRow :disable-hover="true">
@@ -72,7 +73,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { onMounted, reactive, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import {
   Table,
@@ -85,6 +86,7 @@ import {
 import { useStationStorage } from '@/composables/useStationStorage'
 import type { Station } from '@/types/station'
 
+const SUCCESS_DISMISS_DELAY_MS = 2000
 const ALLOWED_ORIGIN = 'https://www.prix-carburants.gouv.fr'
 const ALLOWED_PATH_PREFIX = '/station/'
 
@@ -104,6 +106,13 @@ onMounted(async () => {
 })
 
 const rowDrafts: Ref<RowDraft[]> = ref([])
+
+/**
+ * Per-row success visibility map, keyed by originalUrl.
+ * Kept separate from RowDraft so the watch rebuild does not wipe a
+ * success message that was just set after a successful updateStation call.
+ */
+const rowSuccessMap = reactive<Record<string, boolean>>({})
 
 const newName = ref('')
 const newUrl = ref('')
@@ -203,11 +212,19 @@ function revertDraftUrl(index: number): void {
   rowDrafts.value[index].url = rowDrafts.value[index].originalUrl
 }
 
+function scheduleSuccessDismiss(savedUrl: string): void {
+  setTimeout(() => {
+    delete rowSuccessMap[savedUrl]
+  }, SUCCESS_DISMISS_DELAY_MS)
+}
+
 async function saveExistingRow(index: number, name: string, url: string): Promise<void> {
   const draft = rowDrafts.value[index]
-  const original = draft.originalUrl
+  const originalUrl = draft.originalUrl
   try {
-    await updateStation(original, { name, url })
+    await updateStation(originalUrl, { name, url })
+    rowSuccessMap[originalUrl] = true
+    scheduleSuccessDismiss(originalUrl)
   } catch {
     draft.rowError = 'Could not save changes. Please try again.'
   }
@@ -294,6 +311,13 @@ async function onNewRowBlur(): Promise<void> {
   display: block;
   font-size: 0.75rem;
   color: #ef4444;
+  margin-top: 0.25rem;
+}
+
+.field-success {
+  display: block;
+  font-size: 0.75rem;
+  color: #22c55e;
   margin-top: 0.25rem;
 }
 
