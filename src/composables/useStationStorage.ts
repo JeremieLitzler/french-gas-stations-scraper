@@ -35,10 +35,12 @@ const DEFAULT_STATIONS: readonly Station[] = [
 
 const stations: Ref<Station[]> = ref([])
 
+const ALLOWED_PATH_PREFIX = '/station/'
+
 function isValidUrl(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl)
-    return parsed.origin === ALLOWED_ORIGIN
+    return parsed.origin === ALLOWED_ORIGIN && parsed.pathname.startsWith(ALLOWED_PATH_PREFIX)
   } catch {
     return false
   }
@@ -50,7 +52,7 @@ function stripHtmlTags(text: string): string {
 
 function isValidName(name: string): boolean {
   const stripped = stripHtmlTags(name)
-  return stripped === name && name.length > 0 && name.length <= MAX_NAME_LENGTH
+  return stripped === name && name.trim().length > 0 && name.length <= MAX_NAME_LENGTH
 }
 
 function isStation(value: unknown): value is Station {
@@ -96,16 +98,30 @@ async function removeStation(url: string): Promise<void> {
   stations.value = filtered
 }
 
+async function updateStation(originalUrl: string, updated: Station): Promise<void> {
+  if (!isValidUrl(updated.url)) throw new Error(`Invalid station URL: ${updated.url}`)
+  if (!isValidName(updated.name)) throw new Error(`Invalid station name: ${updated.name}`)
+  const index = stations.value.findIndex((station) => station.url === originalUrl)
+  if (index === -1) return
+  const updatedList = stations.value.map((station, listIndex) =>
+    listIndex === index ? updated : station,
+  )
+  await set(STATIONS_KEY, updatedList)
+  stations.value = updatedList
+}
+
 export function useStationStorage(): {
   stations: Ref<Station[]>
   loadStations: () => Promise<void>
   addStation: (station: Station) => Promise<void>
   removeStation: (url: string) => Promise<void>
+  updateStation: (originalUrl: string, updated: Station) => Promise<void>
 } {
   return {
     stations,
     loadStations,
     addStation,
     removeStation,
+    updateStation,
   }
 }
