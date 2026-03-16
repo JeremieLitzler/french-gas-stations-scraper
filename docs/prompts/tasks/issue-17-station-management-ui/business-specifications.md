@@ -67,6 +67,15 @@ No new composables, utilities, or types beyond those listed are required. All st
 2. **URL must match the allowed origin and path prefix.** The URL must start with `https://www.prix-carburants.gouv.fr/station/`. An inline error is shown adjacent to the URL input.
 3. **Duplicate URLs are rejected.** If the submitted or edited URL already exists in another row of the current station list, an inline error is shown adjacent to the URL input and the change is not persisted.
 
+### Success feedback on save
+
+- After a successful edit of an existing row (name or URL changed, validated, and saved via `updateStation`), a brief inline success message is shown near the edited row.
+- The success message is per-row: each row tracks its own success state independently of all other rows.
+- The success message auto-dismisses after approximately 2 seconds; no user action is needed to clear it.
+- The success message is shown inline, adjacent to the row (consistent with the error display pattern), not as a toast or modal.
+- The success message does not appear when the user blurs a cell without changing its value (no-op blur).
+- The success message does not appear after adding a new station (only after editing an existing one).
+
 ### Error display
 
 - All errors are shown inline, adjacent to the field they relate to.
@@ -131,6 +140,35 @@ No new composables, utilities, or types beyond those listed are required. All st
 - And: the empty row's name input has "Another Station" and URL input has that same URL
 - When: the user blurs either input
 - Then: an inline error appears beside the URL input; no station is added
+
+### Rule: success message appears after a valid edit saves
+
+**Example — name changed and saved**
+- Given: an existing row shows name "Station A"
+- When: the user changes the name to "Station B" and blurs the field
+- Then: `updateStation` is called; a brief inline success message (e.g. "Saved") appears near that row
+- And: the success message disappears automatically after approximately 2 seconds
+
+**Example — URL changed and saved**
+- Given: an existing row has a valid URL
+- When: the user changes the URL to a different valid, non-duplicate URL and blurs the field
+- Then: `updateStation` is called; a brief inline success message appears near that row
+- And: the success message disappears automatically after approximately 2 seconds
+
+**Example — blur without change shows no success message**
+- Given: an existing row with name "Station A" and a valid URL
+- When: the user clicks into the name input and blurs without changing the value
+- Then: `updateStation` is not called; no success message appears
+
+**Example — validation failure shows no success message**
+- Given: an existing row with name "Station A"
+- When: the user clears the name input and blurs
+- Then: an inline error is shown; no success message appears
+
+**Example — success message is per-row and does not affect other rows**
+- Given: a table with two rows
+- When: the user edits and saves the name of the first row
+- Then: a success message appears only on the first row; the second row is unaffected
 
 ### Rule: error clears on typing
 
