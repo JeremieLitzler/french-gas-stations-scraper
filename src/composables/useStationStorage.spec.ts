@@ -23,7 +23,11 @@ const store = new Map<string, unknown>()
 vi.mock('../utils/indexedDb', () => ({
   get: vi.fn((key: string) => Promise.resolve(store.get(key))),
   set: vi.fn((key: string, value: unknown) => {
-    store.set(key, value)
+    // structuredClone simulates the IDB structured clone algorithm.
+    // Passing a Vue Proxy would throw a DataCloneError here, acting as
+    // a compile-time guard that toPlainStations() is applied before every set().
+    const cloned = structuredClone(value)
+    store.set(key, cloned)
     return Promise.resolve()
   }),
   del: vi.fn((key: string) => {
@@ -404,5 +408,55 @@ describe('TC-NEW-01: Load merges only the missing defaults, not already-present 
     // Merged list persisted
     const storedInDb = store.get('stations') as Station[]
     expect(storedInDb).toHaveLength(6)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Regression: DataCloneError — Vue Proxy objects must not reach IndexedDB set()
+// ---------------------------------------------------------------------------
+
+describe('TC-NEW-02: set() is never called with Vue Proxy objects (DataCloneError regression)', () => {
+  it('addStation does not throw a DataCloneError (structuredClone succeeds on the persisted value)', async () => {
+    const { loadStations, addStation } = await freshComposable()
+    await loadStations()
+
+    // After loadStations the list is reactive; addStation spreads it and calls set().
+    // The mock set() runs structuredClone() which would throw if any item is a Proxy.
+    await expect(
+      addStation({ name: 'Clone Test', url: 'https://www.prix-carburants.gouv.fr/station/77777777' }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('removeStation does not throw a DataCloneError after the list is reactive', async () => {
+    store.set('stations', [USER_STATION_A, USER_STATION_B])
+    const { loadStations, removeStation } = await freshComposable()
+    await loadStations()
+
+    await expect(removeStation(USER_STATION_A.url)).resolves.toBeUndefined()
+  })
+
+  it('updateStation does not throw a DataCloneError after the list is reactive', async () => {
+    store.set('stations', [USER_STATION_A])
+    const { loadStations, updateStation } = await freshComposable()
+    await loadStations()
+
+    await expect(
+      updateStation(USER_STATION_A.url, {
+        name: 'Updated A',
+        url: USER_STATION_A.url,
+      }),
+    ).resolves.toBeUndefined()
+  })
+
+  it('the value persisted to IndexedDB by addStation is structuredClone-safe', async () => {
+    const { loadStations, addStation } = await freshComposable()
+    await loadStations()
+
+    await addStation({ name: 'Clone Test', url: 'https://www.prix-carburants.gouv.fr/station/77777777' })
+
+    // structuredClone is called inside the mock set(); if it did not throw,
+    // the stored value is a plain object that can be read back without issues.
+    const stored = store.get('stations') as Station[]
+    expect(() => structuredClone(stored)).not.toThrow()
   })
 })
