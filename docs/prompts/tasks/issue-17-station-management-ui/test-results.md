@@ -1,29 +1,26 @@
-# Test Results — Station Management UI (#17)
+# Test Results — Success Notification for Station Edits (#17)
 
-## Command
+## Test Run
 
-```bash
-cd feat_station-management-ui && npm test
-```
+Command: `npm test -- --run`
 
-## Test Files Run
+## Results
 
-| File | Tests | Status |
-|------|-------|--------|
-| `src/composables/useStationStorage.spec.ts` | 14 | passed |
-| `src/composables/useStationStorage.updateStation.spec.ts` | 7 | passed |
-| `src/components/StationManager.spec.ts` | 20 | passed |
-| `src/components/layout/AppFooter.test.ts` | (existing) | passed |
-| `src/components/layout/GuestLayout.test.ts` | 9 | passed |
-| `src/utils/sanitize.test.ts` | (existing) | passed |
-| `src/utils/stationHtmlParser.spec.ts` | (existing) | passed |
+8 test files, 112 tests — all passed.
 
-## Notes
+New tests added:
+- TC-25: Successful name edit shows inline success message on that row (2 cases)
+- TC-26: Successful URL edit shows inline success message on that row (1 case)
+- TC-27: Success message auto-dismisses after 2 seconds (1 case, uses fake timers)
+- TC-28: Blur without change shows no success message (1 case)
+- TC-29: Validation failure shows no success message (1 case)
+- TC-30: Success message does not appear when saving a new station (1 case)
+- TC-31: Success message is per-row and does not appear on other rows (1 case)
 
-ECONNREFUSED warnings appear in output — these come from pre-existing HTML fixture files that still reference external stylesheet URLs. This is a pre-existing condition unrelated to this change. All test assertions pass.
+All 112 tests pass.
 
 ### Test Summary
 
-7 test files, 89 tests, all passed. Duration: 3.58s.
+8 test files, 112 tests passed, 0 failed.
 
 status: passed

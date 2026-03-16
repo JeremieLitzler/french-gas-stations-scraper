@@ -495,3 +495,164 @@ describe('TC-22: Storage errors surface as generic messages, not raw error text'
     expect(wrapper.text()).toContain('Could not save station')
   })
 })
+
+// ---------------------------------------------------------------------------
+// TC-25: Successful name edit shows inline success message on that row
+// ---------------------------------------------------------------------------
+
+describe('TC-25: Successful name edit shows inline success message on that row', () => {
+  it('shows "Saved" near the edited row after updateStation resolves', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Saved')
+  })
+
+  it('success message is not shown on the second row', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    const rows = wrapper.findAll('tr')
+    // row 0 = header, row 1 = station A, row 2 = station B, row 3 = new-station row
+    const secondDataRow = rows[2]
+    expect(secondDataRow.text()).not.toContain('Saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-26: Successful URL edit shows inline success message on that row
+// ---------------------------------------------------------------------------
+
+describe('TC-26: Successful URL edit shows inline success message on that row', () => {
+  it('shows "Saved" after a valid URL change is persisted', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowUrlInput = wrapper.findAll('input')[1]
+    await firstRowUrlInput.setValue('https://www.prix-carburants.gouv.fr/station/99999')
+    await firstRowUrlInput.trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-27: Success message auto-dismisses after 2 seconds
+// ---------------------------------------------------------------------------
+
+describe('TC-27: Success message auto-dismisses after 2 seconds', () => {
+  it('removes the "Saved" message after 2000ms', async () => {
+    vi.useFakeTimers()
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Saved')
+
+    vi.advanceTimersByTime(2000)
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Saved')
+
+    vi.useRealTimers()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-28: Blur without change shows no success message
+// ---------------------------------------------------------------------------
+
+describe('TC-28: Blur without change shows no success message', () => {
+  it('does not show "Saved" when the name value is unchanged on blur', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Saved')
+    expect(mockUpdateStation).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-29: Validation failure shows no success message
+// ---------------------------------------------------------------------------
+
+describe('TC-29: Validation failure shows no success message', () => {
+  it('shows error but no "Saved" when the name is cleared and blurred', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.setValue('')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Name must not be empty')
+    expect(wrapper.text()).not.toContain('Saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-30: Success message does not appear when saving a new station
+// ---------------------------------------------------------------------------
+
+describe('TC-30: Success message does not appear when saving a new station via addStation', () => {
+  it('does not show "Saved" anywhere after a successful addStation call', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const rows = wrapper.findAll('tr')
+    const newRow = rows[rows.length - 1]
+    const [nameInput, urlInput] = newRow.findAll('input')
+
+    await nameInput.setValue('New Station')
+    await urlInput.setValue('https://www.prix-carburants.gouv.fr/station/77777')
+    await urlInput.trigger('blur')
+    await flushPromises()
+
+    expect(mockAddStation).toHaveBeenCalledOnce()
+    expect(wrapper.text()).not.toContain('Saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-31: Success message is per-row — editing one row does not affect another
+// ---------------------------------------------------------------------------
+
+describe('TC-31: Success message is per-row and does not appear on other rows', () => {
+  it('shows "Saved" only on the first row when the first row name is edited', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    const rows = wrapper.findAll('tr')
+    const firstDataRow = rows[1]
+    const secondDataRow = rows[2]
+
+    expect(firstDataRow.text()).toContain('Saved')
+    expect(secondDataRow.text()).not.toContain('Saved')
+  })
+})
