@@ -435,6 +435,42 @@ describe('TC-17: Input values are trimmed before validation and storage', () => 
 })
 
 // ---------------------------------------------------------------------------
+// TC-23: Blurring a name cell without changing the value does NOT call updateStation
+// ---------------------------------------------------------------------------
+
+describe('TC-23: Blurring a name input without editing does not call updateStation', () => {
+  it('does not call updateStation when the name value is unchanged on blur', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    // Trigger blur on the first name input without changing its value
+    const firstRowNameInput = wrapper.findAll('input')[0]
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(mockUpdateStation).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-24: Blurring a URL cell without changing the value does NOT call updateStation
+// ---------------------------------------------------------------------------
+
+describe('TC-24: Blurring a URL input without editing does not call updateStation', () => {
+  it('does not call updateStation when the URL value is unchanged on blur', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    // Trigger blur on the first URL input without changing its value
+    const firstRowUrlInput = wrapper.findAll('input')[1]
+    await firstRowUrlInput.trigger('blur')
+    await flushPromises()
+
+    expect(mockUpdateStation).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-22: Raw storage errors are not exposed verbatim in the UI
 // ---------------------------------------------------------------------------
 

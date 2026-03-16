@@ -166,6 +166,9 @@ async function onExistingNameBlur(index: number): Promise<void> {
     return
   }
 
+  const original = stations.value.find((s) => s.url === draft.originalUrl)
+  if (original && trimmed === original.name && draft.url.trim() === original.url) return
+
   await saveExistingRow(index, trimmed, draft.url.trim())
 }
 
@@ -184,6 +187,9 @@ async function onExistingUrlBlur(index: number): Promise<void> {
     revertDraftUrl(index)
     return
   }
+
+  const original = stations.value.find((s) => s.url === draft.originalUrl)
+  if (original && draft.name.trim() === original.name && trimmedUrl === original.url) return
 
   await saveExistingRow(index, draft.name.trim(), trimmedUrl)
 }
