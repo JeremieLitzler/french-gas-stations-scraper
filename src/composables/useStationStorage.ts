@@ -66,20 +66,21 @@ function filterValidStations(raw: unknown): Station[] {
   return raw.filter(isStation)
 }
 
-async function seedDefaults(): Promise<void> {
-  const seedList = [...DEFAULT_STATIONS]
-  await set(STATIONS_KEY, seedList)
-  stations.value = seedList
+function mergeWithDefaults(stored: Station[]): Station[] {
+  const storedUrls = new Set(stored.map((station) => station.url))
+  const missingDefaults = DEFAULT_STATIONS.filter((station) => !storedUrls.has(station.url))
+  return [...missingDefaults, ...stored]
 }
 
 async function loadStations(): Promise<void> {
   const stored = await get<unknown>(STATIONS_KEY)
   const validStations = filterValidStations(stored)
-  if (validStations.length > 0) {
-    stations.value = validStations
-    return
+  const merged = mergeWithDefaults(validStations)
+  const hasNewDefaults = merged.length > validStations.length
+  if (hasNewDefaults) {
+    await set(STATIONS_KEY, merged)
   }
-  await seedDefaults()
+  stations.value = merged
 }
 
 async function addStation(station: Station): Promise<void> {
