@@ -13,7 +13,7 @@
  * documented framework exception.
  */
 
-import { ref } from 'vue'
+import { ref, toRaw } from 'vue'
 import type { Ref } from 'vue'
 import type { Station } from '@/types/station'
 import { get, set } from '@/utils/indexedDb'
@@ -66,6 +66,15 @@ function filterValidStations(raw: unknown): Station[] {
   return raw.filter(isStation)
 }
 
+/**
+ * Strip Vue Proxy wrappers from every station before writing to IndexedDB.
+ * The structured clone algorithm used by IDB cannot serialize Proxy objects,
+ * so calling set() with reactive items would throw a DataCloneError.
+ */
+function toPlainStations(list: Station[]): Station[] {
+  return list.map((s) => ({ ...toRaw(s) }))
+}
+
 function mergeWithDefaults(stored: Station[]): Station[] {
   const storedUrls = new Set(stored.map((station) => station.url))
   const missingDefaults = DEFAULT_STATIONS.filter((station) => !storedUrls.has(station.url))
@@ -78,7 +87,7 @@ async function loadStations(): Promise<void> {
   const merged = mergeWithDefaults(validStations)
   const hasNewDefaults = merged.length > validStations.length
   if (hasNewDefaults) {
-    await set(STATIONS_KEY, merged)
+    await set(STATIONS_KEY, toPlainStations(merged))
   }
   stations.value = merged
 }
@@ -87,7 +96,7 @@ async function addStation(station: Station): Promise<void> {
   if (!isValidUrl(station.url)) throw new Error(`Invalid station URL: ${station.url}`)
   if (!isValidName(station.name)) throw new Error(`Invalid station name: ${station.name}`)
   const updated = [...stations.value, station]
-  await set(STATIONS_KEY, updated)
+  await set(STATIONS_KEY, toPlainStations(updated))
   stations.value = updated
 }
 
@@ -95,7 +104,7 @@ async function removeStation(url: string): Promise<void> {
   const filtered = stations.value.filter((station) => station.url !== url)
   const hasChanged = filtered.length !== stations.value.length
   if (!hasChanged) return
-  await set(STATIONS_KEY, filtered)
+  await set(STATIONS_KEY, toPlainStations(filtered))
   stations.value = filtered
 }
 
@@ -107,7 +116,7 @@ async function updateStation(originalUrl: string, updated: Station): Promise<voi
   const updatedList = stations.value.map((station, listIndex) =>
     listIndex === index ? updated : station,
   )
-  await set(STATIONS_KEY, updatedList)
+  await set(STATIONS_KEY, toPlainStations(updatedList))
   stations.value = updatedList
 }
 
