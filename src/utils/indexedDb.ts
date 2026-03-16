@@ -49,9 +49,16 @@ function runTransaction(
       request.onsuccess = () => {
         requestResult = request.result
       }
+      request.onerror = () => {
+        reject(request.error ?? new Error('IndexedDB request failed'))
+      }
       transaction.oncomplete = () => resolve(requestResult)
-      transaction.onerror = () => reject(transaction.error)
-      transaction.onabort = () => reject(transaction.error)
+      transaction.onerror = () => {
+        reject(transaction.error ?? new Error('IndexedDB transaction error'))
+      }
+      transaction.onabort = () => {
+        reject(transaction.error ?? new Error('IndexedDB transaction aborted'))
+      }
     })
   })
 }
