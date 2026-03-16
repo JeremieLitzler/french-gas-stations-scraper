@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="station-manager">
     <Table>
       <TableHeader>
         <TableRow :disable-hover="true">
@@ -72,7 +72,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import {
   Table,
@@ -97,7 +97,11 @@ interface RowDraft {
   rowError: string
 }
 
-const { stations, addStation, removeStation, updateStation } = useStationStorage()
+const { stations, loadStations, addStation, removeStation, updateStation } = useStationStorage()
+
+onMounted(async () => {
+  await loadStations()
+})
 
 const rowDrafts: Ref<RowDraft[]> = ref([])
 
@@ -262,6 +266,10 @@ async function onNewRowBlur(): Promise<void> {
 </script>
 
 <style scoped>
+.station-manager {
+  width: 100%;
+}
+
 .station-input {
   width: 100%;
   background: transparent;

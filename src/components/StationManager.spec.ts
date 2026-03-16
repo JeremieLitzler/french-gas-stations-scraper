@@ -19,6 +19,7 @@ const mockStations = ref([
   { name: 'Station B', url: 'https://www.prix-carburants.gouv.fr/station/22222' },
 ])
 
+const mockLoadStations = vi.fn().mockResolvedValue(undefined)
 const mockAddStation = vi.fn().mockResolvedValue(undefined)
 const mockRemoveStation = vi.fn().mockResolvedValue(undefined)
 const mockUpdateStation = vi.fn().mockResolvedValue(undefined)
@@ -26,7 +27,7 @@ const mockUpdateStation = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/composables/useStationStorage', () => ({
   useStationStorage: () => ({
     stations: mockStations,
-    loadStations: vi.fn().mockResolvedValue(undefined),
+    loadStations: mockLoadStations,
     addStation: mockAddStation,
     removeStation: mockRemoveStation,
     updateStation: mockUpdateStation,
@@ -42,6 +43,7 @@ beforeEach(() => {
     { name: 'Station A', url: 'https://www.prix-carburants.gouv.fr/station/11111' },
     { name: 'Station B', url: 'https://www.prix-carburants.gouv.fr/station/22222' },
   ]
+  mockLoadStations.mockResolvedValue(undefined)
   mockAddStation.mockResolvedValue(undefined)
   mockRemoveStation.mockResolvedValue(undefined)
   mockUpdateStation.mockResolvedValue(undefined)
@@ -62,6 +64,19 @@ function mountComponent() {
     },
   })
 }
+
+// ---------------------------------------------------------------------------
+// Bug fix: loadStations is called on mount
+// ---------------------------------------------------------------------------
+
+describe('loadStations is called on mount to seed defaults from IndexedDB', () => {
+  it('calls loadStations once when the component mounts', async () => {
+    mountComponent()
+    await flushPromises()
+
+    expect(mockLoadStations).toHaveBeenCalledOnce()
+  })
+})
 
 // ---------------------------------------------------------------------------
 // TC-01: Station list renders all existing stations
