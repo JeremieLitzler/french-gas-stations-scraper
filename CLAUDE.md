@@ -130,7 +130,7 @@ npm test
 
 ## Shell commands — use `rtk` wrappers
 
-Prefer `rtk` over raw commands for token-efficient output.
+**Always** use `rtk` for the commands listed below — never the bare equivalent. These are the commands auto-approved in `.claude/settings.local.json`; running them without `rtk` will trigger a permission prompt on every call.
 
 ### Git
 
