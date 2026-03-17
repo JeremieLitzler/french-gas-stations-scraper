@@ -11,7 +11,10 @@
       "Bash(rtk git checkout:*)",
       "Bash(rtk npm run:*)",
       "Bash(rtk ls:*)",
-      "Bash(rtk lint:*)"
+      "Bash(rtk lint:*)",
+      "Bash(npm run:*)",
+      "Bash(rtk vitest:*)",
+      "Bash(npx vitest:*)"
     ]
   }
 }
