@@ -29,7 +29,13 @@ Each rule must state:
 
 - **What** must be enforced
 - **Where** (which file or layer it applies to)
-- **Why** (the attack vector or risk it mitigates)
+- **Why** (the attack vector or risk it mitigates — one sentence max)
+
+**Conciseness rules (strictly enforced):**
+- Skip any scope area (dependencies, secrets, CORS, etc.) not touched by this feature. Do not write "N/A" rules.
+- Do not include rules already enforced project-wide by an existing ADR — cite the ADR by number if it is relevant.
+- Do not restate constraints already present in `business-specifications.md`.
+- Target **4–6 rules maximum**. A feature with a small attack surface may only need 2–3.
 
 Do NOT prescribe implementation details. No function signatures, no code snippets, no variable names. State the constraint and the reason.
 
