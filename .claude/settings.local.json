@@ -1,19 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run test:*)",
-      "Bash(npm run build:*)",
-      "Bash(npm run lint:*)",
-      "Bash(npm run type-check:*)",
-      "Bash(npm run format:*)",
+      "Bash(rtk npm run test:*)",
+      "Bash(rtk npm run build:*)",
+      "Bash(rtk npm run lint:*)",
+      "Bash(rtk npm run type-check:*)",
+      "Bash(rtk npm run format:*)",
       "Bash(rtk gh issue:*)",
       "Bash(rtk git:*)",
       "Bash(rtk gh pr:*)",
       "Bash(rtk gh api:*)",
       "Bash(powershell:*)",
-      "Bash(git pull:*)",
-      "Bash(git checkout:*)",
-      "Bash(npm run:*)"
+      "Bash(rtk git pull:*)",
+      "Bash(rtk git checkout:*)",
+      "Bash(rtk npm run:*)",
+      "Bash(rtk ls:*)"
     ]
   }
 }
