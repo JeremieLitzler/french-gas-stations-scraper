@@ -33,9 +33,10 @@ const DEFAULT_STATIONS: readonly Station[] = [
   { name: 'à SUPER U SAINT-DONAT', url: 'https://www.prix-carburants.gouv.fr/station/26260001' },
 ]
 
-export function useStationStorage() {
-  const stations: Ref<Station[]> = ref([])
+// Module-level ref — all consumers share the same reactive state (ADR-002 singleton pattern).
+const stations: Ref<Station[]> = ref([])
 
+export function useStationStorage() {
   const ALLOWED_PATH_PREFIX = '/station/'
 
   const isValidUrl = (rawUrl: string): boolean => {
