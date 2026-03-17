@@ -1,8 +1,14 @@
 /**
- * Tests for the index page — warning display and loading indicator.
+ * Tests for the index page — warning display, Suspense wiring, and loading indicator.
  *
  * useStationPrices is mocked so tests control reactive state directly.
- * useStationStorage is mocked to prevent IndexedDB calls from onMounted.
+ * useStationStorage is mocked to prevent IndexedDB calls from async setup.
+ *
+ * TC-08: AppLoader fallback is shown during Suspense suspension.
+ * TC-09: Content is visible after async initialisation completes.
+ * TC-10: StationManager does not render an AppLoader internally.
+ * TC-12: Warning messages rendered in the UI include station name and URL.
+ * TC-13: No warning messages rendered when warnings list is empty.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -55,6 +61,71 @@ beforeEach(() => {
   mockIsLoading.value = false
   mockFetchCompleted.value = false
   mockLoadAllStationPrices.mockClear()
+})
+
+// ---------------------------------------------------------------------------
+// TC-08: AppLoader fallback is shown when children are suspended
+// ---------------------------------------------------------------------------
+
+describe('TC-08: AppLoader fallback is rendered inside <Suspense> when children suspend', () => {
+  it('renders the AppLoader stub before async setup resolves (synchronous check before flushPromises)', async () => {
+    const IndexPage = (await import('./index.vue')).default
+    const wrapper = mount(IndexPage, {
+      global: { stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } } },
+    })
+
+    // Before promises settle, the Suspense fallback (AppLoader) should be present
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-09: Content visible after async initialisation completes
+// ---------------------------------------------------------------------------
+
+describe('TC-09: StationPrices content is visible after Suspense resolves', () => {
+  it('renders the prices section after async setup resolves', async () => {
+    const IndexPage = (await import('./index.vue')).default
+    const wrapper = mount(IndexPage, {
+      global: { stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } } },
+    })
+    await flushPromises()
+
+    // After setup resolves, the Suspense fallback is gone and content is shown
+    expect(wrapper.find('.station-prices').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-10: StationManager does not render an AppLoader internally
+// ---------------------------------------------------------------------------
+
+describe('TC-10: StationManager does not render an AppLoader inside itself', () => {
+  it('does not find an AppLoader component inside StationManager', async () => {
+    const IndexPage = (await import('./index.vue')).default
+    const wrapper = mount(IndexPage, {
+      global: {
+        stubs: {
+          AppLoader: { template: '<div class="app-loader-stub" />' },
+          // Do not stub StationManager so we can inspect its internals
+          AppLink: { template: '<a><slot /></a>' },
+          Table: { template: '<table><slot /></table>' },
+          TableHeader: { template: '<thead><slot /></thead>' },
+          TableBody: { template: '<tbody><slot /></tbody>' },
+          TableRow: { template: '<tr><slot /></tr>' },
+          TableHead: { template: '<th><slot /></th>' },
+          TableCell: { template: '<td><slot /></td>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    const stationManager = wrapper.findComponent({ name: 'StationManager' })
+    expect(stationManager.exists()).toBe(true)
+    // AppLoader is not rendered inside StationManager — it has no loading indicator
+    const loaderInsideManager = stationManager.findComponent({ name: 'AppLoader' })
+    expect(loaderInsideManager.exists()).toBe(false)
+  })
 })
 
 // ---------------------------------------------------------------------------
