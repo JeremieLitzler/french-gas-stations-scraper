@@ -147,6 +147,12 @@ When running shell commands, prefer rtk equivalents to reduce token usage (use t
 
 Prefer the dedicated Read/Glob/Grep tools over shell commands when available.
 
+## Composable Caller Responsibility
+
+Composables must never self-trigger data fetching on init. The caller component is always responsible for invoking fetch actions. Never call a fetch action inside a composable's own setup or initialisation — only expose it for the component to call.
+
+Never call a composable inside a plain or async function within another composable. Composables must only be called at the top level of `setup()`. If a composable needs data from another, the caller component calls both in `setup()` and passes the data as a parameter to the action that needs it.
+
 ## Shell Command Retry Limit
 
 Do not execute more than **3 failing shell commands in total** — whether retrying the same command or trying a different one. After 3 failed executions, stop immediately and report the full error output to the orchestrator.
