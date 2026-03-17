@@ -2,7 +2,6 @@
   <div class="station-prices">
     <h2 class="text-xl font-semibold mb-1">Prices</h2>
     <p class="mb-4">Change fuel type to your need</p>
-    <AppLoader v-if="isLoading" />
     <p v-if="showFetchSuccess" class="fetch-success" role="status">
       Scraping complete.
     </p>
@@ -12,7 +11,7 @@
         (<a :href="warning.url" target="_blank" rel="noopener noreferrer">{{ warning.url }}</a>).
       </li>
     </ul>
-    <template v-if="!isLoading && availableFuelTypes.length > 0">
+    <template v-if="availableFuelTypes.length > 0">
       <div class="fuel-type-selector" role="group" aria-label="Fuel type selector">
         <button
           v-for="fuelType in availableFuelTypes"
@@ -42,9 +41,8 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import AppLoader from '@/components/AppLoader.vue'
+<script async setup lang="ts">
+import { computed, onUnmounted, ref, watch } from 'vue'
 import {
   Table,
   TableBody,
@@ -61,7 +59,7 @@ import type { PriceRow } from '@/types'
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
 const { stations, loadStations } = useStationStorage()
-const { isLoading, results, warnings, fetchCompleted, loadAllStationPrices } = useStationPrices()
+const { results, warnings, fetchCompleted, loadAllStationPrices } = useStationPrices()
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
@@ -103,10 +101,8 @@ watch(fetchCompleted, (completed) => {
   scheduleDismiss()
 })
 
-onMounted(async () => {
-  await loadStations();
-  await loadAllStationPrices(stations.value)
-})
+await loadStations()
+await loadAllStationPrices(stations.value)
 
 onUnmounted(() => {
   clearDismissTimer()

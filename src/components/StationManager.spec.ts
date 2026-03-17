@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { ref } from 'vue'
+import { defineComponent, ref } from 'vue'
 import StationManager from './StationManager.vue'
 
 // ---------------------------------------------------------------------------
@@ -50,8 +50,17 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+/**
+ * Mount StationManager inside a <Suspense> boundary.
+ * StationManager uses a top-level await in <script setup> — Vue requires
+ * a Suspense ancestor or the component will not render its content.
+ */
 function mountComponent() {
-  return mount(StationManager, {
+  const Wrapper = defineComponent({
+    components: { StationManager },
+    template: '<Suspense><StationManager /></Suspense>',
+  })
+  return mount(Wrapper, {
     global: {
       stubs: {
         AppLink: { template: '<a><slot /></a>' },

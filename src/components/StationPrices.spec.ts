@@ -1,16 +1,20 @@
 /**
  * Tests for the StationPrices component.
  *
- * TC-01 through TC-03 (issue #30 loader fix) and TC-11 through TC-24.
+ * TC-11 through TC-24 (existing) and TC-07 (Suspense: no internal loader).
  *
  * Both `useStationPrices` and `useStationStorage` are mocked so tests
- * fully control reactive state (isLoading, results, warnings, fetchCompleted)
+ * fully control reactive state (results, warnings, fetchCompleted)
  * without network calls or IndexedDB.
+ *
+ * StationPrices uses a top-level await in <script setup> and must be
+ * mounted inside a <Suspense> boundary. mountComponent() wraps the
+ * component in a Suspense parent automatically.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { nextTick, ref } from 'vue'
+import { defineComponent, nextTick, ref } from 'vue'
 import type { StationData } from '@/types/station-data'
 import type { StationWarning } from '@/types/station-warning'
 import StationPrices from './StationPrices.vue'
@@ -19,7 +23,6 @@ import StationPrices from './StationPrices.vue'
 // Shared mock state — mutated per test in beforeEach
 // ---------------------------------------------------------------------------
 
-const mockIsLoading = ref(false)
 const mockResults = ref<StationData[]>([])
 const mockWarnings = ref<StationWarning[]>([])
 const mockFetchCompleted = ref(false)
@@ -27,7 +30,6 @@ const mockLoadAllStationPrices = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/composables/useStationPrices', () => ({
   useStationPrices: () => ({
-    isLoading: mockIsLoading,
     results: mockResults,
     warnings: mockWarnings,
     fetchCompleted: mockFetchCompleted,
@@ -55,20 +57,28 @@ function makeStation(name: string, fuels: { type: string; price: number | null }
   return { stationName: name, fuels }
 }
 
+const sharedStubs = {
+  AppLink: { template: '<a><slot /></a>' },
+  Table: { template: '<table><slot /></table>' },
+  TableHeader: { template: '<thead><slot /></thead>' },
+  TableBody: { template: '<tbody><slot /></tbody>' },
+  TableRow: { template: '<tr><slot /></tr>' },
+  TableHead: { template: '<th><slot /></th>' },
+  TableCell: { template: '<td><slot /></td>' },
+}
+
+/**
+ * Mount StationPrices inside a <Suspense> boundary.
+ * StationPrices uses a top-level await — Vue requires a Suspense ancestor.
+ * After mounting, flush promises so async setup resolves.
+ */
 function mountComponent() {
-  return mount(StationPrices, {
-    global: {
-      stubs: {
-        AppLoader: { template: '<div class="app-loader-stub" />' },
-        AppLink: { template: '<a><slot /></a>' },
-        Table: { template: '<table><slot /></table>' },
-        TableHeader: { template: '<thead><slot /></thead>' },
-        TableBody: { template: '<tbody><slot /></tbody>' },
-        TableRow: { template: '<tr><slot /></tr>' },
-        TableHead: { template: '<th><slot /></th>' },
-        TableCell: { template: '<td><slot /></td>' },
-      },
-    },
+  const Wrapper = defineComponent({
+    components: { StationPrices },
+    template: '<Suspense><StationPrices /></Suspense>',
+  })
+  return mount(Wrapper, {
+    global: { stubs: sharedStubs },
   })
 }
 
@@ -78,7 +88,6 @@ function mountComponent() {
  * the component is mounted, so we must set results post-mount to trigger it.
  */
 async function mountWithResults(stations: StationData[]) {
-  mockIsLoading.value = false
   mockResults.value = []
   const wrapper = mountComponent()
   await flushPromises()
@@ -96,7 +105,6 @@ async function mountWithResults(stations: StationData[]) {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  mockIsLoading.value = false
   mockResults.value = []
   mockWarnings.value = []
   mockFetchCompleted.value = false
@@ -106,27 +114,43 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
-// TC-11 — Selector is not rendered during loading
+// TC-07 — Suspense: StationPrices does not render an internal AppLoader
 // ---------------------------------------------------------------------------
 
-describe('TC-11: fuel-type selector is hidden while loading', () => {
-  it('does not render the selector when isLoading is true', async () => {
-    mockIsLoading.value = true
+describe('TC-07: StationPrices does not render an AppLoader internally', () => {
+  it('does not render any AppLoader inside StationPrices after setup resolves', async () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    expect(wrapper.find('.fuel-type-selector').exists()).toBe(false)
-    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
+    // AppLoader is not imported or rendered inside StationPrices anymore
+    const loaderStub = wrapper.findComponent({ name: 'AppLoader' })
+    expect(loaderStub.exists()).toBe(false)
+    const loaderDiv = wrapper.find('[data-app-loader]')
+    expect(loaderDiv.exists()).toBe(false)
   })
 })
 
 // ---------------------------------------------------------------------------
-// TC-12 — Table is not rendered during loading
+// TC-11 — Selector is not rendered when results are empty
 // ---------------------------------------------------------------------------
 
-describe('TC-12: price table is hidden while loading', () => {
-  it('does not render a table when isLoading is true', async () => {
-    mockIsLoading.value = true
+describe('TC-11: fuel-type selector is hidden when results are empty', () => {
+  it('does not render the selector when results is empty', async () => {
+    mockResults.value = []
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('.fuel-type-selector').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-12 — Table is not rendered when results are empty
+// ---------------------------------------------------------------------------
+
+describe('TC-12: price table is hidden when results are empty', () => {
+  it('does not render a table when results is empty', async () => {
+    mockResults.value = []
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -139,8 +163,7 @@ describe('TC-12: price table is hidden while loading', () => {
 // ---------------------------------------------------------------------------
 
 describe('TC-13: selector and table appear after loading with results', () => {
-  it('renders the selector and table when loading is false and results are non-empty', async () => {
-    mockIsLoading.value = false
+  it('renders the selector and table when results are non-empty', async () => {
     mockResults.value = [
       makeStation('Station A', [{ type: 'SP95', price: 1.85 }]),
     ]
@@ -149,7 +172,6 @@ describe('TC-13: selector and table appear after loading with results', () => {
 
     expect(wrapper.find('.fuel-type-selector').exists()).toBe(true)
     expect(wrapper.find('table').exists()).toBe(true)
-    expect(wrapper.find('.app-loader-stub').exists()).toBe(false)
   })
 })
 
@@ -159,7 +181,6 @@ describe('TC-13: selector and table appear after loading with results', () => {
 
 describe('TC-14: no selector or table when results are empty after loading', () => {
   it('renders neither selector nor table when results is empty', async () => {
-    mockIsLoading.value = false
     mockResults.value = []
     const wrapper = mountComponent()
     await flushPromises()
@@ -261,7 +282,6 @@ describe('TC-18: all stations are shown in the table regardless of fuel type', (
 
 describe('TC-19: table has exactly two header columns', () => {
   it('renders Station Name and Price header cells', async () => {
-    mockIsLoading.value = false
     mockResults.value = [
       makeStation('Station A', [{ type: 'SP95', price: 1.85 }]),
     ]
@@ -283,7 +303,6 @@ describe('TC-19: table has exactly two header columns', () => {
 
 describe('TC-20: all available fuel type buttons are rendered', () => {
   it('renders one button per available fuel type', async () => {
-    mockIsLoading.value = false
     mockResults.value = [
       makeStation('Station A', [
         { type: 'SP95', price: 1.85 },
@@ -310,7 +329,6 @@ describe('TC-20: all available fuel type buttons are rendered', () => {
 
 describe('TC-21: no <select> element is used for the fuel type selector', () => {
   it('does not render a <select> element', async () => {
-    mockIsLoading.value = false
     mockResults.value = [
       makeStation('Station A', [{ type: 'SP95', price: 1.85 }]),
     ]
@@ -347,7 +365,6 @@ describe('TC-22: table renders even when all stations have null prices', () => {
 
 describe('TC-23: selected fuel type resets when results change', () => {
   it('resets to the first fuel type from the new results', async () => {
-    mockIsLoading.value = false
     mockResults.value = [
       makeStation('Station A', [
         { type: 'SP95', price: 1.85 },
@@ -392,69 +409,5 @@ describe('TC-24: station names are rendered as text, not parsed as HTML', () => 
     expect(stationCell).toBeDefined()
     // No actual <script> child was injected
     expect(wrapper.find('script').exists()).toBe(false)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// TC-01 — Loader is visible when isLoading is true
-// ---------------------------------------------------------------------------
-
-describe('TC-01: loader is visible when isLoading is true', () => {
-  it('renders AppLoader in the DOM when isLoading is true', async () => {
-    mockIsLoading.value = true
-    const wrapper = mountComponent()
-    await flushPromises()
-
-    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// TC-02 — Loader is hidden when isLoading is false
-// ---------------------------------------------------------------------------
-
-describe('TC-02: loader is absent from the DOM when isLoading is false', () => {
-  it('does not render AppLoader when isLoading is false', async () => {
-    mockIsLoading.value = false
-    const wrapper = mountComponent()
-    await flushPromises()
-
-    expect(wrapper.find('.app-loader-stub').exists()).toBe(false)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// TC-03 — Loader receives no custom CSS class from StationPrices
-// ---------------------------------------------------------------------------
-
-const DEFAULT_LOADER_CLASS =
-  'absolute top-1/2 transform -translate-y-1/2 left-1/2 -translate-x-1/2 flex justify-center items-center w-full h-screen bg-background bg-opacity-90 z-50'
-
-describe('TC-03: AppLoader rendered by StationPrices uses default class only', () => {
-  it('applies the default Tailwind class string and not a bare unstyled identifier', async () => {
-    mockIsLoading.value = true
-    const wrapper = mount(StationPrices, {
-      global: {
-        stubs: {
-          // Use the real AppLoader — no stub — so we can inspect its class
-          'iconify-icon': true,
-          AppLink: { template: '<a><slot /></a>' },
-          Table: { template: '<table><slot /></table>' },
-          TableHeader: { template: '<thead><slot /></thead>' },
-          TableBody: { template: '<tbody><slot /></tbody>' },
-          TableRow: { template: '<tr><slot /></tr>' },
-          TableHead: { template: '<th><slot /></th>' },
-          TableCell: { template: '<td><slot /></td>' },
-        },
-      },
-    })
-    await flushPromises()
-
-    // The first div inside the loader wrapper carries the cssClass binding
-    const loaderWrapper = wrapper.findComponent({ name: 'AppLoader' })
-    expect(loaderWrapper.exists()).toBe(true)
-    const loaderDiv = loaderWrapper.find('div')
-    expect(loaderDiv.attributes('class')).toBe(DEFAULT_LOADER_CLASS)
-    expect(loaderDiv.attributes('class')).not.toContain('fetch-loader')
   })
 })

@@ -74,8 +74,8 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
+<script async setup lang="ts">
+import { reactive, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import {
   Table,
@@ -103,9 +103,7 @@ interface RowDraft {
 
 const { stations, loadStations, addStation, removeStation, updateStation } = useStationStorage()
 
-onMounted(async () => {
-  await loadStations()
-})
+await loadStations()
 
 const rowDrafts: Ref<RowDraft[]> = ref([])
 
