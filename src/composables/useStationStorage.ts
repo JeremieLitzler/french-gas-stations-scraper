@@ -7,7 +7,7 @@
  * Persistence is handled via a thin IndexedDB wrapper (ADR-008).
  * All input is validated before being stored (security-guidelines.md).
  *
- * Object Calisthenics exception: the composable function body exceeds
+ * Object Calisthenics exception: the composable const body exceeds
  * five lines because Vue composable conventions require grouping all
  * returned reactive state and operations in one function — this is a
  * documented framework exception.
@@ -33,100 +33,94 @@ const DEFAULT_STATIONS: readonly Station[] = [
   { name: 'à SUPER U SAINT-DONAT', url: 'https://www.prix-carburants.gouv.fr/station/26260001' },
 ]
 
-const stations: Ref<Station[]> = ref([])
+export function useStationStorage() {
+  const stations: Ref<Station[]> = ref([])
 
-const ALLOWED_PATH_PREFIX = '/station/'
+  const ALLOWED_PATH_PREFIX = '/station/'
 
-function isValidUrl(rawUrl: string): boolean {
-  try {
-    const parsed = new URL(rawUrl)
-    return parsed.origin === ALLOWED_ORIGIN && parsed.pathname.startsWith(ALLOWED_PATH_PREFIX)
-  } catch {
-    return false
+  const isValidUrl = (rawUrl: string): boolean => {
+    try {
+      const parsed = new URL(rawUrl)
+      return parsed.origin === ALLOWED_ORIGIN && parsed.pathname.startsWith(ALLOWED_PATH_PREFIX)
+    } catch {
+      return false
+    }
   }
-}
 
-function stripHtmlTags(text: string): string {
-  return text.replace(/<[^>]*>/g, '')
-}
-
-function isValidName(name: string): boolean {
-  const stripped = stripHtmlTags(name)
-  return stripped === name && name.trim().length > 0 && name.length <= MAX_NAME_LENGTH
-}
-
-function isStation(value: unknown): value is Station {
-  if (typeof value !== 'object' || value === null) return false
-  const candidate = value as Record<string, unknown>
-  return typeof candidate.name === 'string' && typeof candidate.url === 'string'
-}
-
-function filterValidStations(raw: unknown): Station[] {
-  if (!Array.isArray(raw)) return []
-  return raw.filter(isStation)
-}
-
-/**
- * Strip Vue Proxy wrappers from every station before writing to IndexedDB.
- * The structured clone algorithm used by IDB cannot serialize Proxy objects,
- * so calling set() with reactive items would throw a DataCloneError.
- */
-function toPlainStations(list: Station[]): Station[] {
-  return list.map((s) => ({ ...toRaw(s) }))
-}
-
-function mergeWithDefaults(stored: Station[]): Station[] {
-  const storedUrls = new Set(stored.map((station) => station.url))
-  const missingDefaults = DEFAULT_STATIONS.filter((station) => !storedUrls.has(station.url))
-  return [...missingDefaults, ...stored]
-}
-
-async function loadStations(): Promise<void> {
-  const stored = await get<unknown>(STATIONS_KEY)
-  const validStations = filterValidStations(stored)
-  const merged = mergeWithDefaults(validStations)
-  const hasNewDefaults = merged.length > validStations.length
-  if (hasNewDefaults) {
-    await set(STATIONS_KEY, toPlainStations(merged))
+  const stripHtmlTags = (text: string): string => {
+    return text.replace(/<[^>]*>/g, '')
   }
-  stations.value = merged
-}
 
-async function addStation(station: Station): Promise<void> {
-  if (!isValidUrl(station.url)) throw new Error(`Invalid station URL: ${station.url}`)
-  if (!isValidName(station.name)) throw new Error(`Invalid station name: ${station.name}`)
-  const updated = [...stations.value, station]
-  await set(STATIONS_KEY, toPlainStations(updated))
-  stations.value = updated
-}
+  const isValidName = (name: string): boolean => {
+    const stripped = stripHtmlTags(name)
+    return stripped === name && name.trim().length > 0 && name.length <= MAX_NAME_LENGTH
+  }
 
-async function removeStation(url: string): Promise<void> {
-  const filtered = stations.value.filter((station) => station.url !== url)
-  const hasChanged = filtered.length !== stations.value.length
-  if (!hasChanged) return
-  await set(STATIONS_KEY, toPlainStations(filtered))
-  stations.value = filtered
-}
+  const isStation = (value: unknown): value is Station => {
+    if (typeof value !== 'object' || value === null) return false
+    const candidate = value as Record<string, unknown>
+    return typeof candidate.name === 'string' && typeof candidate.url === 'string'
+  }
 
-async function updateStation(originalUrl: string, updated: Station): Promise<void> {
-  if (!isValidUrl(updated.url)) throw new Error(`Invalid station URL: ${updated.url}`)
-  if (!isValidName(updated.name)) throw new Error(`Invalid station name: ${updated.name}`)
-  const index = stations.value.findIndex((station) => station.url === originalUrl)
-  if (index === -1) return
-  const updatedList = stations.value.map((station, listIndex) =>
-    listIndex === index ? updated : station,
-  )
-  await set(STATIONS_KEY, toPlainStations(updatedList))
-  stations.value = updatedList
-}
+  const filterValidStations = (raw: unknown): Station[] => {
+    if (!Array.isArray(raw)) return []
+    return raw.filter(isStation)
+  }
 
-export function useStationStorage(): {
-  stations: Ref<Station[]>
-  loadStations: () => Promise<void>
-  addStation: (station: Station) => Promise<void>
-  removeStation: (url: string) => Promise<void>
-  updateStation: (originalUrl: string, updated: Station) => Promise<void>
-} {
+  /**
+   * Strip Vue Proxy wrappers from every station before writing to IndexedDB.
+   * The structured clone algorithm used by IDB cannot serialize Proxy objects,
+   * so calling set() with reactive items would throw a DataCloneError.
+   */
+  const toPlainStations = (list: Station[]): Station[] => {
+    return list.map((s) => ({ ...toRaw(s) }))
+  }
+
+  const mergeWithDefaults = (stored: Station[]): Station[] => {
+    const storedUrls = new Set(stored.map((station) => station.url))
+    const missingDefaults = DEFAULT_STATIONS.filter((station) => !storedUrls.has(station.url))
+    return [...missingDefaults, ...stored]
+  }
+
+  const loadStations = async (): Promise<void> => {
+    const stored = await get<unknown>(STATIONS_KEY)
+    const validStations = filterValidStations(stored)
+    const merged = mergeWithDefaults(validStations)
+    const hasNewDefaults = merged.length > validStations.length
+    if (hasNewDefaults) {
+      await set(STATIONS_KEY, toPlainStations(merged))
+    }
+    stations.value = merged
+  }
+
+  const addStation = async (station: Station): Promise<void> => {
+    if (!isValidUrl(station.url)) throw new Error(`Invalid station URL: ${station.url}`)
+    if (!isValidName(station.name)) throw new Error(`Invalid station name: ${station.name}`)
+    const updated = [...stations.value, station]
+    await set(STATIONS_KEY, toPlainStations(updated))
+    stations.value = updated
+  }
+
+  const removeStation = async (url: string): Promise<void> => {
+    const filtered = stations.value.filter((station) => station.url !== url)
+    const hasChanged = filtered.length !== stations.value.length
+    if (!hasChanged) return
+    await set(STATIONS_KEY, toPlainStations(filtered))
+    stations.value = filtered
+  }
+
+  const updateStation = async (originalUrl: string, updated: Station): Promise<void> => {
+    if (!isValidUrl(updated.url)) throw new Error(`Invalid station URL: ${updated.url}`)
+    if (!isValidName(updated.name)) throw new Error(`Invalid station name: ${updated.name}`)
+    const index = stations.value.findIndex((station) => station.url === originalUrl)
+    if (index === -1) return
+    const updatedList = stations.value.map((station, listIndex) =>
+      listIndex === index ? updated : station,
+    )
+    await set(STATIONS_KEY, toPlainStations(updatedList))
+    stations.value = updatedList
+  }
+
   return {
     stations,
     loadStations,

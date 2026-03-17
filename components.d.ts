@@ -52,6 +52,7 @@ declare module 'vue' {
     Separator: typeof import('./src/components/ui/separator/Separator.vue')['default']
     Settings2: typeof import('./src/components/ui/icon/Settings2.vue')['default']
     StationManager: typeof import('./src/components/StationManager.vue')['default']
+    StationPrices: typeof import('./src/components/StationPrices.vue')['default']
     SunMedium: typeof import('./src/components/ui/icon/SunMedium.vue')['default']
     Table: typeof import('./src/components/ui/table/Table.vue')['default']
     TableBody: typeof import('./src/components/ui/table/TableBody.vue')['default']

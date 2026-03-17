@@ -120,6 +120,9 @@ declare global {
   export type { StationData } from './src/types/station-data'
   import('./src/types/station-data')
   // @ts-ignore
+  export type { StationWarning } from './src/types/station-warning'
+  import('./src/types/station-warning')
+  // @ts-ignore
   export type { Station } from './src/types/station'
   import('./src/types/station')
 }

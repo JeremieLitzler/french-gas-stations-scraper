@@ -18,6 +18,7 @@ import type { StationWarning } from '../types/station-warning'
 const mockResults = ref<StationData[]>([])
 const mockWarnings = ref<StationWarning[]>([])
 const mockIsLoading = ref(false)
+const mockFetchCompleted = ref(false)
 const mockLoadAllStationPrices = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/composables/useStationPrices', () => ({
@@ -25,6 +26,7 @@ vi.mock('@/composables/useStationPrices', () => ({
     results: mockResults,
     warnings: mockWarnings,
     isLoading: mockIsLoading,
+    fetchCompleted: mockFetchCompleted,
     loadAllStationPrices: mockLoadAllStationPrices,
   }),
 }))
@@ -51,6 +53,7 @@ beforeEach(() => {
   mockResults.value = []
   mockWarnings.value = []
   mockIsLoading.value = false
+  mockFetchCompleted.value = false
   mockLoadAllStationPrices.mockClear()
 })
 
