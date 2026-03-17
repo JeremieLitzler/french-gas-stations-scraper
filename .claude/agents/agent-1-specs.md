@@ -25,6 +25,12 @@ A good spec describes WHAT the system does: goals, rules, constraints, and obser
 
 Use the Example Mapping method from the Agile community to write specifications.
 
+**Conciseness rules (strictly enforced):**
+- Write at most **1 example per rule**. If the rule is self-evident from its description, omit the example entirely.
+- Integrate edge cases directly into the rule they qualify. Do not create a standalone Edge Cases section.
+- Do not repeat information from CLAUDE.md, existing ADRs, or the README. Reference them by name instead.
+- Target **60 lines maximum** for the output file. Cut rules that only restate technology decisions already captured in CLAUDE.md or ADRs.
+
 Ask up to 10 clarifying questions about architecture, edge cases, and dependencies to the human if needed. **DO NOT TRY TO GUESS**.
 
 Do NOT include any of the following in a spec:
