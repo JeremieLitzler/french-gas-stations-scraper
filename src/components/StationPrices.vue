@@ -2,7 +2,7 @@
   <div class="station-prices">
     <h2 class="text-xl font-semibold mb-1">Prices</h2>
     <p class="mb-4">Change fuel type to your need</p>
-    <AppLoader v-if="isLoading" css-class="fetch-loader" />
+    <AppLoader v-if="isLoading" />
     <p v-if="showFetchSuccess" class="fetch-success" role="status">
       Scraping complete.
     </p>
