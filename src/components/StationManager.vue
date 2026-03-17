@@ -1,5 +1,7 @@
 <template>
   <div class="station-manager">
+    <h2 class="text-xl font-semibold mb-1">Station List</h2>
+    <p class="mb-4">Edit the list of station by giving a name and the link from <AppLink href="https://www.prix-carburants.gouv.fr/" target="_blank" rel="noopener">https://www.prix-carburants.gouv.fr/</AppLink></p>
     <Table>
       <TableHeader>
         <TableRow :disable-hover="true">
@@ -9,6 +11,31 @@
         </TableRow>
       </TableHeader>
       <TableBody>
+        <TableRow :disable-hover="true">
+          <TableCell>
+            <input
+              class="station-input"
+              type="text"
+              :value="newName"
+              placeholder="Station name"
+              @input="onNewNameInput($event)"
+              @blur="onNewRowBlur"
+            />
+            <span v-if="newNameError" class="field-error">{{ newNameError }}</span>
+          </TableCell>
+          <TableCell>
+            <input
+              class="station-input"
+              type="text"
+              :value="newUrl"
+              placeholder="https://www.prix-carburants.gouv.fr/station/..."
+              @input="onNewUrlInput($event)"
+              @blur="onNewRowBlur"
+            />
+            <span v-if="newUrlError" class="field-error">{{ newUrlError }}</span>
+          </TableCell>
+          <TableCell></TableCell>
+        </TableRow>
         <TableRow
           v-for="(draft, index) in rowDrafts"
           :key="draft.originalUrl"
@@ -41,31 +68,6 @@
             <span v-if="draft.rowError" class="field-error">{{ draft.rowError }}</span>
             <span v-if="rowSuccessMap[draft.originalUrl]" class="field-success">Saved</span>
           </TableCell>
-        </TableRow>
-        <TableRow :disable-hover="true">
-          <TableCell>
-            <input
-              class="station-input"
-              type="text"
-              :value="newName"
-              placeholder="Station name"
-              @input="onNewNameInput($event)"
-              @blur="onNewRowBlur"
-            />
-            <span v-if="newNameError" class="field-error">{{ newNameError }}</span>
-          </TableCell>
-          <TableCell>
-            <input
-              class="station-input"
-              type="text"
-              :value="newUrl"
-              placeholder="https://www.prix-carburants.gouv.fr/station/..."
-              @input="onNewUrlInput($event)"
-              @blur="onNewRowBlur"
-            />
-            <span v-if="newUrlError" class="field-error">{{ newUrlError }}</span>
-          </TableCell>
-          <TableCell></TableCell>
         </TableRow>
       </TableBody>
     </Table>

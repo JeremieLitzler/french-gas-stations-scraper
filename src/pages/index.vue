@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col w-full">
-    <StationManager />
     <StationPrices />
+    <StationManager />
   </div>
 </template>
 

@@ -117,6 +117,9 @@ declare global {
   export type { FuelPrice } from './src/types/index'
   import('./src/types/index')
   // @ts-ignore
+  export type { PriceRow } from './src/types/price-row'
+  import('./src/types/price-row')
+  // @ts-ignore
   export type { StationData } from './src/types/station-data'
   import('./src/types/station-data')
   // @ts-ignore
