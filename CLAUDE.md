@@ -130,7 +130,7 @@ npm test
 
 ## Shell commands — use `rtk` wrappers
 
-Prefer `rtk` over raw commands for token-efficient output. The commands below are auto-approved in `.claude/settings.local.json` and will not prompt for permission.
+Prefer `rtk` over raw commands for token-efficient output.
 
 ### Git
 
@@ -138,11 +138,10 @@ Prefer `rtk` over raw commands for token-efficient output. The commands below ar
 rtk git status          # compact status
 rtk git log -n 10       # one-line commits
 rtk git diff            # condensed diff
-rtk git add <files>     # -> "ok"
+rtk git add             # -> "ok"
 rtk git commit -m "msg" # -> "ok abc1234"
-rtk git push origin <branch>
-rtk git pull origin <branch>
-rtk git checkout <branch>
+rtk git push            # -> "ok main"
+rtk git pull            # -> "ok 3 files +10 -2"
 ```
 
 ### GitHub CLI
@@ -150,25 +149,39 @@ rtk git checkout <branch>
 ```bash
 rtk gh pr list          # compact PR listing
 rtk gh pr view 42       # PR details + checks
-rtk gh pr create        # open a PR
-rtk gh pr merge <url>   # merge a PR
 rtk gh issue list       # compact issue listing
-rtk gh issue create     # create an issue
-rtk gh api <endpoint>   # raw API call
+rtk gh run list         # workflow run status
 ```
 
-### npm scripts
+### Build & lint
 
 ```bash
-rtk npm run test        # run tests
-rtk npm run build       # production build
-rtk npm run lint        # ESLint
-rtk npm run type-check  # vue-tsc type check
-rtk npm run format      # Prettier
+rtk tsc                 # TypeScript errors grouped by file
+rtk lint                # ESLint grouped by rule/file
+rtk err npm run build   # errors/warnings only
+rtk vitest run          # failures only
+rtk playwright test     # E2E failures only
 ```
 
-### Files
+### Files & search
 
 ```bash
 rtk ls .                # token-optimized directory tree
+rtk read file.ts        # smart file reading
+rtk find "*.ts" .       # compact find results
+rtk grep "pattern" .    # grouped search results
+rtk diff file1 file2    # condensed diff
+```
+
+### Package managers
+
+```bash
+rtk pnpm list           # compact dependency tree
+```
+
+### Token savings
+
+```bash
+rtk gain                # summary stats
+rtk discover            # find missed savings opportunities
 ```
