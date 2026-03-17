@@ -1,11 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(rtk npm run test:*)",
-      "Bash(rtk npm run build:*)",
-      "Bash(rtk npm run lint:*)",
-      "Bash(rtk npm run type-check:*)",
-      "Bash(rtk npm run format:*)",
+      "Bash(rtk npm run:*)",
       "Bash(rtk gh issue:*)",
       "Bash(rtk git:*)",
       "Bash(rtk gh pr:*)",
@@ -14,7 +10,8 @@
       "Bash(rtk git pull:*)",
       "Bash(rtk git checkout:*)",
       "Bash(rtk npm run:*)",
-      "Bash(rtk ls:*)"
+      "Bash(rtk ls:*)",
+      "Bash(rtk lint:*)"
     ]
   }
 }
