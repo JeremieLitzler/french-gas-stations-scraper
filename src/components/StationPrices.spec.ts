@@ -1,7 +1,7 @@
 /**
  * Tests for the StationPrices component.
  *
- * TC-11 through TC-24 from test-cases.md.
+ * TC-01 through TC-03 (issue #30 loader fix) and TC-11 through TC-24.
  *
  * Both `useStationPrices` and `useStationStorage` are mocked so tests
  * fully control reactive state (isLoading, results, warnings, fetchCompleted)
@@ -392,5 +392,69 @@ describe('TC-24: station names are rendered as text, not parsed as HTML', () => 
     expect(stationCell).toBeDefined()
     // No actual <script> child was injected
     expect(wrapper.find('script').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-01 — Loader is visible when isLoading is true
+// ---------------------------------------------------------------------------
+
+describe('TC-01: loader is visible when isLoading is true', () => {
+  it('renders AppLoader in the DOM when isLoading is true', async () => {
+    mockIsLoading.value = true
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-02 — Loader is hidden when isLoading is false
+// ---------------------------------------------------------------------------
+
+describe('TC-02: loader is absent from the DOM when isLoading is false', () => {
+  it('does not render AppLoader when isLoading is false', async () => {
+    mockIsLoading.value = false
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-03 — Loader receives no custom CSS class from StationPrices
+// ---------------------------------------------------------------------------
+
+const DEFAULT_LOADER_CLASS =
+  'absolute top-1/2 transform -translate-y-1/2 left-1/2 -translate-x-1/2 flex justify-center items-center w-full h-screen bg-background bg-opacity-90 z-50'
+
+describe('TC-03: AppLoader rendered by StationPrices uses default class only', () => {
+  it('applies the default Tailwind class string and not a bare unstyled identifier', async () => {
+    mockIsLoading.value = true
+    const wrapper = mount(StationPrices, {
+      global: {
+        stubs: {
+          // Use the real AppLoader — no stub — so we can inspect its class
+          'iconify-icon': true,
+          AppLink: { template: '<a><slot /></a>' },
+          Table: { template: '<table><slot /></table>' },
+          TableHeader: { template: '<thead><slot /></thead>' },
+          TableBody: { template: '<tbody><slot /></tbody>' },
+          TableRow: { template: '<tr><slot /></tr>' },
+          TableHead: { template: '<th><slot /></th>' },
+          TableCell: { template: '<td><slot /></td>' },
+        },
+      },
+    })
+    await flushPromises()
+
+    // The first div inside the loader wrapper carries the cssClass binding
+    const loaderWrapper = wrapper.findComponent({ name: 'AppLoader' })
+    expect(loaderWrapper.exists()).toBe(true)
+    const loaderDiv = loaderWrapper.find('div')
+    expect(loaderDiv.attributes('class')).toBe(DEFAULT_LOADER_CLASS)
+    expect(loaderDiv.attributes('class')).not.toContain('fetch-loader')
   })
 })
