@@ -1,11 +1,10 @@
 /**
- * Composable for fetching and parsing gas station fuel prices.
+ * Composable for concurrently fetching and parsing fuel prices for all stored stations.
  *
- * Calls the fetch-page Netlify function to retrieve raw HTML, then passes
- * the result through stationHtmlParser to produce structured StationData.
- *
- * The station name comes from the caller (stored in IndexedDB as Station.name)
- * and is not extracted from the HTML.
+ * Fetches every station in the list at the same time, collects successful
+ * parse results in `results`, and records failures (selector not found or
+ * network errors) in `warnings`. The `isLoading` flag is true from the
+ * moment the first request is initiated until all promises settle.
  *
  * Singleton pattern (ADR-002): shared reactive state is declared at module
  * level so all consumers share the same reference.
@@ -18,66 +17,97 @@
 
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import type { Station, StationData } from '@/types'
+import type { Station, StationData, StationWarning } from '@/types'
 import { parseStationHtml } from '@/utils/stationHtmlParser'
+import { useStationStorage } from '@/composables/useStationStorage'
 
 const FETCH_PAGE_ENDPOINT = '/.netlify/functions/fetch-page'
 
-type FetchPageResponse = { success: true; html: string } | { success: false; error: string }
+type FetchPageSuccess = { success: true; html: string }
+type FetchPageFailure = { success: false; error: string }
+type FetchPageResponse = FetchPageSuccess | FetchPageFailure
 
 type StationPricesState = {
-  stationData: Ref<StationData | null>
+  results: Ref<StationData[]>
+  warnings: Ref<StationWarning[]>
   isLoading: Ref<boolean>
-  error: Ref<string | null>
 }
 
-const stationData: Ref<StationData | null> = ref(null)
+const results: Ref<StationData[]> = ref([])
+const warnings: Ref<StationWarning[]> = ref([])
 const isLoading: Ref<boolean> = ref(false)
-const error: Ref<string | null> = ref(null)
 
 function buildFetchUrl(stationUrl: string): string {
   return `${FETCH_PAGE_ENDPOINT}?url=${encodeURIComponent(stationUrl)}`
 }
 
-async function fetchPageHtml(stationUrl: string): Promise<FetchPageResponse> {
-  const response = await fetch(buildFetchUrl(stationUrl))
-  return response.json() as Promise<FetchPageResponse>
+function asFetchPageResponse(json: unknown): FetchPageResponse {
+  if (typeof json !== 'object' || json === null) {
+    return { success: false, error: 'unexpected_response' }
+  }
+  const candidate = json as Record<string, unknown>
+  if (candidate.success === true && typeof candidate.html === 'string') {
+    return { success: true, html: candidate.html }
+  }
+  if (candidate.success === false && typeof candidate.error === 'string') {
+    return { success: false, error: candidate.error }
+  }
+  return { success: false, error: 'unexpected_response' }
 }
 
-function applyParseResult(html: string, stationName: string): void {
-  const result = parseStationHtml(html)
-  if (!result.success) {
-    error.value = result.error
+async function fetchPageResponse(stationUrl: string): Promise<FetchPageResponse> {
+  const response = await fetch(buildFetchUrl(stationUrl))
+  const json: unknown = await response.json()
+  return asFetchPageResponse(json)
+}
+
+function toStationWarning(station: Station): StationWarning {
+  return { stationName: station.name, url: station.url }
+}
+
+function applySuccessResponse(station: Station, html: string): void {
+  const parseResult = parseStationHtml(html)
+  if (!parseResult.success) {
+    warnings.value = [...warnings.value, toStationWarning(station)]
     return
   }
-  stationData.value = { stationName, fuels: result.fuels }
+  results.value = [...results.value, { stationName: station.name, fuels: parseResult.fuels }]
 }
 
-async function loadStationPrices(station: Station): Promise<void> {
-  isLoading.value = true
-  error.value = null
-  stationData.value = null
+async function fetchOneStation(station: Station): Promise<void> {
   try {
-    const pageResponse = await fetchPageHtml(station.url)
+    const pageResponse = await fetchPageResponse(station.url)
     if (!pageResponse.success) {
-      error.value = pageResponse.error
+      warnings.value = [...warnings.value, toStationWarning(station)]
       return
     }
-    applyParseResult(pageResponse.html, station.name)
+    applySuccessResponse(station, pageResponse.html)
   } catch {
-    error.value = 'fetch_failed'
-  } finally {
-    isLoading.value = false
+    warnings.value = [...warnings.value, toStationWarning(station)]
   }
+}
+
+async function loadAllStationPrices(): Promise<void> {
+  const { stations } = useStationStorage()
+  const stationList = stations.value
+
+  results.value = []
+  warnings.value = []
+
+  if (stationList.length === 0) return
+
+  isLoading.value = true
+  await Promise.allSettled(stationList.map(fetchOneStation))
+  isLoading.value = false
 }
 
 export function useStationPrices(): StationPricesState & {
-  loadStationPrices: (station: Station) => Promise<void>
+  loadAllStationPrices: () => Promise<void>
 } {
   return {
-    stationData,
+    results,
+    warnings,
     isLoading,
-    error,
-    loadStationPrices,
+    loadAllStationPrices,
   }
 }
