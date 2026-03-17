@@ -54,6 +54,7 @@ function mountComponent() {
   return mount(StationManager, {
     global: {
       stubs: {
+        AppLink: { template: '<a><slot /></a>' },
         Table: { template: '<table><slot /></table>' },
         TableHeader: { template: '<thead><slot /></thead>' },
         TableBody: { template: '<tbody><slot /></tbody>' },
@@ -117,7 +118,7 @@ describe('TC-03: Editing an existing station name auto-saves on blur', () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -138,7 +139,7 @@ describe('TC-04: Editing an existing station URL auto-saves on blur', () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowUrlInput = wrapper.findAll('input')[1]
+    const firstRowUrlInput = wrapper.findAll('input')[3]
     await firstRowUrlInput.setValue('https://www.prix-carburants.gouv.fr/station/99999')
     await firstRowUrlInput.trigger('blur')
     await flushPromises()
@@ -159,7 +160,7 @@ describe('TC-05: Clearing an existing station name shows inline error and revert
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -178,7 +179,7 @@ describe('TC-06: Whitespace-only name shows inline error and does not save', () 
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('   ')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -236,7 +237,7 @@ describe('TC-09: Inline error clears when user starts typing in the errored fiel
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -276,15 +277,15 @@ describe('TC-10: Clicking the delete button calls removeStation', () => {
 // TC-11: Empty new-station row is always present at the bottom
 // ---------------------------------------------------------------------------
 
-describe('TC-11: A permanent empty new-station row is rendered at the bottom', () => {
-  it('the last row has two empty inputs and no delete button', async () => {
+describe('TC-11: A permanent empty new-station row is rendered at the top', () => {
+  it('the first data row has two empty inputs and no delete button', async () => {
     const wrapper = mountComponent()
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const lastRow = rows[rows.length - 1]
-    const inputs = lastRow.findAll('input')
-    const buttons = lastRow.findAll('button.delete-button')
+    const newStationRow = rows[1]
+    const inputs = newStationRow.findAll('input')
+    const buttons = newStationRow.findAll('button.delete-button')
 
     expect(inputs).toHaveLength(2)
     expect(inputs[0].element.value).toBe('')
@@ -292,6 +293,7 @@ describe('TC-11: A permanent empty new-station row is rendered at the bottom', (
     expect(buttons).toHaveLength(0)
   })
 })
+
 
 // ---------------------------------------------------------------------------
 // TC-12: New-station row auto-saves when both fields are valid on blur
@@ -303,7 +305,7 @@ describe('TC-12: New-station row auto-saves when both fields are valid on blur',
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('New Station')
@@ -328,7 +330,7 @@ describe('TC-13: New-station row does not save when only the name field is fille
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput] = newRow.findAll('input')
 
     await nameInput.setValue('New Station')
@@ -351,7 +353,7 @@ describe('TC-14: New-station row shows URL inline error when URL is invalid', ()
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('New Station')
@@ -374,7 +376,7 @@ describe('TC-15: New-station row shows name error when URL is filled but name is
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [, urlInput] = newRow.findAll('input')
 
     await urlInput.setValue('https://www.prix-carburants.gouv.fr/station/88888')
@@ -396,7 +398,7 @@ describe('TC-16: New-station row rejects a URL already in the list', () => {
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('Another')
@@ -419,7 +421,7 @@ describe('TC-17: Input values are trimmed before validation and storage', () => 
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('  New Station  ')
@@ -482,7 +484,7 @@ describe('TC-22: Storage errors surface as generic messages, not raw error text'
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('New Station')
@@ -505,7 +507,7 @@ describe('TC-25: Successful name edit shows inline success message on that row',
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -517,14 +519,14 @@ describe('TC-25: Successful name edit shows inline success message on that row',
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    // row 0 = header, row 1 = station A, row 2 = station B, row 3 = new-station row
-    const secondDataRow = rows[2]
+    // row 0 = header, row 1 = new-station row, row 2 = station A, row 3 = station B
+    const secondDataRow = rows[3]
     expect(secondDataRow.text()).not.toContain('Saved')
   })
 })
@@ -538,7 +540,7 @@ describe('TC-26: Successful URL edit shows inline success message on that row', 
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowUrlInput = wrapper.findAll('input')[1]
+    const firstRowUrlInput = wrapper.findAll('input')[3]
     await firstRowUrlInput.setValue('https://www.prix-carburants.gouv.fr/station/99999')
     await firstRowUrlInput.trigger('blur')
     await flushPromises()
@@ -558,7 +560,7 @@ describe('TC-27: Success message auto-dismisses after 2 seconds', () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -601,7 +603,7 @@ describe('TC-29: Validation failure shows no success message', () => {
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
@@ -621,7 +623,7 @@ describe('TC-30: Success message does not appear when saving a new station via a
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const newRow = rows[rows.length - 1]
+    const newRow = rows[1]
     const [nameInput, urlInput] = newRow.findAll('input')
 
     await nameInput.setValue('New Station')
@@ -643,14 +645,15 @@ describe('TC-31: Success message is per-row and does not appear on other rows', 
     const wrapper = mountComponent()
     await flushPromises()
 
-    const firstRowNameInput = wrapper.findAll('input')[0]
+    const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
     await flushPromises()
 
     const rows = wrapper.findAll('tr')
-    const firstDataRow = rows[1]
-    const secondDataRow = rows[2]
+    // row 0 = header, row 1 = new-station row, row 2 = station A, row 3 = station B
+    const firstDataRow = rows[2]
+    const secondDataRow = rows[3]
 
     expect(firstDataRow.text()).toContain('Saved')
     expect(secondDataRow.text()).not.toContain('Saved')
