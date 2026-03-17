@@ -1,30 +1,20 @@
 /**
  * Tests for useStationPrices composable.
  *
- * The composable is a singleton, so vi.resetModules() + dynamic import()
- * is used to get a fresh module (and therefore fresh reactive refs) for
- * each test.
- *
  * `fetch` is mocked via vi.stubGlobal so each test controls per-station
  * HTTP responses without real network calls.
  *
- * `useStationStorage` is mocked so tests control the station list without
- * touching IndexedDB.
+ * `loadAllStationPrices` accepts the station list as a parameter, so no
+ * useStationStorage mock is needed here.
+ *
+ * vi.resetModules() + dynamic import() is used to get a fresh composable
+ * instance for each test — the composable uses standard Vue pattern
+ * (refs declared inside the function body), so each call to useStationPrices()
+ * returns independent reactive state.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
 import type { Station } from '../types/station'
-
-// ---------------------------------------------------------------------------
-// Shared mock state — reset before each test
-// ---------------------------------------------------------------------------
-
-const mockStations = ref<Station[]>([])
-
-vi.mock('./useStationStorage', () => ({
-  useStationStorage: () => ({ stations: mockStations }),
-}))
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,7 +74,6 @@ async function freshComposable() {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  mockStations.value = []
   vi.restoreAllMocks()
 })
 
@@ -94,12 +83,11 @@ beforeEach(() => {
 
 describe('TC-01: all stations succeed — results populated, warnings empty', () => {
   it('populates results with one entry per station and leaves warnings empty', async () => {
-    mockStations.value = [STATION_A, STATION_B, STATION_C]
     vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B, STATION_C])
 
     expect(results.value).toHaveLength(3)
     expect(warnings.value).toHaveLength(0)
@@ -113,8 +101,6 @@ describe('TC-01: all stations succeed — results populated, warnings empty', ()
 
 describe('TC-02: one station returns selector_not_found — placed in warnings', () => {
   it('puts the failing station in warnings and successful ones in results', async () => {
-    mockStations.value = [STATION_A, STATION_B, STATION_C]
-
     let callCount = 0
     vi.stubGlobal(
       'fetch',
@@ -129,7 +115,7 @@ describe('TC-02: one station returns selector_not_found — placed in warnings',
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B, STATION_C])
 
     expect(results.value).toHaveLength(2)
     expect(warnings.value).toHaveLength(1)
@@ -143,12 +129,11 @@ describe('TC-02: one station returns selector_not_found — placed in warnings',
 
 describe('TC-03: all stations return selector_not_found — results empty, all in warnings', () => {
   it('leaves results empty and puts all stations in warnings', async () => {
-    mockStations.value = [STATION_A, STATION_B]
     vi.stubGlobal('fetch', makeFetchSelectorNotFound())
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B])
 
     expect(results.value).toHaveLength(0)
     expect(warnings.value).toHaveLength(2)
@@ -162,8 +147,6 @@ describe('TC-03: all stations return selector_not_found — results empty, all i
 
 describe('TC-04: isLoading is true during fetch and false after all settle', () => {
   it('is true immediately after triggering and false after completion', async () => {
-    mockStations.value = [STATION_A]
-
     let resolveFetch!: (value: unknown) => void
     const pendingPromise = new Promise((resolve) => { resolveFetch = resolve })
 
@@ -178,7 +161,7 @@ describe('TC-04: isLoading is true during fetch and false after all settle', () 
 
     const { isLoading, loadAllStationPrices } = await freshComposable()
 
-    const loadingPromise = loadAllStationPrices()
+    const loadingPromise = loadAllStationPrices([STATION_A])
     // isLoading must be true before the fetch resolves
     expect(isLoading.value).toBe(true)
 
@@ -195,8 +178,6 @@ describe('TC-04: isLoading is true during fetch and false after all settle', () 
 
 describe('TC-05: network error for one station — treated as warning', () => {
   it('puts the erroring station in warnings and keeps the successful one in results', async () => {
-    mockStations.value = [STATION_A, STATION_B]
-
     let callCount = 0
     vi.stubGlobal(
       'fetch',
@@ -211,7 +192,7 @@ describe('TC-05: network error for one station — treated as warning', () => {
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B])
 
     expect(warnings.value).toHaveLength(1)
     expect(results.value).toHaveLength(1)
@@ -225,12 +206,11 @@ describe('TC-05: network error for one station — treated as warning', () => {
 
 describe('TC-06: all stations produce network errors — results empty, all in warnings', () => {
   it('leaves results empty and puts all stations in warnings', async () => {
-    mockStations.value = [STATION_A, STATION_B]
     vi.stubGlobal('fetch', makeFetchNetworkError())
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B])
 
     expect(results.value).toHaveLength(0)
     expect(warnings.value).toHaveLength(2)
@@ -244,13 +224,12 @@ describe('TC-06: all stations produce network errors — results empty, all in w
 
 describe('TC-07: empty station list — no loading, no results, no warnings', () => {
   it('makes no fetch calls and leaves all state at defaults', async () => {
-    mockStations.value = []
     const mockFetch = vi.fn()
     vi.stubGlobal('fetch', mockFetch)
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([])
 
     expect(isLoading.value).toBe(false)
     expect(results.value).toHaveLength(0)
@@ -269,13 +248,12 @@ describe('TC-08: station URL is percent-encoded in the fetch request', () => {
       name: 'Special',
       url: 'https://www.prix-carburants.gouv.fr/station/12345?foo=bar&baz=qux',
     }
-    mockStations.value = [specialStation]
 
     const mockFetch = makeFetchSuccess(VALID_HTML)
     vi.stubGlobal('fetch', mockFetch)
 
     const { loadAllStationPrices } = await freshComposable()
-    await loadAllStationPrices()
+    await loadAllStationPrices([specialStation])
 
     const calledUrl = mockFetch.mock.calls[0][0] as string
     expect(calledUrl).toContain('url=')
@@ -290,12 +268,11 @@ describe('TC-08: station URL is percent-encoded in the fetch request', () => {
 
 describe('TC-09: unexpected response shape — treated as warning', () => {
   it('puts the station in warnings and leaves results empty', async () => {
-    mockStations.value = [STATION_A]
     vi.stubGlobal('fetch', makeFetchUnexpectedShape())
 
     const { results, warnings, isLoading, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A])
 
     expect(warnings.value).toHaveLength(1)
     expect(results.value).toHaveLength(0)
@@ -309,18 +286,16 @@ describe('TC-09: unexpected response shape — treated as warning', () => {
 
 describe('TC-10: re-triggering clears previous state', () => {
   it('clears results and warnings at the start of a new fetch run', async () => {
-    mockStations.value = [STATION_A, STATION_B]
     vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
 
     const { results, warnings, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A, STATION_B])
     expect(results.value).toHaveLength(2)
 
-    mockStations.value = [STATION_C]
     vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_C])
 
     expect(results.value).toHaveLength(1)
     expect(results.value[0].stationName).toBe(STATION_C.name)
@@ -334,12 +309,11 @@ describe('TC-10: re-triggering clears previous state', () => {
 
 describe('TC-11: warning entry contains station name and URL', () => {
   it('populates stationName and url fields on the warning entry', async () => {
-    mockStations.value = [STATION_A]
     vi.stubGlobal('fetch', makeFetchSelectorNotFound())
 
     const { warnings, loadAllStationPrices } = await freshComposable()
 
-    await loadAllStationPrices()
+    await loadAllStationPrices([STATION_A])
 
     expect(warnings.value).toHaveLength(1)
     expect(warnings.value[0].stationName).toBe(STATION_A.name)
@@ -348,12 +322,11 @@ describe('TC-11: warning entry contains station name and URL', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TC-14: Singleton — multiple consumers share the same state
+// TC-14: Independent state — each composable call returns its own refs
 // ---------------------------------------------------------------------------
 
-describe('TC-14: singleton — multiple consumers share the same reactive state', () => {
-  it('reflects changes made via one reference in the other reference', async () => {
-    mockStations.value = [STATION_A]
+describe('TC-14: independent state — each useStationPrices() call returns its own refs', () => {
+  it('state changes in one instance do not affect another instance', async () => {
     vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
 
     vi.resetModules()
@@ -362,12 +335,11 @@ describe('TC-14: singleton — multiple consumers share the same reactive state'
     const consumer1 = mod.useStationPrices()
     const consumer2 = mod.useStationPrices()
 
-    await consumer1.loadAllStationPrices()
+    await consumer1.loadAllStationPrices([STATION_A])
 
-    expect(consumer2.results.value).toHaveLength(1)
-    expect(consumer1.results.value).toBe(consumer2.results.value)
-    expect(consumer1.warnings.value).toBe(consumer2.warnings.value)
-    expect(consumer1.isLoading.value).toBe(consumer2.isLoading.value)
+    expect(consumer1.results.value).toHaveLength(1)
+    expect(consumer2.results.value).toHaveLength(0)
+    expect(consumer1.results.value).not.toBe(consumer2.results.value)
   })
 })
 
@@ -377,8 +349,6 @@ describe('TC-14: singleton — multiple consumers share the same reactive state'
 
 describe('TC-15: fetch calls are initiated concurrently, not sequentially', () => {
   it('starts all fetches before any of them resolves', async () => {
-    mockStations.value = [STATION_A, STATION_B]
-
     const fetchCallTimes: number[] = []
     const resolvers: Array<() => void> = []
 
@@ -395,7 +365,7 @@ describe('TC-15: fetch calls are initiated concurrently, not sequentially', () =
     )
 
     const { loadAllStationPrices } = await freshComposable()
-    const loadPromise = loadAllStationPrices()
+    const loadPromise = loadAllStationPrices([STATION_A, STATION_B])
 
     // Both fetches must have been called before we resolve any
     await Promise.resolve() // allow microtasks to run

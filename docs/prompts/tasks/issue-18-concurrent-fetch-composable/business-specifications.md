@@ -14,13 +14,14 @@ The scope covers:
 
 ### Files to Create or Modify
 
-- `src/composables/useStationPrices.ts` — reworked to expose multi-station reactive state: a list of successful station results, a list of warning entries for stations that failed parsing, and a loading flag. Fetching all stations concurrently is initiated by a single trigger action.
-- `src/pages/index.vue` — displays warning messages below the station management UI when the warnings list is non-empty. Also hosts the loading indicator while fetching is in progress.
+- `src/composables/useStationPrices.ts` — reworked to expose multi-station reactive state: a list of successful station results, a list of warning entries for stations that failed parsing, a loading flag, and a fetch-completed signal. Fetching all stations concurrently is initiated by a single trigger action.
+- `src/components/StationPrices.vue` (**new**) — owns the fetch-related feedback UI: the loading indicator, the success feedback message, and the warnings list. Reads state from the prices composable directly. Placed below the station management UI.
+- `src/pages/index.vue` — simplified to include `<StationManager />` and `<StationPrices />` only. All fetch-feedback rendering is delegated to `StationPrices.vue`.
 - `src/types/` — if new types are needed for the warning shape or the multi-station result shape, they must be defined here before any composable logic uses them.
 
 ### Out of Scope for Issue 18
 
-- `src/components/StationPrices.vue` — a new component responsible for rendering fuel prices on fuel type selection. This is planned for issue 19. Issue 18 must not implement or reference it.
+- Fuel type selection and price table rendering inside `StationPrices.vue` — those features are planned for issue 19. Issue 18 only adds the loading indicator, success message, and warnings list to `StationPrices.vue`.
 
 ### Rules and Constraints
 
@@ -32,7 +33,10 @@ The scope covers:
 6. The results list contains only stations that produced at least one fuel price entry.
 7. Warning messages rendered in the UI must reference both the station name and the station URL so the user can identify which station failed.
 8. The composable follows the singleton pattern (ADR-002): shared reactive state is declared at module level so all consumers share the same reference.
-9. The composable must be callable without arguments (the station list is obtained from the existing station storage composable).
+9. The fetch action on the composable accepts the station list as a parameter. The caller component (`StationPrices.vue`) is responsible for calling `useStationStorage()` at the top level of its own `setup()` and passing `stations.value` to the fetch action in `onMounted`. The composable must not call any other composable inside a plain or async function — composables may only be called at the top level of `setup()`.
+10. Once all fetches have settled and loading is complete, a success feedback message must be shown to the user in the UI. This message is shown regardless of whether there are warnings — it signals that the scraping run has finished. The message must auto-dismiss after a short delay (similar to the inline save confirmation in the station manager).
+11. The composable must never self-trigger data fetching. The caller component (`StationPrices.vue`) is solely responsible for invoking the fetch action in its own `onMounted` hook. The composable only exposes state and actions; it never calls those actions itself.
+12. `StationPrices.vue` must render below `StationManager` in a stacked vertical layout. The `index.vue` wrapper must use a `flex-col w-full` container so the two components stack vertically, not side-by-side.
 
 ### Example Mapping
 
@@ -94,6 +98,28 @@ The scope covers:
 - Then a warning message is visible below the station management table
 - And each warning message includes the station name and station URL
 
+#### Rule: Success feedback message
+
+**Example — All fetches complete, success message shown:**
+
+- Given the station list is non-empty
+- When all fetches have settled (regardless of how many warnings there are)
+- Then a success feedback message is visible in the UI indicating the scraping run has finished
+- And the message automatically disappears after a short delay
+
+**Example — Success message shown even when there are warnings:**
+
+- Given two stations were fetched, one succeeded and one produced a warning
+- When loading finishes
+- Then both the warning entry and the success feedback message are visible
+- And the success message auto-dismisses after a short delay
+
+**Example — Success message not shown before fetch completes:**
+
+- Given a fetch is in progress
+- When the page renders mid-fetch
+- Then no success feedback message is visible yet
+
 #### Rule: Empty station list
 
 **Example — No stations stored:**
@@ -106,8 +132,9 @@ The scope covers:
 
 ### Edge Cases
 
-- If the station list is empty when the fetch action is called, no HTTP requests are made and the loading flag must not remain true indefinitely.
+- If the station list is empty when the fetch action is called, no HTTP requests are made and the loading flag must not remain true indefinitely. No success feedback message is shown in this case (there was nothing to scrape).
 - If the same composable state is consumed by multiple components, all components observe the same `isLoading`, `results`, and `warnings` transitions simultaneously (singleton guarantee).
-- Re-triggering the fetch while a previous fetch is still in progress replaces the previous state: `isLoading` is reset to true, previous `results` and `warnings` are cleared, and the new set of concurrent fetches begins.
+- Re-triggering the fetch while a previous fetch is still in progress replaces the previous state: `isLoading` is reset to true, previous `results` and `warnings` are cleared, and the new set of concurrent fetches begins. Any visible success message from the previous run must be cleared when re-triggering starts.
+- The success feedback message auto-dismisses after a short fixed delay and must not persist indefinitely.
 
 status: ready

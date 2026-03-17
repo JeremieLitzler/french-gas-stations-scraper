@@ -5,6 +5,8 @@
  * parse results in `results`, and records failures (selector not found or
  * network errors) in `warnings`. The `isLoading` flag is true from the
  * moment the first request is initiated until all promises settle.
+ * `fetchCompleted` flips to true once a non-empty run finishes; consumers
+ * use it to trigger success feedback and own the auto-dismiss timer.
  *
  * Singleton pattern (ADR-002): shared reactive state is declared at module
  * level so all consumers share the same reference.
@@ -19,7 +21,6 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import type { Station, StationData, StationWarning } from '@/types'
 import { parseStationHtml } from '@/utils/stationHtmlParser'
-import { useStationStorage } from '@/composables/useStationStorage'
 
 const FETCH_PAGE_ENDPOINT = '/.netlify/functions/fetch-page'
 
@@ -27,87 +28,80 @@ type FetchPageSuccess = { success: true; html: string }
 type FetchPageFailure = { success: false; error: string }
 type FetchPageResponse = FetchPageSuccess | FetchPageFailure
 
-type StationPricesState = {
-  results: Ref<StationData[]>
-  warnings: Ref<StationWarning[]>
-  isLoading: Ref<boolean>
-}
+export function useStationPrices() {
+  const results: Ref<StationData[]> = ref([])
+  const warnings: Ref<StationWarning[]> = ref([])
+  const isLoading: Ref<boolean> = ref(false)
+  const fetchCompleted: Ref<boolean> = ref(false)
 
-const results: Ref<StationData[]> = ref([])
-const warnings: Ref<StationWarning[]> = ref([])
-const isLoading: Ref<boolean> = ref(false)
+  const buildFetchUrl = (stationUrl: string): string => {
+    return `${FETCH_PAGE_ENDPOINT}?url=${encodeURIComponent(stationUrl)}`
+  }
 
-function buildFetchUrl(stationUrl: string): string {
-  return `${FETCH_PAGE_ENDPOINT}?url=${encodeURIComponent(stationUrl)}`
-}
-
-function asFetchPageResponse(json: unknown): FetchPageResponse {
-  if (typeof json !== 'object' || json === null) {
+  const asFetchPageResponse = (json: unknown): FetchPageResponse => {
+    if (typeof json !== 'object' || json === null) {
+      return { success: false, error: 'unexpected_response' }
+    }
+    const candidate = json as Record<string, unknown>
+    if (candidate.success === true && typeof candidate.html === 'string') {
+      return { success: true, html: candidate.html }
+    }
+    if (candidate.success === false && typeof candidate.error === 'string') {
+      return { success: false, error: candidate.error }
+    }
     return { success: false, error: 'unexpected_response' }
   }
-  const candidate = json as Record<string, unknown>
-  if (candidate.success === true && typeof candidate.html === 'string') {
-    return { success: true, html: candidate.html }
+
+  const fetchPageResponse = async (stationUrl: string): Promise<FetchPageResponse> => {
+    const response = await fetch(buildFetchUrl(stationUrl))
+    const json: unknown = await response.json()
+    return asFetchPageResponse(json)
   }
-  if (candidate.success === false && typeof candidate.error === 'string') {
-    return { success: false, error: candidate.error }
+
+  const toStationWarning = (station: Station): StationWarning => {
+    return { stationName: station.name, url: station.url }
   }
-  return { success: false, error: 'unexpected_response' }
-}
 
-async function fetchPageResponse(stationUrl: string): Promise<FetchPageResponse> {
-  const response = await fetch(buildFetchUrl(stationUrl))
-  const json: unknown = await response.json()
-  return asFetchPageResponse(json)
-}
-
-function toStationWarning(station: Station): StationWarning {
-  return { stationName: station.name, url: station.url }
-}
-
-function applySuccessResponse(station: Station, html: string): void {
-  const parseResult = parseStationHtml(html)
-  if (!parseResult.success) {
-    warnings.value = [...warnings.value, toStationWarning(station)]
-    return
-  }
-  results.value = [...results.value, { stationName: station.name, fuels: parseResult.fuels }]
-}
-
-async function fetchOneStation(station: Station): Promise<void> {
-  try {
-    const pageResponse = await fetchPageResponse(station.url)
-    if (!pageResponse.success) {
+  const applySuccessResponse = (station: Station, html: string): void => {
+    const parseResult = parseStationHtml(html)
+    if (!parseResult.success) {
       warnings.value = [...warnings.value, toStationWarning(station)]
       return
     }
-    applySuccessResponse(station, pageResponse.html)
-  } catch {
-    warnings.value = [...warnings.value, toStationWarning(station)]
+    results.value = [...results.value, { stationName: station.name, fuels: parseResult.fuels }]
   }
-}
 
-async function loadAllStationPrices(): Promise<void> {
-  const { stations } = useStationStorage()
-  const stationList = stations.value
+  const fetchOneStation = async (station: Station): Promise<void> => {
+    try {
+      const pageResponse = await fetchPageResponse(station.url)
+      if (!pageResponse.success) {
+        warnings.value = [...warnings.value, toStationWarning(station)]
+        return
+      }
+      applySuccessResponse(station, pageResponse.html)
+    } catch {
+      warnings.value = [...warnings.value, toStationWarning(station)]
+    }
+  }
 
-  results.value = []
-  warnings.value = []
+  const loadAllStationPrices = async (stations: Station[]): Promise<void> => {
+    results.value = []
+    warnings.value = []
+    fetchCompleted.value = false
 
-  if (stationList.length === 0) return
+    if (stations.length === 0) return
 
-  isLoading.value = true
-  await Promise.allSettled(stationList.map(fetchOneStation))
-  isLoading.value = false
-}
+    isLoading.value = true
+    await Promise.allSettled(stations.map(fetchOneStation))
+    isLoading.value = false
+    fetchCompleted.value = true
+  }
 
-export function useStationPrices(): StationPricesState & {
-  loadAllStationPrices: () => Promise<void>
-} {
   return {
     results,
     warnings,
     isLoading,
+    fetchCompleted,
     loadAllStationPrices,
   }
 }
