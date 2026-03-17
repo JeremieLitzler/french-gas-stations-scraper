@@ -36,4 +36,28 @@
 **Action**: Render `App.vue`.
 **Expected outcome**: The `AppLoader` element is present and carries the default Tailwind class string unchanged.
 
+## TC-07 — StationPrices does not render an internal loader when wrapped in Suspense
+
+**Precondition**: `StationPrices.vue` is rendered inside a `<Suspense>` wrapper. The async initialisation has completed.
+**Action**: Inspect the rendered output of `StationPrices.vue`.
+**Expected outcome**: No `AppLoader` component is rendered inside `StationPrices.vue`; loading UI is handled entirely by the `<Suspense>` fallback.
+
+## TC-08 — index.vue renders AppLoader as Suspense fallback during async initialisation
+
+**Precondition**: `index.vue` wraps `<StationPrices />` and `<StationManager />` in a `<Suspense>` block with `<AppLoader />` as the fallback.
+**Action**: Render `index.vue` while the async setup of its children has not yet resolved.
+**Expected outcome**: The `<AppLoader />` fallback is shown in the DOM, not the content of `StationPrices` or `StationManager`.
+
+## TC-09 — index.vue shows content after async initialisation completes
+
+**Precondition**: `index.vue` wraps `<StationPrices />` and `<StationManager />` in `<Suspense>`.
+**Action**: Render `index.vue` after the async setup of its children has resolved.
+**Expected outcome**: `StationPrices` and `StationManager` content is visible; the `<AppLoader />` fallback is no longer in the DOM.
+
+## TC-10 — StationManager does not render an internal loader
+
+**Precondition**: `StationManager.vue` is rendered inside a `<Suspense>` wrapper. The async initialisation has completed.
+**Action**: Inspect the rendered output of `StationManager.vue`.
+**Expected outcome**: No `AppLoader` component is rendered inside `StationManager.vue`.
+
 status: ready
