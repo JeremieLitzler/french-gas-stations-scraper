@@ -20,6 +20,7 @@ Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 | [ADR-006](./ADR-006-netlify-functions-for-cors-proxy.md)           | Netlify Functions for CORS-Free HTML Fetching | Accepted | 2026-02-13 |
 | [ADR-007](./ADR-007-html-sanitization-for-vhtml.md)               | HTML Sanitization Strategy for v-html Rendering | Accepted | 2026-03-03 |
 | [ADR-008](./ADR-008-client-side-storage.md)                       | IndexedDB Over localStorage for Client-Side Persistence | Accepted | 2026-03-04 |
+| [ADR-009](./ADR-009-cross-composable-reactivity-pattern.md)       | Cross-Composable Reactivity Pattern                     | Accepted | 2026-03-18 |
 
 ## How to Add a New ADR
 
