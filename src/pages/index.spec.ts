@@ -34,6 +34,9 @@ vi.mock('@/composables/useStationPrices', () => ({
     isLoading: mockIsLoading,
     fetchCompleted: mockFetchCompleted,
     loadAllStationPrices: mockLoadAllStationPrices,
+    removeStationPrice: vi.fn(),
+    addStationPrice: vi.fn().mockResolvedValue(undefined),
+    renameStation: vi.fn(),
   }),
 }))
 

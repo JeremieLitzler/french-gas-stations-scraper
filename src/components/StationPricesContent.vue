@@ -55,15 +55,17 @@ import { useStationPrices } from '@/composables/useStationPrices'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { buildPriceRows, deriveFuelTypes } from '@/utils/fuelTypeUtils'
 import type { PriceRow } from '@/types/price-row'
+import type { Station } from '@/types/station'
 
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
 const { stations, loadStations } = useStationStorage()
-const { results, warnings, fetchCompleted, loadAllStationPrices } = useStationPrices()
+const { results, warnings, fetchCompleted, loadAllStationPrices, removeStationPrice, addStationPrice, renameStation } = useStationPrices()
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
 let dismissTimer: ReturnType<typeof setTimeout> | null = null
+let isInitialized = false
 
 const availableFuelTypes = computed<string[]>(() => deriveFuelTypes(results.value))
 
@@ -73,6 +75,7 @@ const priceRows = computed<PriceRow[]>(() => {
 })
 
 watch(availableFuelTypes, (fuelTypes: string[]) => {
+  if (fuelTypes.includes(selectedFuelType.value)) return
   selectedFuelType.value = fuelTypes[0] ?? ''
 })
 
@@ -101,8 +104,50 @@ watch(fetchCompleted, (completed) => {
   scheduleDismiss()
 })
 
+function indexByUrl(stationList: Station[]): Map<string, Station> {
+  const map = new Map<string, Station>()
+  for (const station of stationList) {
+    map.set(station.url, station)
+  }
+  return map
+}
+
+function applyRemovals(oldByUrl: Map<string, Station>, newByUrl: Map<string, Station>): void {
+  for (const [url] of oldByUrl) {
+    if (!newByUrl.has(url)) removeStationPrice(url)
+  }
+}
+
+function applyAdditionOrRename(
+  url: string,
+  station: Station,
+  oldByUrl: Map<string, Station>,
+): void {
+  if (!oldByUrl.has(url)) {
+    addStationPrice(station)
+    return
+  }
+  const previousStation = oldByUrl.get(url) as Station
+  if (previousStation.name !== station.name) renameStation(url, station.name)
+}
+
+function applyStationListChange(newStations: Station[], oldStations: Station[]): void {
+  const oldByUrl = indexByUrl(oldStations)
+  const newByUrl = indexByUrl(newStations)
+  applyRemovals(oldByUrl, newByUrl)
+  for (const [url, station] of newByUrl) {
+    applyAdditionOrRename(url, station, oldByUrl)
+  }
+}
+
+watch(stations, (newStations: Station[], oldStations: Station[]) => {
+  if (!isInitialized) return
+  applyStationListChange(newStations, oldStations)
+})
+
 await loadStations()
 await loadAllStationPrices(stations.value)
+isInitialized = true
 
 onUnmounted(() => {
   clearDismissTimer()

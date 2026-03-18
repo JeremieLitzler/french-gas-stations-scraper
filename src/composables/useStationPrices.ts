@@ -8,6 +8,10 @@
  * `fetchCompleted` flips to true once a non-empty run finishes; consumers
  * use it to trigger success feedback and own the auto-dismiss timer.
  *
+ * Incremental operations (addStationPrice, removeStationPrice, renameStation)
+ * allow the component to update the price table reactively as the station
+ * list changes, following the Imperative pattern (ADR-009).
+ *
  * Singleton pattern (ADR-002): shared reactive state is declared at module
  * level so all consumers share the same reference.
  *
@@ -70,7 +74,10 @@ export function useStationPrices() {
       warnings.value = [...warnings.value, toStationWarning(station)]
       return
     }
-    results.value = [...results.value, { stationName: station.name, fuels: parseResult.fuels }]
+    results.value = [
+      ...results.value,
+      { stationName: station.name, url: station.url, fuels: parseResult.fuels },
+    ]
   }
 
   const fetchOneStation = async (station: Station): Promise<void> => {
@@ -99,11 +106,31 @@ export function useStationPrices() {
     fetchCompleted.value = true
   }
 
+  const removeStationPrice = (url: string): void => {
+    results.value = results.value.filter((result) => result.url !== url)
+    warnings.value = warnings.value.filter((warning) => warning.url !== url)
+  }
+
+  const addStationPrice = async (station: Station): Promise<void> => {
+    isLoading.value = true
+    await fetchOneStation(station)
+    isLoading.value = false
+  }
+
+  const renameStation = (url: string, newName: string): void => {
+    results.value = results.value.map((result) =>
+      result.url === url ? { ...result, stationName: newName } : result,
+    )
+  }
+
   return {
     results,
     warnings,
     isLoading,
     fetchCompleted,
     loadAllStationPrices,
+    removeStationPrice,
+    addStationPrice,
+    renameStation,
   }
 }
