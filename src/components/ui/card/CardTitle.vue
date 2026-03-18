@@ -11,8 +11,8 @@ const props = defineProps<{
 <template>
   <AppHeading heading-type="h1" v-if="props.isPageTitle" :class="cn('sfc-card-title', props.class)">
     <slot />
-  </AppHeading heading-type="h1">
+  </AppHeading>
   <AppHeading heading-type="h3" v-else :class="cn('sfc-card-title', props.class)">
     <slot />
-  </AppHeading heading-type="h3">
+  </AppHeading>
 </template>

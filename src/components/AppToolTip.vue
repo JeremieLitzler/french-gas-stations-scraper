@@ -7,7 +7,6 @@ const { toolTipText = 'Click the status icon to toggle the value', showToolTip =
 
 const displayTooltip = ref(false)
 const tooltipIcon = useTemplateRef('tooltip-icon')
-const tooltipParagraph = useTemplateRef('tooltip-paragraph')
 const tooltipPosition = ref({ top: 0, left: 0 })
 
 const toggleTooltip = (dismiss: boolean = false) => {
