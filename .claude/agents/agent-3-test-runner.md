@@ -24,18 +24,38 @@ Do not execute more than **3 failing shell commands in total** — whether retry
 
 ## Writing the test-results file
 
-Create the file at `[task-folder]/test-results.md`. The file is consumed by the coder agent only when tests fail — write nothing extra when they pass.
+Create `[task-folder]/test-results.md` using this exact template:
 
-If all tests pass, write only:
+```markdown
+# Test Results — Issue #[id]: [title]
 
-```plaintext
+## Test Run
+
+Command: `npm test` (Vitest vX.Y.Z) from the `[worktree name]` worktree.
+
+## Files Run
+
+All those mentioned in [technical specs](technical-specifications.md).
+
+## Results
+
+<if all tests pass>
+All tests passed. No failures.
+
+### Test Summary
+
+[N] test files, [N] tests total — all passed.
+
+- Duration: ~[N] seconds
+<else>
+### Failures
+
+<list each failing test with its stack trace or error output>
+<end-if>
+
 status: passed
 ```
 
-If any tests fail, write the failure details followed by:
-
-```plaintext
-status: failed
-```
-
-Include stack traces and failure output so the coder can diagnose and fix the issues. The status line must always be the last line of the file.
+Rules:
+- If any tests fail, replace the Results section content with failure details and replace `status: passed` with `status: failed`.
+- The status line must always be the last line of the file.
