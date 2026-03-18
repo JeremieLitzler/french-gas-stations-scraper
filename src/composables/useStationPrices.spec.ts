@@ -376,3 +376,155 @@ describe('TC-15: fetch calls are initiated concurrently, not sequentially', () =
     await loadPromise
   })
 })
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-01: removeStationPrice removes matching result entry
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-01: removeStationPrice removes the matching result and leaves others intact', () => {
+  it('removes only the result with the matching URL', async () => {
+    vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
+
+    const { results, removeStationPrice, loadAllStationPrices } = await freshComposable()
+
+    await loadAllStationPrices([STATION_A, STATION_B, STATION_C])
+    expect(results.value).toHaveLength(3)
+
+    removeStationPrice(STATION_B.url)
+
+    expect(results.value).toHaveLength(2)
+    expect(results.value.every((r) => r.url !== STATION_B.url)).toBe(true)
+    expect(results.value.some((r) => r.url === STATION_A.url)).toBe(true)
+    expect(results.value.some((r) => r.url === STATION_C.url)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-01 (warnings): removeStationPrice also removes matching warning
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-01 (warnings): removeStationPrice removes the matching warning entry', () => {
+  it('removes only the warning with the matching URL', async () => {
+    vi.stubGlobal('fetch', makeFetchSelectorNotFound())
+
+    const { warnings, removeStationPrice, loadAllStationPrices } = await freshComposable()
+
+    await loadAllStationPrices([STATION_A, STATION_B])
+    expect(warnings.value).toHaveLength(2)
+
+    removeStationPrice(STATION_A.url)
+
+    expect(warnings.value).toHaveLength(1)
+    expect(warnings.value[0].url).toBe(STATION_B.url)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-04: renameStation updates the stationName without re-fetching
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-04: renameStation updates stationName without triggering a fetch', () => {
+  it('renames the matching result and leaves fuels unchanged', async () => {
+    const mockFetch = makeFetchSuccess(VALID_HTML)
+    vi.stubGlobal('fetch', mockFetch)
+
+    const { results, renameStation, loadAllStationPrices } = await freshComposable()
+
+    await loadAllStationPrices([STATION_A])
+    const callsAfterLoad = mockFetch.mock.calls.length
+
+    renameStation(STATION_A.url, 'Renamed Station')
+
+    expect(mockFetch.mock.calls.length).toBe(callsAfterLoad)
+    expect(results.value[0].stationName).toBe('Renamed Station')
+    expect(results.value[0].url).toBe(STATION_A.url)
+    expect(results.value[0].fuels).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-04 (non-match): renameStation ignores entries that do not match
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-04 (non-match): renameStation does not affect entries with a different URL', () => {
+  it('leaves all other results unchanged', async () => {
+    vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
+
+    const { results, renameStation, loadAllStationPrices } = await freshComposable()
+
+    await loadAllStationPrices([STATION_A, STATION_B])
+
+    renameStation(STATION_A.url, 'Renamed A')
+
+    const stationB = results.value.find((r) => r.url === STATION_B.url)
+    expect(stationB?.stationName).toBe(STATION_B.name)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-05: addStationPrice appends result on successful fetch
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-05: addStationPrice appends a new result on successful fetch', () => {
+  it('appends the new station result after a successful fetch', async () => {
+    vi.stubGlobal('fetch', makeFetchSuccess(VALID_HTML))
+
+    const { results, addStationPrice } = await freshComposable()
+
+    expect(results.value).toHaveLength(0)
+
+    await addStationPrice(STATION_A)
+
+    expect(results.value).toHaveLength(1)
+    expect(results.value[0].url).toBe(STATION_A.url)
+    expect(results.value[0].stationName).toBe(STATION_A.name)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-06: addStationPrice adds to warnings on failed fetch
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-06: addStationPrice places station in warnings on failed fetch', () => {
+  it('adds a warning entry and no result when fetch fails', async () => {
+    vi.stubGlobal('fetch', makeFetchSelectorNotFound())
+
+    const { results, warnings, addStationPrice } = await freshComposable()
+
+    await addStationPrice(STATION_A)
+
+    expect(results.value).toHaveLength(0)
+    expect(warnings.value).toHaveLength(1)
+    expect(warnings.value[0].url).toBe(STATION_A.url)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-31 TC-10: addStationPrice sets isLoading during fetch and clears it after
+// ---------------------------------------------------------------------------
+
+describe('Issue-31 TC-10: addStationPrice sets isLoading to true during fetch and false after', () => {
+  it('is true before the fetch resolves and false after', async () => {
+    let resolveFetch!: (value: unknown) => void
+    const pendingPromise = new Promise((resolve) => { resolveFetch = resolve })
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockReturnValue(
+        pendingPromise.then(() => ({
+          json: () => Promise.resolve({ success: true, html: VALID_HTML }),
+        })),
+      ),
+    )
+
+    const { isLoading, addStationPrice } = await freshComposable()
+
+    const addPromise = addStationPrice(STATION_A)
+    expect(isLoading.value).toBe(true)
+
+    resolveFetch(undefined)
+    await addPromise
+
+    expect(isLoading.value).toBe(false)
+  })
+})
