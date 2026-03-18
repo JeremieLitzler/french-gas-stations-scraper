@@ -72,24 +72,53 @@ Before reviewing Vue/TypeScript-specific issues, fetch the following reference p
 
 ## Writing the review-results file
 
-Create `[task-folder]/review-results.md`. The file is consumed by the coder agent only when changes are requested — write nothing extra when the review is clean.
+Create `[task-folder]/review-results.md` using this exact template:
 
-If findings exist, list every finding with:
+```markdown
+# Review Results — Issue #[id]: [title]
 
-- File path and line reference
-- Which checklist rule it violates
-- A fix direction (no code)
+## Commands Run
 
-End with:
+- `npm run lint` output
 
-```plaintext
-status: changes requested
+<if any lint errors in changed files, list them in a fenced code block>
+
+```
+<content>
 ```
 
-If no findings remain, write only:
+<else>
+None of the changed files (see [technical specs](technical-specifications.md)) produced lint errors.
+<end-if>
 
-```plaintext
+### `npm run type-check` output
+
+<if any type errors, list them in a fenced code block>
+
+```
+<content>
+```
+
+<else>
+Type-check passes with zero errors.
+<end-if>
+
+## Checklist
+
+<if any checklist violation, list details per failing item>
+<else>
+- **Security guidelines:** ✓
+- **Object Calisthenics:** ✓
+- **Business spec compliance:** ✓
+- **Vue/TypeScript-specific issues:** ✓
+- **No dead code or unused imports:** ✓
+- **Naming clarity:** ✓
+<end-if>
+
 status: approved
 ```
 
-The status line must always be the last line of the file.
+Rules:
+- Do NOT add a summary section.
+- If findings exist, replace `status: approved` with `status: changes requested`.
+- The status line must always be the last line of the file.
