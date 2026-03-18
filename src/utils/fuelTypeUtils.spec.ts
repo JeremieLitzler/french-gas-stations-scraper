@@ -13,7 +13,7 @@ import { buildPriceRows, deriveFuelTypes, resolvePrice } from './fuelTypeUtils'
 // ---------------------------------------------------------------------------
 
 function makeStation(name: string, fuels: { type: string; price: number | null }[]): StationData {
-  return { stationName: name, fuels }
+  return { stationName: name, url: `https://www.prix-carburants.gouv.fr/station/${name.replace(/\s+/g, '-')}`, fuels }
 }
 
 // ---------------------------------------------------------------------------

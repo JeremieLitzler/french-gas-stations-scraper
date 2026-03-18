@@ -34,6 +34,9 @@ vi.mock('@/composables/useStationPrices', () => ({
     warnings: mockWarnings,
     fetchCompleted: mockFetchCompleted,
     loadAllStationPrices: mockLoadAllStationPrices,
+    removeStationPrice: vi.fn(),
+    addStationPrice: vi.fn().mockResolvedValue(undefined),
+    renameStation: vi.fn(),
   }),
 }))
 
@@ -54,7 +57,7 @@ vi.mock('@/composables/useStationStorage', () => ({
 // ---------------------------------------------------------------------------
 
 function makeStation(name: string, fuels: { type: string; price: number | null }[]): StationData {
-  return { stationName: name, fuels }
+  return { stationName: name, url: `https://www.prix-carburants.gouv.fr/station/${name.replace(/\s+/g, '-')}`, fuels }
 }
 
 const sharedStubs = {
