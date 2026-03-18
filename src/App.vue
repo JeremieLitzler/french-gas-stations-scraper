@@ -3,12 +3,7 @@ const GuestLayout = defineAsyncComponent(() => import('@/components/layout/Guest
 </script>
 
 <template>
-  <Suspense>
-    <Component :is="GuestLayout">
-      <RouterView />
-    </Component>
-    <template #fallback>
-      <AppLoader />
-    </template>
-  </Suspense>
+  <Component :is="GuestLayout">
+    <RouterView />
+  </Component>
 </template>

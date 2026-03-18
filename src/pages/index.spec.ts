@@ -71,7 +71,9 @@ describe('TC-08: AppLoader fallback is rendered inside <Suspense> when children 
   it('renders the AppLoader stub before async setup resolves (synchronous check before flushPromises)', async () => {
     const IndexPage = (await import('./index.vue')).default
     const wrapper = mount(IndexPage, {
-      global: { stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } } },
+      global: {
+        stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } },
+      },
     })
 
     // Before promises settle, the Suspense fallback (AppLoader) should be present
@@ -87,7 +89,9 @@ describe('TC-09: StationPrices content is visible after Suspense resolves', () =
   it('renders the prices section after async setup resolves', async () => {
     const IndexPage = (await import('./index.vue')).default
     const wrapper = mount(IndexPage, {
-      global: { stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } } },
+      global: {
+        stubs: { StationManager: true, AppLoader: { template: '<div class="app-loader-stub" />' } },
+      },
     })
     await flushPromises()
 
@@ -139,7 +143,9 @@ describe('TC-12: warning messages include station name and URL', () => {
     ]
 
     const IndexPage = (await import('./index.vue')).default
-    const wrapper = mount(IndexPage, { global: { stubs: { StationManager: true, AppLoader: true } } })
+    const wrapper = mount(IndexPage, {
+      global: { stubs: { StationManager: true, AppLoader: true } },
+    })
     await flushPromises()
 
     const warningList = wrapper.find('[aria-label="Station fetch warnings"]')
@@ -160,7 +166,9 @@ describe('TC-13: no warning messages rendered when warnings list is empty', () =
     mockWarnings.value = []
 
     const IndexPage = (await import('./index.vue')).default
-    const wrapper = mount(IndexPage, { global: { stubs: { StationManager: true, AppLoader: true } } })
+    const wrapper = mount(IndexPage, {
+      global: { stubs: { StationManager: true, AppLoader: true } },
+    })
     await flushPromises()
 
     const warningList = wrapper.find('[aria-label="Station fetch warnings"]')

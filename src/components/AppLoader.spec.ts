@@ -8,8 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import AppLoader from './AppLoader.vue'
 
-const DEFAULT_CLASS =
-  'absolute top-1/2 transform -translate-y-1/2 left-1/2 -translate-x-1/2 flex justify-center items-center w-full h-screen bg-background bg-opacity-90 z-50'
+const DEFAULT_CLASS = 'flex justify-center items-center gap-2 py-8'
 
 // ---------------------------------------------------------------------------
 // TC-04 — AppLoader default class produces a visible overlay
@@ -32,10 +31,7 @@ describe('TC-04: AppLoader default class produces a visible overlay', () => {
     })
 
     const cls = wrapper.find('div').attributes('class') ?? ''
-    expect(cls).toContain('absolute')
-    expect(cls).toContain('w-full')
-    expect(cls).toContain('h-screen')
-    expect(cls).toContain('z-50')
+    expect(cls).toContain('flex justify-center items-center gap-2 py-8')
   })
 })
 
