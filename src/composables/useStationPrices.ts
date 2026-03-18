@@ -19,7 +19,9 @@
 
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import type { Station, StationData, StationWarning } from '@/types'
+import type { Station } from '@/types/station'
+import type { StationData } from '@/types/station-data'
+import type { StationWarning } from '@/types/station-warning'
 import { parseStationHtml } from '@/utils/stationHtmlParser'
 
 const FETCH_PAGE_ENDPOINT = '/.netlify/functions/fetch-page'

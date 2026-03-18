@@ -13,7 +13,7 @@
  * adding a station and stored in IndexedDB as Station.name.
  */
 
-import type { FuelPrice } from '@/types'
+import type { FuelPrice } from '@/types/fuel-price'
 
 const FUEL_ROW_SELECTOR = '.details_pdv tbody tr'
 

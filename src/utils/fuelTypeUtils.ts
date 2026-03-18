@@ -9,7 +9,9 @@
  * markup or code (security-guidelines.md rules 1 and 2).
  */
 
-import type { FuelPrice, PriceRow, StationData } from '@/types'
+import type { FuelPrice } from '@/types/fuel-price'
+import type { PriceRow } from '@/types/price-row'
+import type { StationData } from '@/types/station-data'
 
 function addUnique(accumulator: string[], fuelType: string): string[] {
   if (accumulator.includes(fuelType)) return accumulator
@@ -63,5 +65,7 @@ function comparePriceRows(rowA: PriceRow, rowB: PriceRow): number {
  * Rows are sorted ascending by price; stations without the type sort last.
  */
 export function buildPriceRows(stations: StationData[], fuelType: string): PriceRow[] {
-  return stations.map((station: StationData) => toPriceRow(station, fuelType)).sort(comparePriceRows)
+  return stations
+    .map((station: StationData) => toPriceRow(station, fuelType))
+    .sort(comparePriceRows)
 }

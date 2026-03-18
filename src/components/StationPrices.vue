@@ -2,13 +2,15 @@
   <div class="station-prices">
     <h2 class="text-xl font-semibold mb-1">Prices</h2>
     <p class="mb-4">Change fuel type to your need</p>
-    <p v-if="showFetchSuccess" class="fetch-success" role="status">
-      Scraping complete.
-    </p>
+    <p v-if="showFetchSuccess" class="fetch-success" role="status">Scraping complete.</p>
     <ul v-if="warnings.length > 0" class="station-warnings" aria-label="Station fetch warnings">
       <li v-for="warning in warnings" :key="warning.url" class="station-warning-item">
-        Could not load prices for <strong>{{ warning.stationName }}</strong>
-        (<a :href="warning.url" target="_blank" rel="noopener noreferrer">{{ warning.url }}</a>).
+        Could not load prices for <strong>{{ warning.stationName }}</strong> (<a
+          :href="warning.url"
+          target="_blank"
+          rel="noopener noreferrer"
+          >{{ warning.url }}</a
+        >).
       </li>
     </ul>
     <template v-if="availableFuelTypes.length > 0">
@@ -54,7 +56,7 @@ import {
 import { useStationPrices } from '@/composables/useStationPrices'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { buildPriceRows, deriveFuelTypes } from '@/utils/fuelTypeUtils'
-import type { PriceRow } from '@/types'
+import type { PriceRow } from '@/types/price-row'
 
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
@@ -153,5 +155,4 @@ onUnmounted(() => {
   color: var(--cta-neutral-light);
   border-color: var(--cta-darker);
 }
-
 </style>

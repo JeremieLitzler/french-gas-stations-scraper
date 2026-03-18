@@ -22,7 +22,7 @@ interface AnchorLink {
   to?: string
 }
 // By default, the `to` property is a string with a default
-const { to = '#link-not-set', ...props } = defineProps<RouterLinkProps | AnchorLink>()
+const { to = '#link-not-set' } = defineProps<RouterLinkProps | AnchorLink>()
 const isExternal = computed(() => {
   // If we have a link that is inferred by Unplugin VueRouter, the type of `to` is object
   // RouteLocationAsRelativeTyped<RouteNamedMap, "/"> | RouteLocationAsRelativeTyped<RouteNamedMap, "/[...catchAll]"> | ... 9 more ... | RouteLocationAsPathTyped<...>

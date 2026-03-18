@@ -114,8 +114,8 @@ declare global {
   export type { ButtonVariants } from './src/components/ui/button/index'
   import('./src/components/ui/button/index')
   // @ts-ignore
-  export type { FuelPrice } from './src/types/index'
-  import('./src/types/index')
+  export type { FuelPrice } from './src/types/fuel-price'
+  import('./src/types/fuel-price')
   // @ts-ignore
   export type { PriceRow } from './src/types/price-row'
   import('./src/types/price-row')

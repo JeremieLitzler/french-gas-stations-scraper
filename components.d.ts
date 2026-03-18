@@ -14,7 +14,6 @@ declare module 'vue' {
     AppFooter: typeof import('./src/components/layout/AppFooter.vue')['default']
     AppFormField: typeof import('./src/components/AppFormField.vue')['default']
     AppHeading: typeof import('./src/components/AppHeading.vue')['default']
-    AppInputLiveEditText: typeof import('./src/components/AppInputLiveEditText.vue')['default']
     AppLink: typeof import('./src/components/AppLink.vue')['default']
     AppLoader: typeof import('./src/components/AppLoader.vue')['default']
     AppToolTip: typeof import('./src/components/AppToolTip.vue')['default']

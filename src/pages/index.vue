@@ -1,13 +1,18 @@
 <template>
-  <Suspense>
-    <div class="flex flex-col w-full">
+  <div class="flex flex-col w-full">
+    <Suspense>
       <StationPrices />
+      <template #fallback-prices>
+        <AppLoader />
+      </template>
+    </Suspense>
+    <Suspense>
       <StationManager />
-    </div>
-    <template #fallback>
-      <AppLoader />
-    </template>
-  </Suspense>
+      <template #fallback-manager>
+        <AppLoader />
+      </template>
+    </Suspense>
+  </div>
 </template>
 
 <script setup lang="ts">

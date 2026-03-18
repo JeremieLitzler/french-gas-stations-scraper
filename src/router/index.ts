@@ -6,6 +6,4 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach(async (to, _from) => {})
-
 export default router
