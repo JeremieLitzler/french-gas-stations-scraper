@@ -24,30 +24,18 @@ Do not execute more than **3 failing shell commands in total** — whether retry
 
 ## Writing the test-results file
 
-The file is a self-contained document for the current run. Create it at `[task-folder]/test-results.md`. Under it, write a full test report including:
+Create the file at `[task-folder]/test-results.md`. The file is consumed by the coder agent only when tests fail — write nothing extra when they pass.
 
-- Which tests were run
-- Which passed and which failed
-- Output or stack traces for any failures
-
-End the file with either:
+If all tests pass, write only:
 
 ```plaintext
-### Test Summary
-
-[test summary]
-
 status: passed
 ```
 
-or:
+If any tests fail, write the failure details followed by:
 
 ```plaintext
-### Testing failed
-
-[details of test run]
-
 status: failed
 ```
 
-The status line must always be the last line of the file.
+Include stack traces and failure output so the coder can diagnose and fix the issues. The status line must always be the last line of the file.

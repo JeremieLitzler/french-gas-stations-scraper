@@ -72,9 +72,7 @@ Before reviewing Vue/TypeScript-specific issues, fetch the following reference p
 
 ## Writing the review-results file
 
-Create `[task-folder]/review-results.md`.
-
-Include the full output of `npm run lint` and `npm run type-check`.
+Create `[task-folder]/review-results.md`. The file is consumed by the coder agent only when changes are requested — write nothing extra when the review is clean.
 
 If findings exist, list every finding with:
 
@@ -88,7 +86,7 @@ End with:
 status: changes requested
 ```
 
-If no findings remain, write a brief summary of what was reviewed. End with:
+If no findings remain, write only:
 
 ```plaintext
 status: approved
