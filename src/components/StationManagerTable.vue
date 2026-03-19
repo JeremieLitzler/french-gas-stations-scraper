@@ -1,10 +1,10 @@
 <template>
-  <Table>
+  <Table class="table-auto">
     <TableHeader>
       <TableRow :disable-hover="true">
-        <TableHead>Name</TableHead>
-        <TableHead>URL</TableHead>
-        <TableHead></TableHead>
+        <TableHead class="w-auto">Name</TableHead>
+        <TableHead class="w-auto">URL</TableHead>
+        <TableHead class="w-px whitespace-nowrap"></TableHead>
       </TableRow>
     </TableHeader>
     <TableBody>
@@ -31,13 +31,9 @@
           />
           <span v-if="newUrlError" class="field-error">{{ newUrlError }}</span>
         </TableCell>
-        <TableCell></TableCell>
+        <TableCell class="w-px whitespace-nowrap"></TableCell>
       </TableRow>
-      <TableRow
-        v-for="(draft, index) in rowDrafts"
-        :key="draft.originalUrl"
-        :disable-hover="true"
-      >
+      <TableRow v-for="(draft, index) in rowDrafts" :key="draft.originalUrl" :disable-hover="true">
         <TableCell>
           <input
             class="station-input"
@@ -58,7 +54,7 @@
           />
           <span v-if="draft.urlError" class="field-error">{{ draft.urlError }}</span>
         </TableCell>
-        <TableCell>
+        <TableCell class="w-px whitespace-nowrap">
           <button class="delete-button" type="button" @click="onDelete(draft.originalUrl)">
             ✕
           </button>
@@ -200,7 +196,9 @@ async function onExistingUrlBlur(index: number): Promise<void> {
 }
 
 function revertDraftName(index: number): void {
-  const original = stations.value.find((station) => station.url === rowDrafts.value[index].originalUrl)
+  const original = stations.value.find(
+    (station) => station.url === rowDrafts.value[index].originalUrl,
+  )
   if (original) rowDrafts.value[index].name = original.name
 }
 
