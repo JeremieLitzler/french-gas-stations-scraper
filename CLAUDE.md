@@ -68,7 +68,7 @@ IndexedDB (client-side only) stores the list of station objects `{ name, url }`.
 - Vue 3 Composition API with `<script setup lang="ts">` always
 - Composables in `src/composables/` prefixed with `use`
 - Utility functions in `src/utils/` — pure functions, no Vue dependencies
-- **Styling**: always use Tailwind CSS utility classes. Write custom CSS (inline `style` attributes, `<style>` blocks, or `.css` files) only when no Tailwind utility class covers the need — and add a comment explaining why
+- **Styling** *(coder: write; reviewer: enforce)*: always use Tailwind CSS utility classes. Write custom CSS (inline `style` attributes, `<style>` blocks, or `.css` files) only when no Tailwind utility class covers the need — and add a comment explaining why
 
 ## Naming Conventions
 
