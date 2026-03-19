@@ -24,7 +24,7 @@ The session runs from `develop/`. The bare repo root is `..`.
 
 ```bash
 git -C .. fetch origin
-git -C .. worktree add ../ci_<slug> -b ci/<slug> origin/develop
+git -C .. worktree add ci_<slug> -b ci/<slug> origin/develop
 ```
 
 Record the resulting worktree absolute path as `[worktree]`.
@@ -83,5 +83,5 @@ git -C .. branch -D ci/<slug>
 Then pull latest into `develop/`:
 
 ```bash
-git pull origin develop
+git pull --rebase origin develop
 ```
