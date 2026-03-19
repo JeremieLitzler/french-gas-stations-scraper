@@ -55,6 +55,18 @@ vi.mock('@/composables/useStationStorage', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useDefaultFuelType (required by StationPricesContent — Issue #28)
+// ---------------------------------------------------------------------------
+
+vi.mock('@/composables/useDefaultFuelType', () => ({
+  useDefaultFuelType: () => ({
+    defaultFuelType: ref(null),
+    loadDefaultFuelType: vi.fn().mockResolvedValue(undefined),
+    saveDefaultFuelType: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 

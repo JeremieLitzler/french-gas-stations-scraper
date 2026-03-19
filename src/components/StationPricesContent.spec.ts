@@ -64,6 +64,20 @@ vi.mock('@/composables/useStationStorage', () => ({
   }),
 }))
 
+const mockDefaultFuelType = ref<string | null>(null)
+const mockLoadDefaultFuelType = vi.fn().mockResolvedValue(undefined)
+const mockSaveDefaultFuelType = vi.fn().mockImplementation(async (label: string) => {
+  mockDefaultFuelType.value = label
+})
+
+vi.mock('@/composables/useDefaultFuelType', () => ({
+  useDefaultFuelType: () => ({
+    defaultFuelType: mockDefaultFuelType,
+    loadDefaultFuelType: mockLoadDefaultFuelType,
+    saveDefaultFuelType: mockSaveDefaultFuelType,
+  }),
+}))
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -108,6 +122,12 @@ beforeEach(() => {
   mockAddStationPrice.mockReset()
   mockAddStationPrice.mockResolvedValue(undefined)
   mockRenameStation.mockReset()
+  mockDefaultFuelType.value = null
+  mockLoadDefaultFuelType.mockResolvedValue(undefined)
+  mockSaveDefaultFuelType.mockReset()
+  mockSaveDefaultFuelType.mockImplementation(async (label: string) => {
+    mockDefaultFuelType.value = label
+  })
 })
 
 afterEach(() => {
@@ -353,5 +373,369 @@ describe('TC-09: selected fuel type resets to first available when it disappears
     expect(newButtons).toHaveLength(1)
     expect(newButtons[0].text()).toBe('SP95')
     expect(newButtons[0].classes()).toContain('active')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-06 — "Save as default" stores the selected fuel type; UI reflects
+//                  the confirmed/active state.
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-06: clicking "Save as default" stores the selection and activates the button', () => {
+  it('calls saveDefaultFuelType with the selected fuel type and shows "Default saved" label', async () => {
+    mockResults.value = [
+      { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    // Trigger watcher so selectedFuelType is seeded
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    const saveButton = activeWrapper.find('.default-fuel-button')
+    expect(saveButton.exists()).toBe(true)
+
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    expect(mockSaveDefaultFuelType).toHaveBeenCalledWith('SP95')
+
+    // After save, mockDefaultFuelType.value === 'SP95', so isCurrentDefault should be true
+    await nextTick()
+    const updatedButton = activeWrapper.find('.default-fuel-button')
+    expect(updatedButton.text()).toBe('Default saved')
+    expect(updatedButton.classes()).toContain('default-fuel-button--saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-07 — "Save as default" is not rendered when no fuel types are available
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-07: "Save as default" button is not rendered when no fuel types are loaded', () => {
+  it('does not render the default-fuel-actions section when availableFuelTypes is empty', async () => {
+    mockResults.value = []
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const saveButton = activeWrapper.find('.default-fuel-button')
+    expect(saveButton.exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-08 — After saving, the fuel type list reorders with new default first
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-08: after saving "Gasoil" as default, it appears first in the fuel type list', () => {
+  it('places "Gasoil" at index 0 in the fuel type selector after saving', async () => {
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+          { type: 'E10', price: 1.79 },
+        ],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    // Seed selectedFuelType via watcher
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    // Select Gasoil and save as default
+    const buttons = activeWrapper.findAll('.fuel-type-selector button')
+    const gasoilButton = buttons.find((b) => b.text() === 'Gasoil')
+    expect(gasoilButton).toBeDefined()
+    await gasoilButton!.trigger('click')
+    await flushPromises()
+
+    const saveButton = activeWrapper.find('.default-fuel-button')
+    await saveButton.trigger('click')
+    await flushPromises()
+
+    // mockSaveDefaultFuelType sets mockDefaultFuelType.value = 'Gasoil'
+    await nextTick()
+    await flushPromises()
+
+    const reorderedButtons = activeWrapper.findAll('.fuel-type-selector button')
+    expect(reorderedButtons[0].text()).toBe('Gasoil')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-12 — "Update default" is visible when selection differs from stored default
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-12: "Update default" button is visible when the selected type differs from the stored default', () => {
+  it('renders the "Update default" button when "Gasoil" is selected and "SP95" is the default', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+        ],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    // Seed selection
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    // Select Gasoil (which differs from the stored default SP95)
+    const buttons = activeWrapper.findAll('.fuel-type-selector button')
+    const gasoilButton = buttons.find((b) => b.text() === 'Gasoil')
+    await gasoilButton!.trigger('click')
+    await nextTick()
+
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    expect(updateButton).toBeDefined()
+    expect(updateButton!.exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-13 — "Update default" is not visible when selection matches stored default
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-13: "Update default" button is not rendered when the selected type matches the stored default', () => {
+  it('hides "Update default" when "SP95" is selected and "SP95" is the stored default', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+        ],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    // Seed selection (SP95 is the stored default, so it seeds as SP95)
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    const allDefaultButtons = activeWrapper.findAll('.default-fuel-button')
+    const updateButton = allDefaultButtons.find((b) => b.text() === 'Update default')
+    expect(updateButton).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-14 — "Update default" is not visible when no default is stored
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-14: "Update default" button is not rendered when no default is stored', () => {
+  it('shows only "Save as default" when defaultFuelType is null', async () => {
+    mockDefaultFuelType.value = null
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [{ type: 'Gasoil', price: 1.75 }],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    const allDefaultButtons = activeWrapper.findAll('.default-fuel-button')
+    const updateButton = allDefaultButtons.find((b) => b.text() === 'Update default')
+    expect(updateButton).toBeUndefined()
+
+    const saveButton = allDefaultButtons.find((b) => b.text() === 'Save as default')
+    expect(saveButton).toBeDefined()
+    expect(saveButton!.exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-15 — Clicking "Update default" replaces the stored default
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-15: clicking "Update default" calls saveDefaultFuelType with the current selection', () => {
+  it('saves "Gasoil" and hides "Update default" after clicking it', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+        ],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    // Select Gasoil
+    const buttons = activeWrapper.findAll('.fuel-type-selector button')
+    const gasoilButton = buttons.find((b) => b.text() === 'Gasoil')
+    await gasoilButton!.trigger('click')
+    await nextTick()
+
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    expect(updateButton!.exists()).toBe(true)
+
+    await updateButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockSaveDefaultFuelType).toHaveBeenCalledWith('Gasoil')
+
+    // After save, mockDefaultFuelType.value === 'Gasoil' — Update default should disappear
+    await nextTick()
+    const remainingDefaultButtons = activeWrapper.findAll('.default-fuel-button')
+    const stillUpdateButton = remainingDefaultButtons.find((b) => b.text() === 'Update default')
+    expect(stillUpdateButton).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-17 — Fuel type label is not rendered as raw HTML
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-17: fuel type labels containing HTML markup are displayed as plain text', () => {
+  it('renders "<b>SP95</b>" as a literal string, not as bold markup', async () => {
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [{ type: '<b>SP95</b>', price: 1.89 }],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    // The fuel-type-selector should show the literal string, not rendered HTML
+    const selectorButtons = activeWrapper.findAll('.fuel-type-selector button')
+    expect(selectorButtons).toHaveLength(1)
+    expect(selectorButtons[0].text()).toBe('<b>SP95</b>')
+    // No <b> element should be rendered inside the button
+    expect(selectorButtons[0].find('b').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-19 — "Save as default" button is keyboard accessible
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-19: "Save as default" is a plain <button> element for keyboard accessibility', () => {
+  it('renders as a <button> with type="button" so it is reachable via Tab and activatable via Enter/Space', async () => {
+    mockResults.value = [
+      { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    const saveButton = activeWrapper.find('.default-fuel-button')
+    expect(saveButton.element.tagName).toBe('BUTTON')
+    expect(saveButton.attributes('type')).toBe('button')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-20 — "Update default" button is keyboard accessible
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-20: "Update default" is a plain <button> element for keyboard accessibility', () => {
+  it('renders as a <button> with type="button" so it is reachable via Tab and activatable via Enter/Space', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+        ],
+      },
+    ]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const snapshot = [...mockResults.value]
+    mockResults.value = []
+    await nextTick()
+    mockResults.value = snapshot
+    await nextTick()
+    await flushPromises()
+
+    // Select Gasoil to make "Update default" visible
+    const fuelButtons = activeWrapper.findAll('.fuel-type-selector button')
+    const gasoilButton = fuelButtons.find((b) => b.text() === 'Gasoil')
+    await gasoilButton!.trigger('click')
+    await nextTick()
+
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    expect(updateButton).toBeDefined()
+    expect(updateButton!.element.tagName).toBe('BUTTON')
+    expect(updateButton!.attributes('type')).toBe('button')
   })
 })
