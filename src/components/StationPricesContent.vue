@@ -24,20 +24,30 @@
         </button>
       </div>
       <div class="default-fuel-actions">
+        <span v-if="isCurrentDefault" class="default-indicator" aria-label="This is your default fuel type">Default</span>
         <button
+          v-if="showSaveDefault"
           type="button"
-          :class="['default-fuel-button', { 'default-fuel-button--saved': isCurrentDefault }]"
+          class="default-fuel-button"
           @click="onSaveDefault"
         >
-          {{ isCurrentDefault ? 'Default saved' : 'Save as default' }}
+          Save as default
         </button>
         <button
           v-if="showUpdateDefault"
           type="button"
           class="default-fuel-button"
-          @click="onSaveDefault"
+          @click="onUpdateDefault"
         >
           Update default
+        </button>
+        <button
+          v-if="showClearDefault"
+          type="button"
+          class="default-fuel-button"
+          @click="onClearDefault"
+        >
+          Clear default
         </button>
       </div>
       <Table>
@@ -79,7 +89,7 @@ const SUCCESS_DISMISS_DELAY_MS = 3000
 
 const { stations, loadStations } = useStationStorage()
 const { results, warnings, fetchCompleted, loadAllStationPrices, removeStationPrice, addStationPrice, renameStation } = useStationPrices()
-const { defaultFuelType, loadDefaultFuelType, saveDefaultFuelType } = useDefaultFuelType()
+const { defaultFuelType, loadDefaultFuelType, saveDefaultFuelType, updateDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
@@ -93,7 +103,7 @@ const derivedFuelTypes = computed<string[]>(() => deriveFuelTypes(results.value)
  * The composable accepts any non-empty string from IndexedDB; the component is responsible
  * for checking the value against the currently available fuel types before treating it as valid.
  * Returns null when the stored default is absent from the derived list — without clearing
- * the persisted value (TC-11: stored default is left intact when fuel types change).
+ * the persisted value (TC-15: stored default is left intact when fuel types change).
  */
 const validatedDefaultFuelType = computed<string | null>(() => {
   const stored = defaultFuelType.value
@@ -114,12 +124,27 @@ const isCurrentDefault = computed<boolean>(
   () => validatedDefaultFuelType.value !== null && selectedFuelType.value === validatedDefaultFuelType.value,
 )
 
+/**
+ * Button visibility matrix (business-specifications.md):
+ *
+ * | Condition                                       | Save | Update | Clear |
+ * |-------------------------------------------------|------|--------|-------|
+ * | No default stored                               |  ✓   |   —    |   —   |
+ * | Default stored, selection = default             |  —   |   —    |   ✓   |
+ * | Default stored, selection ≠ default             |  —   |   ✓    |   ✓   |
+ */
+const hasStoredDefault = computed<boolean>(() => defaultFuelType.value !== null)
+
+const showSaveDefault = computed<boolean>(() => !hasStoredDefault.value)
+
 const showUpdateDefault = computed<boolean>(
   () =>
-    validatedDefaultFuelType.value !== null &&
+    hasStoredDefault.value &&
     selectedFuelType.value !== '' &&
     selectedFuelType.value !== validatedDefaultFuelType.value,
 )
+
+const showClearDefault = computed<boolean>(() => hasStoredDefault.value)
 
 function resolveInitialSelection(fuelTypes: string[]): string {
   if (fuelTypes.length === 0) return ''
@@ -136,6 +161,15 @@ watch(derivedFuelTypes, (fuelTypes: string[]) => {
 async function onSaveDefault(): Promise<void> {
   if (selectedFuelType.value === '') return
   await saveDefaultFuelType(selectedFuelType.value)
+}
+
+async function onUpdateDefault(): Promise<void> {
+  if (selectedFuelType.value === '') return
+  await updateDefaultFuelType(selectedFuelType.value)
+}
+
+async function onClearDefault(): Promise<void> {
+  await clearDefaultFuelType()
 }
 
 function clearDismissTimer(): void {
@@ -257,43 +291,49 @@ onUnmounted(() => {
 
 /*
  * .default-fuel-actions: Custom CSS required because Tailwind has no utility for
- * CSS custom properties used as design-token references (e.g. var(--cta-light),
- * var(--cta-base)). The layout itself (flex, gap, margin) could use Tailwind, but
- * keeping all button-group styles in the same rule set avoids splitting related
- * declarations across template attributes and the style block.
+ * CSS custom properties used as design-token references. The layout itself
+ * (flex, gap, margin) could use Tailwind, but keeping all button-group styles
+ * in the same rule set avoids splitting related declarations across template
+ * attributes and the style block.
  */
 .default-fuel-actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   margin-bottom: 1rem;
 }
 
 /*
- * .default-fuel-button: Custom CSS required because the button appearance relies
- * on CSS custom properties (var(--cta-light), var(--cta-lighter), etc.) defined
- * in the global design token stylesheet. Tailwind's arbitrary-value syntax
- * (e.g. bg-[var(--cta-lighter)]) is intentionally avoided to keep design-token
- * references centralised in the scoped style block rather than scattered across
- * template attributes.
+ * .default-indicator: Custom CSS required to apply the stone-200/stone-800
+ * design tokens (var(--color-stone-200), var(--color-stone-800)) from the
+ * business spec. Tailwind arbitrary-value syntax for CSS custom properties
+ * is intentionally avoided to keep design-token references centralised in
+ * the scoped style block.
  */
-.default-fuel-button {
-  padding: 0.25rem 0.75rem;
-  border: 1px solid var(--cta-light);
+.default-indicator {
+  padding: 0.125rem 0.5rem;
   border-radius: 0.375rem;
-  background-color: var(--cta-lighter);
-  color: var(--cta-neutral-dark);
-  cursor: pointer;
-  font-size: 0.875rem;
+  background-color: var(--color-stone-200);
+  color: var(--color-stone-800);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 /*
- * .default-fuel-button--saved: BEM modifier using the same CSS custom property
- * tokens as .default-fuel-button. Same rationale applies — Tailwind arbitrary
- * values for design tokens are avoided here for consistency.
+ * .default-fuel-button: Custom CSS required because the button appearance relies
+ * on CSS custom properties (var(--color-stone-200), var(--color-stone-800))
+ * defined in the global design token stylesheet per business-specifications.md.
+ * Tailwind's arbitrary-value syntax (e.g. bg-[var(--color-stone-200)]) is
+ * intentionally avoided to keep design-token references centralised in the
+ * scoped style block rather than scattered across template attributes.
  */
-.default-fuel-button--saved {
-  background-color: var(--cta-base);
-  color: var(--cta-neutral-light);
-  border-color: var(--cta-darker);
+.default-fuel-button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--color-stone-400);
+  border-radius: 0.375rem;
+  background-color: var(--color-stone-200);
+  color: var(--color-stone-800);
+  cursor: pointer;
+  font-size: 0.875rem;
 }
 </style>

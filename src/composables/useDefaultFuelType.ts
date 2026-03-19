@@ -16,7 +16,7 @@
 
 import { ref } from 'vue'
 import type { Ref } from 'vue'
-import { get, set } from '@/utils/indexedDb'
+import { get, set, del } from '@/utils/indexedDb'
 
 const DEFAULT_FUEL_TYPE_KEY = 'defaultFuelType'
 
@@ -42,9 +42,21 @@ export function useDefaultFuelType() {
     defaultFuelType.value = label
   }
 
+  const updateDefaultFuelType = async (label: string): Promise<void> => {
+    await set(DEFAULT_FUEL_TYPE_KEY, label)
+    defaultFuelType.value = label
+  }
+
+  const clearDefaultFuelType = async (): Promise<void> => {
+    await del(DEFAULT_FUEL_TYPE_KEY)
+    defaultFuelType.value = null
+  }
+
   return {
     defaultFuelType,
     loadDefaultFuelType,
     saveDefaultFuelType,
+    updateDefaultFuelType,
+    clearDefaultFuelType,
   }
 }
