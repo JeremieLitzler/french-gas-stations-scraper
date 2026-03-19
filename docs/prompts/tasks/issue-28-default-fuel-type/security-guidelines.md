@@ -22,4 +22,9 @@
 - **Where:** `src/utils/fuelTypeUtils.ts`, in the new ordering function.
 - **Why:** Mutating shared reactive state from a utility function can propagate unexpected side effects across composables that hold a reference to the same array.
 
+**5. Use a proper key deletion — never overwrite with empty or null**
+- **What:** `clearDefault` must call the IndexedDB `del(key)` operation to remove the key entirely; setting the key to an empty string, `null`, or `undefined` is prohibited.
+- **Where:** `src/composables/useDefaultFuelType.ts`, in the `clearDefault` action; `src/utils/indexedDb.ts`, which must expose a `del` helper.
+- **Why:** A sentinel value left in storage could be read back by validation logic and treated as a valid-but-empty default, bypassing the non-empty-string guard and leaving the store in an ambiguous state.
+
 status: ready
