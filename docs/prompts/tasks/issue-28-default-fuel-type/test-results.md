@@ -13,9 +13,7 @@ All those mentioned in [technical specifications](technical-specifications.md).
 All tests passed. No failures.
 
 ### Test Summary
-
-16 test files, 203 tests total — all passed.
-
-- Duration: ~11.75 seconds
+16 test files, 225 tests total — all passed.
+- Duration: ~11.19 seconds (transform 3.89s, setup 0ms, import 4.68s, tests 6.62s, environment 14.17s)
 
 status: passed

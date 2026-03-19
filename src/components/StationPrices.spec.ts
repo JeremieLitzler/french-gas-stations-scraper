@@ -61,6 +61,8 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
     defaultFuelType: ref(null),
     loadDefaultFuelType: vi.fn().mockResolvedValue(undefined),
     saveDefaultFuelType: vi.fn().mockResolvedValue(undefined),
+    updateDefaultFuelType: vi.fn().mockResolvedValue(undefined),
+    clearDefaultFuelType: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
