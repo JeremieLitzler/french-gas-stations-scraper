@@ -65,19 +65,13 @@ Show the user the PR URL and ask for approval to merge.
 
 ## Step 6 — Merge and clean up
 
-Once approved, run from the bare repo root (not from inside any worktree) to avoid `gh` attempting a local branch switch:
+Once approved, remove the worktree first (so the branch is free), then merge from the bare repo root:
 
 ```bash
-cd .. && gh pr merge <pr-url> --rebase --delete-branch
-```
-
-Then clean up from the bare repo root:
-
-```bash
-git -C .. fetch origin
 git -C .. worktree remove --force ci_<slug>
 git -C .. worktree prune
-git -C .. branch -D ci/<slug>
+cd .. && gh pr merge <pr-url> --rebase --delete-branch
+git -C .. fetch origin
 ```
 
 Then pull latest into `develop/`:
