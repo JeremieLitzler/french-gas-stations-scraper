@@ -2,41 +2,39 @@
 
 ## Commands Run
 
-- `npm run lint` output
-
-None of the changed files produced lint errors.
+### `npm run lint` output
+No lint errors in changed files.
 
 ### `npm run type-check` output
-
 Type-check passes with zero errors.
 
 ## Checklist
 
-- [x] **Security rule 1 — validate stored value before use**: `loadDefaultFuelType` in `useDefaultFuelType.ts` uses `isNonEmptyString` to reject non-string and empty-string values from IndexedDB. The component's `validatedDefaultFuelType` computed cross-checks the accepted string against `derivedFuelTypes` before treating it as valid — returning `null` when absent from the live list. Two-layer validation is in place.
-- [x] **Security rule 2 — no `v-html`**: All fuel type label rendering uses `{{ }}` text interpolation throughout `StationPricesContent.vue`. No `v-html` usage in any changed file.
-- [x] **Security rule 3 — plain string storage only**: `saveDefaultFuelType(label: string)` passes the label directly to `set(DEFAULT_FUEL_TYPE_KEY, label)`. No object serialisation.
-- [x] **Security rule 4 — input array not mutated**: `orderFuelTypes` accepts `readonly string[]`, returns `[...fuelTypes]` or `[defaultFuelType, ...remaining]` via spread and `filter`. The input is never mutated.
-- [x] **Object Calisthenics**: All functions are small and single-purpose. The composable body exception is documented inline with a framework-convention rationale.
-- [x] **Business spec — Story 1 (save default)**: "Save as default" button is inside `v-if="availableFuelTypes.length > 0"`, calls `onSaveDefault()` which guards against empty selection, and applies the `default-fuel-button--saved` modifier class via `isCurrentDefault`.
-- [x] **Business spec — Story 2 (load and apply on startup)**: `loadDefaultFuelType()` is awaited before `loadAllStationPrices`; `resolveInitialSelection` uses `validatedDefaultFuelType` to prefer the stored default over the first available item.
-- [x] **Business spec — Story 2 fallback (stored default absent from derived list)**: `validatedDefaultFuelType` returns `null` when the stored value is not in `derivedFuelTypes`; `resolveInitialSelection` falls back to `fuelTypes[0]`. The persisted IndexedDB value is left intact (TC-11).
-- [x] **Business spec — Story 3 (update default)**: `showUpdateDefault` is `true` only when a validated default exists and the current selection differs. "Update default" button is rendered conditionally and calls `onSaveDefault()`.
-- [x] **Business spec — Story 4 (ordered list)**: `availableFuelTypes` computed applies `orderFuelTypes(derivedFuelTypes.value, validatedDefaultFuelType.value)` reactively.
-- [x] **Keyboard accessibility**: Both "Save as default" and "Update default" are `<button type="button">` elements.
+- [x] **Security rule 1 — validate stored value before use**: `loadDefaultFuelType` calls `get<unknown>` and passes the result through `isNonEmptyString()` before assigning to reactive state. `validatedDefaultFuelType` further cross-checks against `derivedFuelTypes` before the value drives any UI logic. Two-layer validation is in place.
+- [x] **Security rule 2 — no `v-html`**: Absent from the entire component. The `Default` indicator renders a static string literal; no fuel label is ever passed to `v-html`.
+- [x] **Security rule 3 — store plain string only**: `saveDefaultFuelType(label: string)` and `updateDefaultFuelType(label: string)` call `set(DEFAULT_FUEL_TYPE_KEY, label)` with the string directly — no structured payload.
+- [x] **Security rule 4 — input array not mutated**: `orderFuelTypes` accepts `readonly string[]` and returns `[...fuelTypes]` or `[defaultFuelType, ...remaining]` via spread and `filter`. The input is never written to.
+- [x] **Security rule 5 — `del()` not overwrite**: `clearDefaultFuelType` calls `del(DEFAULT_FUEL_TYPE_KEY)` and resets the in-memory ref to `null`. No empty-string or null overwrite.
+- [x] **Button visibility matrix — all 3 conditions × 3 buttons**:
+  - No default stored: `showSaveDefault = !hasStoredDefault` → visible; `showUpdateDefault` → false (hasStoredDefault false); `showClearDefault = hasStoredDefault` → false. Correct.
+  - Default stored, selection = default: `showSaveDefault` → false; `showUpdateDefault` → false (`selectedFuelType === validatedDefaultFuelType`); `showClearDefault` → true. Correct.
+  - Default stored, selection ≠ default: `showSaveDefault` → false; `showUpdateDefault` → true; `showClearDefault` → true. Correct.
+- [x] **"Default" indicator is separate from buttons**: `<span class="default-indicator">Default</span>` with `v-if="isCurrentDefault"` is a distinct element — not a modifier on any button, not conditioned on `showSaveDefault`.
+- [x] **Object Calisthenics**: All functions are small and single-purpose. Composable body exception is documented with a framework-convention rationale comment.
+- [x] **No dead code, unused imports, or unreachable branches**: All imports are used. `updateDefaultFuelType` and `saveDefaultFuelType` have identical storage operations but are exposed as distinct named actions — intentional per spec. No unreachable branches.
+- [x] **Naming clarity, no abbreviations**: All identifiers are fully spelled out (`validatedDefaultFuelType`, `hasStoredDefault`, `clearDefaultFuelType`, `resolveInitialSelection`, etc.).
+- [x] **No destructuring reactivity loss**: `defaultFuelType` ref is returned as-is from the composable and accessed via `.value` everywhere — reactivity is preserved.
+- [x] **Watch targets correct**: `watch(derivedFuelTypes, ...)` targets a `ComputedRef<string[]>` directly, which is valid in Vue 3. Watching `derivedFuelTypes` (not `availableFuelTypes`) correctly limits re-seeding to when the set of available types changes, not on every save/update/clear (documented in technical spec).
+- [x] **No `any`/`unknown` without narrowing**: `get<unknown>` result is narrowed by `isNonEmptyString()` before assignment. No other unguarded `unknown` usage.
+- [x] **No non-null assertions without null check**: The single `as Station` assertion (line 224) is guarded by the `oldByUrl.has(url)` check on line 219.
+- [x] **Explicit return types on exported functions**: All exported functions in `fuelTypeUtils.ts`, `indexedDb.ts`, and `useDefaultFuelType.ts` carry explicit return type annotations (`string[]`, `Promise<void>`, `Promise<T | undefined>`, etc.).
+- [x] **Side effects cleaned up with `onUnmounted`**: The dismiss timer is cleared in `onUnmounted(() => { clearDismissTimer() })`. The composable registers no lifecycle hooks, so no composable-level cleanup is needed.
+- [x] **`async setup` + `<Suspense>`**: `StationPricesContent.vue` uses top-level awaits; its parent `StationPrices.vue` wraps it in `<Suspense>` with an `AppLoader` fallback.
+- [x] **`hasStoredDefault` uses raw `defaultFuelType.value`**: Correctly bases button visibility on the raw ref, not `validatedDefaultFuelType`, so "Clear default" remains visible when the stored default is temporarily absent from the derived list (TC-15).
+- [x] **`loadDefaultFuelType` ordered before `loadAllStationPrices`**: Ensures `defaultFuelType` is populated before `derivedFuelTypes` first emits, preventing a spurious fallback to first-item selection.
+- [x] **Singleton pattern (ADR-002)**: Module-level `Ref<string | null>` is declared outside the composable function body; all consumers share the same reactive instance.
+- [x] **Keyboard accessibility**: All three action buttons are standard `<button type="button">` elements — natively keyboard accessible.
 - [x] **No new external dependency** introduced.
-- [x] **Watch target is `derivedFuelTypes` not `availableFuelTypes`**: Prevents spurious re-seeding of `selectedFuelType` when only ordering changes (TC-09 / TC-11).
-- [x] **`isCurrentDefault` computed**: Uses `validatedDefaultFuelType.value` (not raw `defaultFuelType.value`) — false when no default is set or when the stored default is absent from the live list.
-- [x] **`showUpdateDefault` computed**: Guards on `selectedFuelType.value !== ''` in addition to the default/selection mismatch check — prevents the button showing when no fuel type is selected.
-- [x] **Singleton composable pattern (ADR-002)**: Module-level `Ref<string | null>` declared outside the function body; all consumers share the same reactive reference.
-- [x] **IndexedDB key distinct from stations key**: Key is `"defaultFuelType"`, separate from `"stations"`.
-- [x] **No dead code or unused imports**: All imported symbols are used. No unreachable branches.
-- [x] **No `any` / `unknown` without narrowing**: `get<unknown>` result is narrowed by `isNonEmptyString` before assignment.
-- [x] **No unguarded non-null assertions**: `oldByUrl.get(url) as Station` at line 189 is preceded by a passing `oldByUrl.has(url)` check — the assertion is safe.
-- [x] **All exported functions have explicit return types**: `deriveFuelTypes`, `resolvePrice`, `buildPriceRows`, `orderFuelTypes` all carry explicit return types. Composable functions `loadDefaultFuelType` and `saveDefaultFuelType` are typed `Promise<void>`.
-- [x] **Composable prefixed with `use`**: `useDefaultFuelType`. Correct.
-- [x] **No reactive arg accepted by composable** — `toValue()`/`toRef()` not applicable.
-- [x] **Side effect cleanup**: `useDefaultFuelType` registers no timers or listeners. The `dismissTimer` side effect in `StationPricesContent.vue` is cleaned up in `onUnmounted`.
-- [x] **Styling — CSS comments present**: All three new rule sets (`.default-fuel-actions`, `.default-fuel-button`, `.default-fuel-button--saved`) include an explanatory comment stating why Tailwind arbitrary values for design tokens are avoided.
-- [x] **Naming clarity**: All identifiers are unambiguous and consistent with project conventions (`validatedDefaultFuelType`, `derivedFuelTypes`, `resolveInitialSelection`, `onSaveDefault`, `isCurrentDefault`, `showUpdateDefault`).
+- [x] **CSS comments present**: All new rule sets (`.default-fuel-actions`, `.default-indicator`, `.default-fuel-button`) include a comment explaining why Tailwind arbitrary-value syntax for design tokens is avoided.
 
 status: approved
