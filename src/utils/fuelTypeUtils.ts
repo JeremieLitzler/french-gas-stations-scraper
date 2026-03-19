@@ -69,3 +69,21 @@ export function buildPriceRows(stations: StationData[], fuelType: string): Price
     .map((station: StationData) => toPriceRow(station, fuelType))
     .sort(comparePriceRows)
 }
+
+/**
+ * Return a new fuel type list reordered so the default type appears first.
+ * If the default is absent from the list, or no default is provided,
+ * the original order is preserved.
+ *
+ * The input array is never mutated (security-guidelines.md rule 4).
+ */
+export function orderFuelTypes(
+  fuelTypes: readonly string[],
+  defaultFuelType: string | null | undefined,
+): string[] {
+  if (!defaultFuelType) return [...fuelTypes]
+  const defaultIndex = fuelTypes.indexOf(defaultFuelType)
+  if (defaultIndex <= 0) return [...fuelTypes]
+  const remaining = fuelTypes.filter((type) => type !== defaultFuelType)
+  return [defaultFuelType, ...remaining]
+}
