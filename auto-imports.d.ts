@@ -89,6 +89,7 @@ declare global {
   const useAttrs: typeof import('vue').useAttrs
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
+  const useDefaultFuelType: typeof import('./src/composables/useDefaultFuelType').useDefaultFuelType
   const useId: typeof import('vue').useId
   const useModel: typeof import('vue').useModel
   const useRoute: typeof import('vue-router').useRoute

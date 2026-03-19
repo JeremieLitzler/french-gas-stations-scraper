@@ -1,12 +1,13 @@
 /**
  * Tests for fuelTypeUtils pure utility functions.
  *
- * TC-01 through TC-10 from test-cases.md.
+ * TC-01 through TC-10 from test-cases.md (issue-25 scenarios).
+ * TC-01 through TC-05 from test-cases.md (issue-28 orderFuelTypes scenarios).
  */
 
 import { describe, expect, it } from 'vitest'
 import type { StationData } from '@/types/station-data'
-import { buildPriceRows, deriveFuelTypes, resolvePrice } from './fuelTypeUtils'
+import { buildPriceRows, deriveFuelTypes, orderFuelTypes, resolvePrice } from './fuelTypeUtils'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -202,5 +203,88 @@ describe('TC-10: resolvePrice returns null when the station does not carry the t
     const result = resolvePrice(station, 'SP95')
 
     expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-01 — Default type is placed first in the list
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-01: orderFuelTypes places the default first', () => {
+  it('moves "Gasoil" to index 0 when it is not already first', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+
+    const result = orderFuelTypes(input, 'Gasoil')
+
+    expect(result).toEqual(['Gasoil', 'SP95', 'E10'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-02 — No default: list order is unchanged
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-02: orderFuelTypes preserves order when no default is provided', () => {
+  it('returns the same order when default is undefined', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+
+    expect(orderFuelTypes(input, undefined)).toEqual(['SP95', 'Gasoil', 'E10'])
+  })
+
+  it('returns the same order when default is null', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+
+    expect(orderFuelTypes(input, null)).toEqual(['SP95', 'Gasoil', 'E10'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-03 — Default is already first: list order is unchanged
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-03: orderFuelTypes does not move the default when it is already first', () => {
+  it('returns the same order when "SP95" is already at index 0', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+
+    const result = orderFuelTypes(input, 'SP95')
+
+    expect(result).toEqual(['SP95', 'Gasoil', 'E10'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-04 — Default not present in the list: list order is unchanged
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-04: orderFuelTypes preserves order when the default is not in the list', () => {
+  it('returns the original order when the default fuel type is absent', () => {
+    const input = ['SP95', 'Gasoil']
+
+    const result = orderFuelTypes(input, 'E85')
+
+    expect(result).toEqual(['SP95', 'Gasoil'])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue-28 TC-05 — Ordering function does not mutate the input array
+// ---------------------------------------------------------------------------
+
+describe('Issue-28 TC-05: orderFuelTypes does not mutate the input array', () => {
+  it('leaves the original array unchanged after reordering', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+    const originalCopy = [...input]
+
+    orderFuelTypes(input, 'E10')
+
+    expect(input).toEqual(originalCopy)
+  })
+
+  it('returns a new array reference, not the original', () => {
+    const input = ['SP95', 'Gasoil', 'E10']
+
+    const result = orderFuelTypes(input, 'E10')
+
+    expect(result).not.toBe(input)
   })
 })
