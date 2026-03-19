@@ -153,10 +153,6 @@ Composables must never self-trigger data fetching on init. The caller component 
 
 Never call a composable inside a plain or async function within another composable. Composables must only be called at the top level of `setup()`. If a composable needs data from another, the caller component calls both in `setup()` and passes the data as a parameter to the action that needs it.
 
-## Tailwind CSS Styling
-
-Always use Tailwind CSS utility classes for styling. Do not write custom CSS (inline `style` attributes, `<style>` blocks, or external `.css` files) unless no Tailwind utility class covers the need. When a custom CSS rule is unavoidable, add an inline comment explaining why Tailwind is insufficient.
-
 ## Shell Command Retry Limit
 
 Do not execute more than **3 failing shell commands in total** — whether retrying the same command or trying a different one. After 3 failed executions, stop immediately and report the full error output to the orchestrator.
