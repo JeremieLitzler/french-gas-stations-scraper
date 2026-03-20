@@ -16,9 +16,9 @@
 
 ## Propriété et responsabilité du site
 
-**Propriétaire :** Jeremie Litzler, 675 Chemin d'Andéol, 07300 TOURNON-SUR-RHONE
+**Propriétaire :** Jeremie Litzler, 4 rue de l'égalité, 26260 Clérieux, France
 
-**Responsable de publication :** jeremie.litzler@gmail.com
+**Responsable de publication :** jeremie . litzler @ gmail . com
 
 **Webmaster :** Jeremie Litzler
 
@@ -57,6 +57,7 @@ Jeremie Litzler est responsable du traitement des informations personnelles coll
 ### Finalités de la collecte des données
 
 L'éditeur traite les données aux fins suivantes :
+
 - Navigation sur le site et gestion des services/commandes (données de connexion, facturation, historique de commandes)
 - Prévention de la fraude (adresse IP, mot de passe haché)
 - Amélioration de la navigation
@@ -68,6 +69,7 @@ coupdepompe.madebyjeremie.fr ne commercialise pas vos données personnelles — 
 ### Droits des utilisateurs au titre du RGPD
 
 Les utilisateurs disposent des droits suivants :
+
 - Accès (article 15) et rectification (article 16) des données
 - Effacement (article 17) des données inexactes ou non autorisées
 - Retrait du consentement (article 13-2c)
