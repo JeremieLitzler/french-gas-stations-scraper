@@ -67,8 +67,8 @@ Three scripts under `scripts/pipeline/` encapsulate the git operations most pron
 
 | Script                                                         | Purpose                                                                                                                    |
 | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `scripts/pipeline/fetch-origin.sh [bare-repo]`                 | Ensure `origin` is configured + full refspec, then fetch. Called by `worktree-create.sh`; run standalone for Task 1 alone. |
-| `scripts/pipeline/worktree-create.sh <type> <slug>`            | Fetch (via `fetch-origin.sh`), create branch + worktree, install npm deps. Prints `Worktree: <path>`.                      |
+| `scripts/pipeline/fetch-origin.sh [bare-repo]`                 | Ensure `origin` is configured + full refspec, then fetch. Always run first (Task 1).                                       |
+| `scripts/pipeline/worktree-create.sh <type> <slug>`            | Create branch + worktree, install npm deps. Prints `Worktree: <path>`. Requires fetch-origin.sh to have run first.        |
 | `scripts/pipeline/pr-create.sh <worktree> <title> <body-file>` | Push branch, open PR against `develop`. Prints `PR: <url>`.                                                                |
 | `scripts/pipeline/pr-complete.sh <pr-url>`                     | Merge open PR (rebase + delete remote branch). Skips gracefully if already merged/closed.                                  |
 | `scripts/pipeline/worktree-cleanup.sh <worktree>`              | Remove worktree directory, prune stale entries, delete local branch.                                                       |
@@ -80,25 +80,25 @@ Call them with `bash scripts/pipeline/<script>.sh` from the `develop/` worktree 
 
 ### Task 1: Make Sure Local Repository Is Up-to-date
 
-Handled automatically by `worktree-create.sh` in Task 2. If Task 2 is not being run (rare), run:
+**Always run this first — never skip it.**
 
 ```bash
 bash scripts/pipeline/fetch-origin.sh
 ```
 
-The script checks that `origin` exists (adds it if missing, inferring the URL from the `develop/` remote config), ensures the full fetch refspec is set, and fetches all remote refs.
+Ensures `origin` is configured (adds it if missing, inferring the URL from `develop/`), sets the full fetch refspec, and fetches all remote refs.
 
 ### Task 2: Create new branch and worktree
 
 The orchestrator passes `Type: <type>` and `Slug: <slug>` directly — use these values.
 
-Run from the `develop/` worktree:
+**Requires Task 1 to have completed successfully.**
 
 ```bash
 bash scripts/pipeline/worktree-create.sh <type> <slug>
 ```
 
-The script fetches origin, creates `<bare-repo>/<type>_<slug>` on branch `<type>/<slug>` from `origin/develop`, installs npm dependencies, and prints:
+Creates `<bare-repo>/<type>_<slug>` on branch `<type>/<slug>` from `origin/develop` and installs npm dependencies. Prints:
 
 ```
 Worktree: <absolute-path>

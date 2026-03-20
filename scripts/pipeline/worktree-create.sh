@@ -9,6 +9,8 @@
 # Works when called from any worktree (develop/, feat_*/,  ci_*/) because
 # the bare repo is always the parent directory of whichever worktree holds
 # this script.
+#
+# Prerequisites: run fetch-origin.sh before this script.
 
 set -euo pipefail
 
@@ -23,8 +25,6 @@ BARE_REPO="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 WT_NAME="${TYPE}_${SLUG}"
 BRANCH="${TYPE}/${SLUG}"
 WT_PATH="${BARE_REPO}/${WT_NAME}"
-
-bash "$SCRIPT_DIR/fetch-origin.sh" "$BARE_REPO"
 
 echo "==> Creating worktree '${WT_NAME}' on branch '${BRANCH}'..."
 git -C "$BARE_REPO" worktree add "$WT_NAME" -b "$BRANCH" origin/develop
