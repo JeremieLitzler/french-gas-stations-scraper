@@ -1,30 +1,21 @@
-# Test Results — Issue #50: Rework UX / UI (Inline HTML + Footer translation)
+# Test Results — Issue #50: Rework UX / UI (Bug Feedback Loop — sticky home button + ADR-010)
 
-## Command Run
+## Test Run
 
-```
-npm test -- --run
-```
+Command: `npm test` (Vitest v4.1.0) from the `feat_rework-ux-ui` worktree.
 
-## Output
+## Files Run
 
-```
- RUN  v4.1.0
+All those mentioned in [technical specs](technical-specifications.md).
 
- Test Files  17 passed (17)
-       Tests  239 passed (239)
-    Start at  13:11:48
-    Duration  14.42s
-```
+## Results
 
-The AsyncTaskManager noise in the output is a known happy-dom artifact and does not indicate test failures.
+All tests passed. No failures.
 
-## Bug Fix Tests Updated (this feedback loop)
+### Test Summary
 
-Test strings updated to match implementation changes:
+17 test files, 239 tests total — all passed.
 
-- `src/components/layout/AppFooter.test.ts` — updated three assertions to French labels ("Fait 🛠️ par", "et", "Hébergé sur Netlify")
-- `src/pages/mentions-legales.spec.ts` — test already expects `rel="noopener noreferrer"`; inline HTML link updated to match
-- `src/utils/markdownParser.spec.ts` — deleted (the utility it tested no longer exists)
+- Duration: ~9.7 seconds
 
 status: passed
