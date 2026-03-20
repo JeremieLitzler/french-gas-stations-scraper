@@ -296,11 +296,11 @@ describe('TC-05: adding a new station dispatches addStationPrice', () => {
 })
 
 // ---------------------------------------------------------------------------
-// TC-06 — No default stored: only "Save as default" is visible
+// TC-06 — No default stored: only "Définir par défaut" is visible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-06: no default stored — only "Save as default" is visible', () => {
-  it('shows "Save as default", hides "Update default" and "Clear default"', async () => {
+describe('Issue-28 TC-06: no default stored — only "Définir par défaut" is visible', () => {
+  it('shows "Définir par défaut", hides "Mettre à jour le défaut" and "Effacer le défaut"', async () => {
     mockDefaultFuelType.value = null
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -311,9 +311,9 @@ describe('Issue-28 TC-06: no default stored — only "Save as default" is visibl
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
 
-    expect(labels).toContain('Save as default')
-    expect(labels).not.toContain('Update default')
-    expect(labels).not.toContain('Clear default')
+    expect(labels).toContain('Définir par défaut')
+    expect(labels).not.toContain('Mettre à jour le défaut')
+    expect(labels).not.toContain('Effacer le défaut')
   })
 })
 
@@ -351,11 +351,11 @@ describe('TC-07: fuel type selector reflects only fuel types present in current 
 })
 
 // ---------------------------------------------------------------------------
-// TC-07 (Issue-28) — Default stored, selection = stored default: only "Clear default" visible
+// TC-07 (Issue-28) — Default stored, selection = stored default: only "Effacer le défaut" visible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-07: default stored and selection matches — only "Clear default" is visible', () => {
-  it('shows "Clear default", hides "Save as default" and "Update default"', async () => {
+describe('Issue-28 TC-07: default stored and selection matches — only "Effacer le défaut" is visible', () => {
+  it('shows "Effacer le défaut", hides "Définir par défaut" and "Mettre à jour le défaut"', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -374,9 +374,9 @@ describe('Issue-28 TC-07: default stored and selection matches — only "Clear d
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
 
-    expect(labels).not.toContain('Save as default')
-    expect(labels).not.toContain('Update default')
-    expect(labels).toContain('Clear default')
+    expect(labels).not.toContain('Définir par défaut')
+    expect(labels).not.toContain('Mettre à jour le défaut')
+    expect(labels).toContain('Effacer le défaut')
   })
 })
 
@@ -423,11 +423,11 @@ describe('TC-08: selected fuel type is preserved after a station change when it 
 })
 
 // ---------------------------------------------------------------------------
-// TC-08 (Issue-28) — Default stored, selection ≠ stored default: "Update default" + "Clear default" visible
+// TC-08 (Issue-28) — Default stored, selection ≠ stored default: "Mettre à jour le défaut" + "Effacer le défaut" visible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-08: default stored, selection differs — "Update default" and "Clear default" are visible', () => {
-  it('shows "Update default" and "Clear default", hides "Save as default"', async () => {
+describe('Issue-28 TC-08: default stored, selection differs — "Mettre à jour le défaut" and "Effacer le défaut" are visible', () => {
+  it('shows "Mettre à jour le défaut" and "Effacer le défaut", hides "Définir par défaut"', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -451,9 +451,9 @@ describe('Issue-28 TC-08: default stored, selection differs — "Update default"
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
 
-    expect(labels).not.toContain('Save as default')
-    expect(labels).toContain('Update default')
-    expect(labels).toContain('Clear default')
+    expect(labels).not.toContain('Définir par défaut')
+    expect(labels).toContain('Mettre à jour le défaut')
+    expect(labels).toContain('Effacer le défaut')
   })
 })
 
@@ -499,10 +499,10 @@ describe('TC-09: selected fuel type resets to first available when it disappears
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-09 — "Save as default" stores the selected fuel type
+// Issue-28 TC-09 — "Définir par défaut" stores the selected fuel type
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-09: clicking "Save as default" calls saveDefaultFuelType with the selection', () => {
+describe('Issue-28 TC-09: clicking "Définir par défaut" calls saveDefaultFuelType with the selection', () => {
   it('calls saveDefaultFuelType with "SP95" when SP95 is selected', async () => {
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -510,7 +510,7 @@ describe('Issue-28 TC-09: clicking "Save as default" calls saveDefaultFuelType w
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Save as default')
+    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Définir par défaut')
     expect(saveButton).toBeDefined()
 
     await saveButton!.trigger('click')
@@ -521,37 +521,37 @@ describe('Issue-28 TC-09: clicking "Save as default" calls saveDefaultFuelType w
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-10 — After saving, "Save as default" is hidden and "Default" indicator appears
+// Issue-28 TC-10 — After saving, "Définir par défaut" is hidden and "Default" indicator appears
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-10: after saving, "Save as default" disappears and the "Default" indicator appears', () => {
-  it('hides "Save as default" and shows ".default-indicator" after clicking save', async () => {
+describe('Issue-28 TC-10: after saving, "Définir par défaut" disappears and the "Default" indicator appears', () => {
+  it('hides "Définir par défaut" and shows ".default-indicator" after clicking save', async () => {
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
     ]
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Save as default')
+    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Définir par défaut')
     await saveButton!.trigger('click')
     await flushPromises()
     await nextTick()
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
-    expect(labels).not.toContain('Save as default')
+    expect(labels).not.toContain('Définir par défaut')
 
     const indicator = activeWrapper.find('.default-indicator')
     expect(indicator.exists()).toBe(true)
-    expect(indicator.text()).toBe('Default')
+    expect(indicator.text()).toBe('Par défaut')
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-11 — "Save as default" is not rendered when no fuel types are loaded
+// Issue-28 TC-11 — "Définir par défaut" is not rendered when no fuel types are loaded
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-11: "Save as default" is not rendered when no fuel types are loaded', () => {
+describe('Issue-28 TC-11: "Définir par défaut" is not rendered when no fuel types are loaded', () => {
   it('does not render any .default-fuel-button when availableFuelTypes is empty', async () => {
     mockResults.value = []
 
@@ -589,7 +589,7 @@ describe('Issue-28 TC-12: after saving "Gasoil" as default, it appears first in 
     await gasoilButton!.trigger('click')
     await flushPromises()
 
-    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Save as default')
+    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Définir par défaut')
     await saveButton!.trigger('click')
     await flushPromises()
     await nextTick()
@@ -601,11 +601,11 @@ describe('Issue-28 TC-12: after saving "Gasoil" as default, it appears first in 
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-16 — On startup with a valid stored default, "Default" indicator shown and "Save as default" hidden
+// Issue-28 TC-16 — On startup with a valid stored default, "Default" indicator shown and "Définir par défaut" hidden
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-16: on startup with a valid stored default, "Default" indicator is shown and "Save as default" is hidden', () => {
-  it('shows the default indicator and hides "Save as default" when the stored default is the selected type', async () => {
+describe('Issue-28 TC-16: on startup with a valid stored default, "Default" indicator is shown and "Définir par défaut" is hidden', () => {
+  it('shows the default indicator and hides "Définir par défaut" when the stored default is the selected type', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -615,21 +615,21 @@ describe('Issue-28 TC-16: on startup with a valid stored default, "Default" indi
 
     const indicator = activeWrapper.find('.default-indicator')
     expect(indicator.exists()).toBe(true)
-    expect(indicator.text()).toBe('Default')
+    expect(indicator.text()).toBe('Par défaut')
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
-    expect(labels).not.toContain('Save as default')
-    expect(labels).toContain('Clear default')
+    expect(labels).not.toContain('Définir par défaut')
+    expect(labels).toContain('Effacer le défaut')
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-17 — "Update default" is visible when selection differs from stored default
+// Issue-28 TC-17 — "Mettre à jour le défaut" is visible when selection differs from stored default
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-17: "Update default" is visible when selection differs from stored default', () => {
-  it('renders "Update default" when "Gasoil" is selected and "SP95" is the default', async () => {
+describe('Issue-28 TC-17: "Mettre à jour le défaut" is visible when selection differs from stored default', () => {
+  it('renders "Mettre à jour le défaut" when "Gasoil" is selected and "SP95" is the default', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -650,18 +650,18 @@ describe('Issue-28 TC-17: "Update default" is visible when selection differs fro
     await gasoilButton!.trigger('click')
     await nextTick()
 
-    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Mettre à jour le défaut')
     expect(updateButton).toBeDefined()
     expect(updateButton!.exists()).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-18 — "Update default" is not visible when selection matches stored default
+// Issue-28 TC-18 — "Mettre à jour le défaut" is not visible when selection matches stored default
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-18: "Update default" is not rendered when the selected type matches the stored default', () => {
-  it('hides "Update default" when "SP95" is selected and "SP95" is the stored default', async () => {
+describe('Issue-28 TC-18: "Mettre à jour le défaut" is not rendered when the selected type matches the stored default', () => {
+  it('hides "Mettre à jour le défaut" when "SP95" is selected and "SP95" is the stored default', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -678,17 +678,17 @@ describe('Issue-28 TC-18: "Update default" is not rendered when the selected typ
 
     // SP95 is seeded as selected (matches stored default)
     const allDefaultButtons = activeWrapper.findAll('.default-fuel-button')
-    const updateButton = allDefaultButtons.find((b) => b.text() === 'Update default')
+    const updateButton = allDefaultButtons.find((b) => b.text() === 'Mettre à jour le défaut')
     expect(updateButton).toBeUndefined()
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-19 — "Update default" is not visible when no default is stored
+// Issue-28 TC-19 — "Mettre à jour le défaut" is not visible when no default is stored
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-19: "Update default" is not rendered when no default is stored', () => {
-  it('shows only "Save as default" when defaultFuelType is null', async () => {
+describe('Issue-28 TC-19: "Mettre à jour le défaut" is not rendered when no default is stored', () => {
+  it('shows only "Définir par défaut" when defaultFuelType is null', async () => {
     mockDefaultFuelType.value = null
     mockResults.value = [
       {
@@ -701,21 +701,21 @@ describe('Issue-28 TC-19: "Update default" is not rendered when no default is st
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
     const allDefaultButtons = activeWrapper.findAll('.default-fuel-button')
-    const updateButton = allDefaultButtons.find((b) => b.text() === 'Update default')
+    const updateButton = allDefaultButtons.find((b) => b.text() === 'Mettre à jour le défaut')
     expect(updateButton).toBeUndefined()
 
-    const saveButton = allDefaultButtons.find((b) => b.text() === 'Save as default')
+    const saveButton = allDefaultButtons.find((b) => b.text() === 'Définir par défaut')
     expect(saveButton).toBeDefined()
     expect(saveButton!.exists()).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-20 — Clicking "Update default" replaces the stored default
+// Issue-28 TC-20 — Clicking "Mettre à jour le défaut" replaces the stored default
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-20: clicking "Update default" calls updateDefaultFuelType with the current selection', () => {
-  it('calls updateDefaultFuelType with "Gasoil" and hides "Update default" after clicking', async () => {
+describe('Issue-28 TC-20: clicking "Mettre à jour le défaut" calls updateDefaultFuelType with the current selection', () => {
+  it('calls updateDefaultFuelType with "Gasoil" and hides "Mettre à jour le défaut" after clicking', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -736,7 +736,7 @@ describe('Issue-28 TC-20: clicking "Update default" calls updateDefaultFuelType 
     await gasoilButton!.trigger('click')
     await nextTick()
 
-    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Mettre à jour le défaut')
     expect(updateButton!.exists()).toBe(true)
 
     await updateButton!.trigger('click')
@@ -745,20 +745,20 @@ describe('Issue-28 TC-20: clicking "Update default" calls updateDefaultFuelType 
     expect(mockUpdateDefaultFuelType).toHaveBeenCalledWith('Gasoil')
 
     // After update, mockDefaultFuelType.value === 'Gasoil' — selectedFuelType matches default,
-    // so "Update default" should disappear
+    // so "Mettre à jour le défaut" should disappear
     await nextTick()
     const remainingButtons = activeWrapper.findAll('.default-fuel-button')
-    const stillUpdate = remainingButtons.find((b) => b.text() === 'Update default')
+    const stillUpdate = remainingButtons.find((b) => b.text() === 'Mettre à jour le défaut')
     expect(stillUpdate).toBeUndefined()
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-21 — After updating, "Clear default" remains visible
+// Issue-28 TC-21 — After updating, "Effacer le défaut" remains visible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-21: after updating, "Clear default" remains visible', () => {
-  it('keeps "Clear default" visible after "Update default" is clicked', async () => {
+describe('Issue-28 TC-21: after updating, "Effacer le défaut" remains visible', () => {
+  it('keeps "Effacer le défaut" visible after "Mettre à jour le défaut" is clicked', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -773,30 +773,30 @@ describe('Issue-28 TC-21: after updating, "Clear default" remains visible', () =
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    // Select Gasoil and click "Update default"
+    // Select Gasoil and click "Mettre à jour le défaut"
     const fuelButtons = activeWrapper.findAll('.fuel-type-selector button')
     const gasoilButton = fuelButtons.find((b) => b.text() === 'Gasoil')
     await gasoilButton!.trigger('click')
     await nextTick()
 
-    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Mettre à jour le défaut')
     await updateButton!.trigger('click')
     await flushPromises()
     await nextTick()
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
-    const clearButton = allButtons.find((b) => b.text() === 'Clear default')
+    const clearButton = allButtons.find((b) => b.text() === 'Effacer le défaut')
     expect(clearButton).toBeDefined()
     expect(clearButton!.exists()).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-22 — "Clear default" is visible when default stored and selection = default
+// Issue-28 TC-22 — "Effacer le défaut" is visible when default stored and selection = default
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-22: "Clear default" is visible when a default is stored and selection matches', () => {
-  it('shows "Clear default" when "SP95" is selected and is the stored default', async () => {
+describe('Issue-28 TC-22: "Effacer le défaut" is visible when a default is stored and selection matches', () => {
+  it('shows "Effacer le défaut" when "SP95" is selected and is the stored default', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -804,18 +804,18 @@ describe('Issue-28 TC-22: "Clear default" is visible when a default is stored an
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     expect(clearButton).toBeDefined()
     expect(clearButton!.exists()).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-23 — "Clear default" is visible when default stored and selection ≠ default
+// Issue-28 TC-23 — "Effacer le défaut" is visible when default stored and selection ≠ default
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-23: "Clear default" is visible when a default is stored and selection differs', () => {
-  it('shows "Clear default" alongside "Update default" when "Gasoil" is selected and "SP95" is stored', async () => {
+describe('Issue-28 TC-23: "Effacer le défaut" is visible when a default is stored and selection differs', () => {
+  it('shows "Effacer le défaut" alongside "Mettre à jour le défaut" when "Gasoil" is selected and "SP95" is stored', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       {
@@ -837,17 +837,17 @@ describe('Issue-28 TC-23: "Clear default" is visible when a default is stored an
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
-    expect(labels).toContain('Clear default')
-    expect(labels).toContain('Update default')
+    expect(labels).toContain('Effacer le défaut')
+    expect(labels).toContain('Mettre à jour le défaut')
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-24 — "Clear default" is not visible when no default is stored
+// Issue-28 TC-24 — "Effacer le défaut" is not visible when no default is stored
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-24: "Clear default" is not rendered when no default is stored', () => {
-  it('does not render "Clear default" when defaultFuelType is null', async () => {
+describe('Issue-28 TC-24: "Effacer le défaut" is not rendered when no default is stored', () => {
+  it('does not render "Effacer le défaut" when defaultFuelType is null', async () => {
     mockDefaultFuelType.value = null
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -856,17 +856,17 @@ describe('Issue-28 TC-24: "Clear default" is not rendered when no default is sto
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
-    const clearButton = allButtons.find((b) => b.text() === 'Clear default')
+    const clearButton = allButtons.find((b) => b.text() === 'Effacer le défaut')
     expect(clearButton).toBeUndefined()
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-25 — Clicking "Clear default" calls clearDefaultFuelType
+// Issue-28 TC-25 — Clicking "Effacer le défaut" calls clearDefaultFuelType
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-25: clicking "Clear default" calls clearDefaultFuelType', () => {
-  it('calls clearDefaultFuelType when the "Clear default" button is clicked', async () => {
+describe('Issue-28 TC-25: clicking "Effacer le défaut" calls clearDefaultFuelType', () => {
+  it('calls clearDefaultFuelType when the "Effacer le défaut" button is clicked', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -874,7 +874,7 @@ describe('Issue-28 TC-25: clicking "Clear default" calls clearDefaultFuelType', 
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     await clearButton!.trigger('click')
     await flushPromises()
 
@@ -883,11 +883,11 @@ describe('Issue-28 TC-25: clicking "Clear default" calls clearDefaultFuelType', 
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-26 — After clearing, "Save as default" reappears
+// Issue-28 TC-26 — After clearing, "Définir par défaut" reappears
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-26: after clearing, "Save as default" reappears', () => {
-  it('shows "Save as default" after "Clear default" is clicked', async () => {
+describe('Issue-28 TC-26: after clearing, "Définir par défaut" reappears', () => {
+  it('shows "Définir par défaut" after "Effacer le défaut" is clicked', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -895,24 +895,24 @@ describe('Issue-28 TC-26: after clearing, "Save as default" reappears', () => {
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     await clearButton!.trigger('click')
     await flushPromises()
     await nextTick()
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
-    const saveButton = allButtons.find((b) => b.text() === 'Save as default')
+    const saveButton = allButtons.find((b) => b.text() === 'Définir par défaut')
     expect(saveButton).toBeDefined()
     expect(saveButton!.exists()).toBe(true)
   })
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-27 — After clearing, "Update default" and "Clear default" are hidden
+// Issue-28 TC-27 — After clearing, "Mettre à jour le défaut" and "Effacer le défaut" are hidden
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-27: after clearing, "Update default" and "Clear default" are hidden', () => {
-  it('hides "Update default" and "Clear default" after "Clear default" is clicked', async () => {
+describe('Issue-28 TC-27: after clearing, "Mettre à jour le défaut" and "Effacer le défaut" are hidden', () => {
+  it('hides "Mettre à jour le défaut" and "Effacer le défaut" after "Effacer le défaut" is clicked', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -920,15 +920,15 @@ describe('Issue-28 TC-27: after clearing, "Update default" and "Clear default" a
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     await clearButton!.trigger('click')
     await flushPromises()
     await nextTick()
 
     const allButtons = activeWrapper.findAll('.default-fuel-button')
     const labels = allButtons.map((b) => b.text())
-    expect(labels).not.toContain('Update default')
-    expect(labels).not.toContain('Clear default')
+    expect(labels).not.toContain('Mettre à jour le défaut')
+    expect(labels).not.toContain('Effacer le défaut')
   })
 })
 
@@ -937,7 +937,7 @@ describe('Issue-28 TC-27: after clearing, "Update default" and "Clear default" a
 // ---------------------------------------------------------------------------
 
 describe('Issue-28 TC-28: after clearing, the "Default" indicator disappears', () => {
-  it('removes .default-indicator after "Clear default" is clicked', async () => {
+  it('removes .default-indicator after "Effacer le défaut" is clicked', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -948,7 +948,7 @@ describe('Issue-28 TC-28: after clearing, the "Default" indicator disappears', (
     // Indicator should be present initially
     expect(activeWrapper.find('.default-indicator').exists()).toBe(true)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     await clearButton!.trigger('click')
     await flushPromises()
     await nextTick()
@@ -982,7 +982,7 @@ describe('Issue-28 TC-29: after clearing, the fuel type list reverts to natural 
     const buttonsBefore = activeWrapper.findAll('.fuel-type-selector button')
     expect(buttonsBefore[0].text()).toBe('Gasoil')
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     await clearButton!.trigger('click')
     await flushPromises()
     await nextTick()
@@ -1010,7 +1010,7 @@ describe('Issue-28 TC-30: "Default" indicator is shown when selected type matche
 
     const indicator = activeWrapper.find('.default-indicator')
     expect(indicator.exists()).toBe(true)
-    expect(indicator.text()).toBe('Default')
+    expect(indicator.text()).toBe('Par défaut')
   })
 })
 
@@ -1087,10 +1087,10 @@ describe('Issue-28 TC-34: fuel type labels containing HTML markup are displayed 
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-37 — "Save as default" button is keyboard accessible
+// Issue-28 TC-37 — "Définir par défaut" button is keyboard accessible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-37: "Save as default" is a plain <button> element for keyboard accessibility', () => {
+describe('Issue-28 TC-37: "Définir par défaut" is a plain <button> element for keyboard accessibility', () => {
   it('renders as a <button> with type="button" so it is reachable via Tab and activatable via Enter/Space', async () => {
     mockResults.value = [
       { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
@@ -1098,7 +1098,7 @@ describe('Issue-28 TC-37: "Save as default" is a plain <button> element for keyb
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Save as default')
+    const saveButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Définir par défaut')
     expect(saveButton).toBeDefined()
     expect(saveButton!.element.tagName).toBe('BUTTON')
     expect(saveButton!.attributes('type')).toBe('button')
@@ -1106,10 +1106,10 @@ describe('Issue-28 TC-37: "Save as default" is a plain <button> element for keyb
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-38 — "Update default" button is keyboard accessible
+// Issue-28 TC-38 — "Mettre à jour le défaut" button is keyboard accessible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-38: "Update default" is a plain <button> element for keyboard accessibility', () => {
+describe('Issue-28 TC-38: "Mettre à jour le défaut" is a plain <button> element for keyboard accessibility', () => {
   it('renders as a <button> with type="button" so it is reachable via Tab and activatable via Enter/Space', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
@@ -1125,13 +1125,13 @@ describe('Issue-28 TC-38: "Update default" is a plain <button> element for keybo
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    // Select Gasoil to make "Update default" visible
+    // Select Gasoil to make "Mettre à jour le défaut" visible
     const fuelButtons = activeWrapper.findAll('.fuel-type-selector button')
     const gasoilButton = fuelButtons.find((b) => b.text() === 'Gasoil')
     await gasoilButton!.trigger('click')
     await nextTick()
 
-    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Update default')
+    const updateButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Mettre à jour le défaut')
     expect(updateButton).toBeDefined()
     expect(updateButton!.element.tagName).toBe('BUTTON')
     expect(updateButton!.attributes('type')).toBe('button')
@@ -1139,10 +1139,10 @@ describe('Issue-28 TC-38: "Update default" is a plain <button> element for keybo
 })
 
 // ---------------------------------------------------------------------------
-// Issue-28 TC-39 — "Clear default" button is keyboard accessible
+// Issue-28 TC-39 — "Effacer le défaut" button is keyboard accessible
 // ---------------------------------------------------------------------------
 
-describe('Issue-28 TC-39: "Clear default" is a plain <button> element for keyboard accessibility', () => {
+describe('Issue-28 TC-39: "Effacer le défaut" is a plain <button> element for keyboard accessibility', () => {
   it('renders as a <button> with type="button" so it is reachable via Tab and activatable via Enter/Space', async () => {
     mockDefaultFuelType.value = 'SP95'
     mockResults.value = [
@@ -1151,7 +1151,7 @@ describe('Issue-28 TC-39: "Clear default" is a plain <button> element for keyboa
 
     activeWrapper = await mountAndSeedSelection(mockResults.value)
 
-    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Clear default')
+    const clearButton = activeWrapper.findAll('.default-fuel-button').find((b) => b.text() === 'Effacer le défaut')
     expect(clearButton).toBeDefined()
     expect(clearButton!.element.tagName).toBe('BUTTON')
     expect(clearButton!.attributes('type')).toBe('button')

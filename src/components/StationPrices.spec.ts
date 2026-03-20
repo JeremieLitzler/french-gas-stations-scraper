@@ -308,8 +308,8 @@ describe('TC-19: table has exactly two header columns', () => {
     const headers = wrapper.findAll('th')
     const headerTexts = headers.map((h) => h.text())
 
-    expect(headerTexts).toContain('Station Name')
-    expect(headerTexts).toContain('Price')
+    expect(headerTexts).toContain('Nom de la station')
+    expect(headerTexts).toContain('Prix')
     expect(headers).toHaveLength(2)
   })
 })
