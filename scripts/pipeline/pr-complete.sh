@@ -3,8 +3,12 @@
 #
 # Usage: bash scripts/pipeline/pr-complete.sh <pr-url>
 #
-# Merges an open PR into develop (rebase strategy) and deletes the remote
-# branch. Skips gracefully if the PR is already merged or closed.
+# Merges an open PR into develop (rebase strategy).
+# Skips gracefully if the PR is already merged or closed.
+#
+# Branch deletion (local + remote) is owned by worktree-cleanup.sh so
+# that the worktree is removed first — deleting a branch that is still
+# checked out in a worktree fails on all platforms.
 #
 # Run from any pipeline worktree. Follow with:
 #   worktree-cleanup.sh <worktree-path>
@@ -31,6 +35,6 @@ fi
 echo "==> Merging PR (rebase)..."
 # Run from bare repo root so `gh` does not attempt a local `git switch develop`
 # (which would fail because develop is already checked out in its own worktree).
-(cd "$BARE_REPO" && gh pr merge "$PR_URL" --rebase --delete-branch)
+(cd "$BARE_REPO" && gh pr merge "$PR_URL" --rebase)
 
 echo "==> PR merged."

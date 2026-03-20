@@ -4,7 +4,12 @@
 # Usage: bash scripts/pipeline/worktree-cleanup.sh <worktree-path>
 #
 # Removes a pipeline worktree directory, prunes stale git entries, and
-# deletes the local branch. Safe to re-run if a prior attempt was partial.
+# deletes the local and remote branch. Safe to re-run if a prior attempt
+# was partial.
+#
+# Branch deletion happens here (not in pr-complete.sh) so the worktree is
+# always removed before the branch — deleting a branch still checked out
+# in a worktree fails on all platforms.
 #
 # Run after pr-complete.sh (or after a manual GitHub merge/close).
 # Follow with refresh-develop.sh to fast-forward the develop worktree.
@@ -34,6 +39,9 @@ if [ -n "$BRANCH" ]; then
   # Use -D (force) because GitHub rebase-merge does not create a merge commit,
   # so git never considers the local branch "fully merged".
   git -C "$BARE_REPO" branch -D "$BRANCH" 2>/dev/null || true
+
+  echo "==> Deleting remote branch '${BRANCH}'..."
+  git -C "$BARE_REPO" push origin --delete "$BRANCH" 2>/dev/null || true
 fi
 
 echo "==> Worktree '${WT_NAME}' cleaned up."
