@@ -70,13 +70,13 @@ describe('AppFooter', () => {
     expect(licenseLink).toBeDefined()
   })
 
-  it('renders an AppLink pointing to https://www.netlify.com/ with text "Hosted on Netlify"', () => {
+  it('renders an AppLink pointing to https://www.netlify.com/ with text "Hébergé sur Netlify"', () => {
     const wrapper = mount(AppFooter, globalConfig)
     const netlifyLink = wrapper
       .findAll('a.external-link')
       .find((a) => a.attributes('href') === 'https://www.netlify.com/')
     expect(netlifyLink).toBeDefined()
-    expect(netlifyLink!.text()).toBe('Hosted on Netlify')
+    expect(netlifyLink!.text()).toBe('Hébergé sur Netlify')
   })
 
   it('all links have target="_blank"', () => {
@@ -95,13 +95,13 @@ describe('AppFooter', () => {
     })
   })
 
-  it('footer text contains "Made 🛠️ by"', () => {
+  it('footer text contains "Fait 🛠️ par"', () => {
     const wrapper = mount(AppFooter, globalConfig)
-    expect(wrapper.find('footer').text()).toContain('Made 🛠️ by')
+    expect(wrapper.find('footer').text()).toContain('Fait 🛠️ par')
   })
 
-  it('footer text contains "and"', () => {
+  it('footer text contains "et"', () => {
     const wrapper = mount(AppFooter, globalConfig)
-    expect(wrapper.find('footer').text()).toContain('and')
+    expect(wrapper.find('footer').text()).toContain('et')
   })
 })

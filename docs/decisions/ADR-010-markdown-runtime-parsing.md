@@ -1,7 +1,9 @@
 # ADR-010: Runtime Markdown Parsing for Static Content Pages
 
+> **Status: Superseded.** Inline HTML was chosen instead to avoid a runtime dependency and to allow direct Tailwind class application.
+
 **Date:** 2026-03-20
-**Status:** Accepted
+**Status:** Superseded
 
 ## Context
 
