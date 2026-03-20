@@ -1,9 +1,9 @@
 <template>
   <div>
-    <p v-if="showFetchSuccess" class="fetch-success" role="status">Scraping complete.</p>
-    <ul v-if="warnings.length > 0" class="station-warnings" aria-label="Station fetch warnings">
+    <p v-if="showFetchSuccess" class="fetch-success" role="status">Récupération terminée.</p>
+    <ul v-if="warnings.length > 0" class="station-warnings" aria-label="Avertissements de récupération des stations">
       <li v-for="warning in warnings" :key="warning.url" class="station-warning-item">
-        Could not load prices for <strong>{{ warning.stationName }}</strong> (<a
+        Impossible de charger les prix pour <strong>{{ warning.stationName }}</strong> (<a
           :href="warning.url"
           target="_blank"
           rel="noopener noreferrer"
@@ -12,7 +12,7 @@
       </li>
     </ul>
     <template v-if="availableFuelTypes.length > 0">
-      <div class="fuel-type-selector" role="group" aria-label="Fuel type selector">
+      <div class="fuel-type-selector" role="group" aria-label="Sélecteur de type de carburant">
         <button
           v-for="fuelType in availableFuelTypes"
           :key="fuelType"
@@ -24,14 +24,14 @@
         </button>
       </div>
       <div class="default-fuel-actions">
-        <span v-if="isCurrentDefault" class="default-indicator" aria-label="This is your default fuel type">Default</span>
+        <span v-if="isCurrentDefault" class="default-indicator" aria-label="Ceci est votre carburant par défaut">Par défaut</span>
         <button
           v-if="showSaveDefault"
           type="button"
           class="default-fuel-button"
           @click="onSaveDefault"
         >
-          Save as default
+          Définir par défaut
         </button>
         <button
           v-if="showUpdateDefault"
@@ -39,7 +39,7 @@
           class="default-fuel-button"
           @click="onUpdateDefault"
         >
-          Update default
+          Mettre à jour le défaut
         </button>
         <button
           v-if="showClearDefault"
@@ -47,14 +47,14 @@
           class="default-fuel-button"
           @click="onClearDefault"
         >
-          Clear default
+          Effacer le défaut
         </button>
       </div>
       <Table>
         <TableHeader>
           <TableRow :disable-hover="true">
-            <TableHead>Station Name</TableHead>
-            <TableHead>Price</TableHead>
+            <TableHead>Nom de la station</TableHead>
+            <TableHead>Prix</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
