@@ -1,18 +1,21 @@
 <template>
   <div class="station-manager">
-    <h2 class="text-xl font-semibold mb-1">Station List</h2>
+    <h2 class="text-xl font-semibold mb-1">Liste des stations</h2>
     <p class="mb-4">
-      Edit the list of station by giving a name and the link from
+      Gérez votre liste de stations en renseignant un nom et le lien depuis
       <AppLink href="https://www.prix-carburants.gouv.fr/" target="_blank" rel="noopener"
         >https://www.prix-carburants.gouv.fr/</AppLink
       >
     </p>
-    <Suspense>
-      <StationManagerTable />
-      <template #fallback>
-        <AppLoader />
-      </template>
-    </Suspense>
+    <details>
+      <summary class="cursor-pointer mb-2">Afficher / masquer la liste</summary>
+      <Suspense>
+        <StationManagerTable />
+        <template #fallback>
+          <AppLoader />
+        </template>
+      </Suspense>
+    </details>
   </div>
 </template>
 

@@ -2,7 +2,7 @@
   <Table class="table-auto">
     <TableHeader>
       <TableRow :disable-hover="true">
-        <TableHead class="w-auto">Name</TableHead>
+        <TableHead class="w-auto">Nom</TableHead>
         <TableHead class="w-auto">URL</TableHead>
         <TableHead class="w-px whitespace-nowrap"></TableHead>
       </TableRow>
@@ -14,7 +14,7 @@
             class="station-input"
             type="text"
             :value="newName"
-            placeholder="Station name"
+            placeholder="Nom de la station"
             @input="onNewNameInput($event)"
             @blur="onNewRowBlur"
           />

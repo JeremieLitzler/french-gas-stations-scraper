@@ -1,5 +1,6 @@
 <template>
   <div class="flex flex-col w-full">
+    <h1 class="text-2xl font-bold mb-4">Coup de pompe</h1>
     <StationPrices />
     <StationManager />
   </div>

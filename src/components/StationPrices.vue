@@ -1,7 +1,7 @@
 <template>
   <div class="station-prices">
-    <h2 class="text-xl font-semibold mb-1">Prices</h2>
-    <p class="mb-4">Change fuel type to your need</p>
+    <h2 class="text-xl font-semibold mb-1">Prix</h2>
+    <p class="mb-4">Choisissez le type de carburant selon vos besoins</p>
     <Suspense>
       <StationPricesContent />
       <template #fallback>
