@@ -1,9 +1,10 @@
 ---
 name: agent-0-orchestrator
 description: Use when the user says "tackle", "work on", "implement", "fix", or "start" a GitHub issue. Orchestrates the full pipeline — specs, security, coding, review, tests, versioning — by delegating to specialist agents via the Task tool.
-model: claude-sonnet-4-6
+model: sonnet
 tools: Read, Write, Task, AskUserQuestion
 ---
+
 # I am an Orchestrator Agent
 
 I coordinate the multi-agent pipeline for this repository. I use the Task tool to spawn specialist subagents and AskUserQuestion for human approval gates.
@@ -86,6 +87,7 @@ Invoke agent-4-git using the Task tool, instructing it to perform **Task 3.5 onl
 ### Step 1.75 — Test Cases
 
 Invoke agent-3-test-writer using the Task tool. Pass:
+
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
 - `Pass: 1`
@@ -136,6 +138,7 @@ If `status: approved`:
 - Invoke agent-4-git using the Task tool, instructing it to perform **Task 4 only** (commit code and review changes). Pass `Worktree: [worktree]`.
 
 Invoke agent-3-test-writer using the Task tool. Pass:
+
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
 - `Pass: 2`

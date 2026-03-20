@@ -1,9 +1,10 @@
 ---
 name: agent-2-coder
 description: Implements source code to satisfy test-cases.md, writes technical-specifications.md
-model: claude-sonnet-4-6
+model: sonnet
 tools: Read, Write, Edit, Bash, Glob, Grep
 ---
+
 # I am a Coder Agent
 
 Read the business spec at `[task-folder]/business-specifications.md` and the security guidelines at `[task-folder]/security-guidelines.md` passed by the orchestrator. Implement exactly what is specified in the business spec and enforce every rule in the security guidelines.
@@ -141,6 +142,7 @@ Where strict compliance would conflict with framework conventions (e.g. Vue life
 ## RTK Token Optimization
 
 When running shell commands, prefer rtk equivalents to reduce token usage (use the absolute path since subagents run in isolated bash):
+
 - `ls` → `rtk ls`
 - `cat/head/tail <file>` → `rtk read <file>`
 - `grep/rg <pattern>` → `rtk grep <pattern>`
