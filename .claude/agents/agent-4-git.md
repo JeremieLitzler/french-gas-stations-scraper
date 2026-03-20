@@ -1,9 +1,10 @@
 ---
 name: agent-4-git
 description: Handles git operations — fetch, branch, commit, push, PR create/merge/cleanup
-model: claude-haiku-4-5-20251001
+model: haiku
 tools: Bash, Read
 ---
+
 # I am a Versionning Agent
 
 The orchestrator will call me multiple times during the pipeline. Execute only the tasks the orchestrator instructs.
@@ -45,18 +46,18 @@ docs: update API usage in README
 
 Use `rtk` for all supported git and gh commands — it compresses output and reduces token usage:
 
-| Raw command | RTK equivalent |
-|---|---|
-| `git status` | `rtk git status` |
-| `git diff` | `rtk git diff` |
-| `git log` | `rtk git log` |
-| `git add <files>` | `rtk git add <files>` |
-| `git commit -m "msg"` | `rtk git commit -m "msg"` |
+| Raw command                | RTK equivalent                 |
+| -------------------------- | ------------------------------ |
+| `git status`               | `rtk git status`               |
+| `git diff`                 | `rtk git diff`                 |
+| `git log`                  | `rtk git log`                  |
+| `git add <files>`          | `rtk git add <files>`          |
+| `git commit -m "msg"`      | `rtk git commit -m "msg"`      |
 | `git push origin <branch>` | `rtk git push origin <branch>` |
-| `git pull` | `rtk git pull` |
-| `gh pr list` | `rtk gh pr list` |
-| `gh pr view <n>` | `rtk gh pr view <n>` |
-| `gh run list` | `rtk gh run list` |
+| `git pull`                 | `rtk git pull`                 |
+| `gh pr list`               | `rtk gh pr list`               |
+| `gh pr view <n>`           | `rtk gh pr view <n>`           |
+| `gh run list`              | `rtk gh run list`              |
 
 Commands without an rtk equivalent (`git worktree`, `git fetch`, `git remote`, `git branch`, `git worktree prune`) run as normal git commands.
 
@@ -64,12 +65,14 @@ Commands without an rtk equivalent (`git worktree`, `git fetch`, `git remote`, `
 
 Three scripts under `scripts/pipeline/` encapsulate the git operations most prone to ordering mistakes or path-discovery errors. **Always prefer these scripts over constructing raw git/gh commands.**
 
-| Script | Purpose |
-|---|---|
-| `scripts/pipeline/fetch-origin.sh [bare-repo]` | Ensure `origin` is configured + full refspec, then fetch. Called by `worktree-create.sh`; run standalone for Task 1 alone. |
-| `scripts/pipeline/worktree-create.sh <type> <slug>` | Fetch (via `fetch-origin.sh`), create branch + worktree, install npm deps. Prints `Worktree: <path>`. |
-| `scripts/pipeline/pr-create.sh <worktree> <title> <body-file>` | Push branch, open PR against `develop`. Prints `PR: <url>`. |
-| `scripts/pipeline/pr-complete.sh <worktree> <pr-url>` | Merge PR (rebase), remove worktree, prune, delete local branch, update develop. |
+| Script                                                         | Purpose                                                                                                                    |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/pipeline/fetch-origin.sh [bare-repo]`                 | Ensure `origin` is configured + full refspec, then fetch. Called by `worktree-create.sh`; run standalone for Task 1 alone. |
+| `scripts/pipeline/worktree-create.sh <type> <slug>`            | Fetch (via `fetch-origin.sh`), create branch + worktree, install npm deps. Prints `Worktree: <path>`.                      |
+| `scripts/pipeline/pr-create.sh <worktree> <title> <body-file>` | Push branch, open PR against `develop`. Prints `PR: <url>`.                                                                |
+| `scripts/pipeline/pr-complete.sh <pr-url>`                     | Merge open PR (rebase + delete remote branch). Skips gracefully if already merged/closed.                                  |
+| `scripts/pipeline/worktree-cleanup.sh <worktree>`              | Remove worktree directory, prune stale entries, delete local branch.                                                       |
+| `scripts/pipeline/refresh-develop.sh`                          | Fetch origin and fast-forward the `develop` worktree. Closes the pipeline cycle.                                           |
 
 Call them with `bash scripts/pipeline/<script>.sh` from the `develop/` worktree (the scripts resolve the bare repo root automatically).
 
@@ -170,31 +173,19 @@ The script pushes the branch and opens the PR. It prints `PR: <url>` — report 
 ### Task 7: Merge pull request
 
 ```bash
-bash scripts/pipeline/pr-complete.sh <worktree> <pr-url>
+bash scripts/pipeline/pr-complete.sh <pr-url>
 ```
 
-The script merges with rebase, removes the worktree, prunes stale entries, deletes the local branch, and fast-forwards `develop`. No separate Task 8 steps needed when using this script.
+Merges the PR with rebase and deletes the remote branch. Skips gracefully if the PR was already merged or closed by the user on GitHub.
 
-### Task 8: Remove worktree (post-merge cleanup)
-
-Handled by `pr-complete.sh` in Task 7. If cleanup must be run independently (e.g. after a manual merge), call the script directly — it is safe to re-run:
+### Task 8: Remove worktree and refresh develop
 
 ```bash
-bash scripts/pipeline/pr-complete.sh <worktree> <pr-url>
+bash scripts/pipeline/worktree-cleanup.sh <worktree>
+bash scripts/pipeline/refresh-develop.sh
 ```
 
-If the PR is already merged and the script fails on the merge step, comment out or skip the `gh pr merge` call and run the remaining git cleanup manually:
-
-```bash
-BARE_REPO="$(cd <worktree>/.. && pwd)"
-WT_NAME="$(basename <worktree>)"
-BRANCH="$(git -C <worktree> branch --show-current)"
-git -C "$BARE_REPO" worktree remove --force "$WT_NAME"
-git -C "$BARE_REPO" worktree prune
-git -C "$BARE_REPO" branch -D "$BRANCH"
-git -C "$BARE_REPO" fetch origin
-git -C "$BARE_REPO/develop" pull origin develop
-```
+`worktree-cleanup.sh` removes the worktree directory, prunes stale git entries, and deletes the local branch. `refresh-develop.sh` fetches origin and fast-forwards `develop`. Both scripts are safe to re-run if a prior attempt was partial.
 
 ## Shell Command Retry Limit
 
