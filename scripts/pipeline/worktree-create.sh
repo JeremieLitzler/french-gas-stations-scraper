@@ -24,9 +24,7 @@ WT_NAME="${TYPE}_${SLUG}"
 BRANCH="${TYPE}/${SLUG}"
 WT_PATH="${BARE_REPO}/${WT_NAME}"
 
-echo "==> Fetching origin..."
-git -C "$BARE_REPO" config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-git -C "$BARE_REPO" fetch origin
+bash "$SCRIPT_DIR/fetch-origin.sh" "$BARE_REPO"
 
 echo "==> Creating worktree '${WT_NAME}' on branch '${BRANCH}'..."
 git -C "$BARE_REPO" worktree add "$WT_NAME" -b "$BRANCH" origin/develop

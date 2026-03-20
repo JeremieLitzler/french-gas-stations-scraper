@@ -66,7 +66,8 @@ Three scripts under `scripts/pipeline/` encapsulate the git operations most pron
 
 | Script | Purpose |
 |---|---|
-| `scripts/pipeline/worktree-create.sh <type> <slug>` | Fetch, create branch + worktree, install npm deps. Prints `Worktree: <path>`. |
+| `scripts/pipeline/fetch-origin.sh [bare-repo]` | Ensure `origin` is configured + full refspec, then fetch. Called by `worktree-create.sh`; run standalone for Task 1 alone. |
+| `scripts/pipeline/worktree-create.sh <type> <slug>` | Fetch (via `fetch-origin.sh`), create branch + worktree, install npm deps. Prints `Worktree: <path>`. |
 | `scripts/pipeline/pr-create.sh <worktree> <title> <body-file>` | Push branch, open PR against `develop`. Prints `PR: <url>`. |
 | `scripts/pipeline/pr-complete.sh <worktree> <pr-url>` | Merge PR (rebase), remove worktree, prune, delete local branch, update develop. |
 
@@ -76,15 +77,13 @@ Call them with `bash scripts/pipeline/<script>.sh` from the `develop/` worktree 
 
 ### Task 1: Make Sure Local Repository Is Up-to-date
 
-Handled automatically by `worktree-create.sh` in Task 2. If Task 2 is not being run (rare), verify `origin` is configured and fetch manually:
+Handled automatically by `worktree-create.sh` in Task 2. If Task 2 is not being run (rare), run:
 
 ```bash
-git -C .. remote -v
-# if origin is missing:
-git -C .. remote add origin https://github.com/<owner>/<repo>.git
-git -C .. config remote.origin.fetch "+refs/heads/*:refs/remotes/origin/*"
-git -C .. fetch origin
+bash scripts/pipeline/fetch-origin.sh
 ```
+
+The script checks that `origin` exists (adds it if missing, inferring the URL from the `develop/` remote config), ensures the full fetch refspec is set, and fetches all remote refs.
 
 ### Task 2: Create new branch and worktree
 
