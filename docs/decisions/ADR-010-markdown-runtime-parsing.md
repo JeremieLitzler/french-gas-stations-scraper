@@ -1,61 +1,45 @@
-# ADR-010: Runtime Markdown Parsing for Static Content Pages
-
-> **Status: Superseded.** Inline HTML was chosen instead to avoid a runtime dependency and to allow direct Tailwind class application.
+# ADR-010: Static Content Rendering Strategy for the Mentions Légales Page
 
 **Date:** 2026-03-20
-**Status:** Superseded
+**Status:** Accepted
 
 ## Context
 
-Issue #50 requires a "Mentions légales" page whose content is maintained as a Markdown file (`src/assets/mentions-légales.md`). The content must be rendered as HTML in the Vue SPA.
+Issue #50 required a "Mentions légales" page displaying static legal content in the Vue SPA. Two rendering approaches were evaluated:
 
-Three approaches were considered: ship pre-compiled HTML, use a CMS/remote fetch, or parse the Markdown at runtime in the browser from a bundled static asset.
+1. **Runtime Markdown parsing** — store content as a `.md` asset, import it via Vite's `?raw` suffix, parse it with `marked` at page load, sanitize the output with DOMPurify, and bind it to `v-html`.
+2. **Inline HTML in the Vue template** — write the legal content directly as HTML inside the `<template>` block, applying Tailwind utility classes directly to each element.
 
-This is the first time the project renders Markdown content, so a decision is needed to capture the chosen approach, the library selection, and how it integrates with the existing sanitization strategy (ADR-007).
+The first approach was initially proposed and documented as "use `marked`". During implementation it was superseded by the second approach.
 
 ## Decision
 
-Use **`marked`** to parse the `.md` asset at runtime in the browser, and pipe the resulting HTML through the existing `sanitizeHtml` utility from `src/utils/sanitize.ts` (DOMPurify, per ADR-007) before binding it to `v-html`.
+Use **inline HTML hardcoded in the Vue template** (`src/pages/mentions-legales.vue`) with Tailwind utility classes applied directly to HTML elements. No runtime Markdown parsing. No `marked` dependency.
 
-A pure utility function `src/utils/markdownParser.ts` wraps the full parse-then-sanitize pipeline:
+## Rationale
 
-```ts
-// src/utils/markdownParser.ts
-import { marked } from 'marked'
-import { sanitizeHtml } from './sanitize'
-
-export async function parseMarkdown(markdown: string): Promise<string> {
-  const rawHtml = await marked(markdown)
-  return sanitizeHtml(rawHtml)
-}
-```
-
-The Markdown source is imported as a raw string via Vite's `?raw` suffix and passed to `parseMarkdown` inside the component's `onMounted` hook (or a `computed`/`watchEffect` equivalent). No server-side rendering is involved.
+- **No runtime dependency**: `marked` would have been an additional runtime package that adds bundle weight for a page whose content virtually never changes.
+- **Direct Tailwind class application**: Headings, links, and lists receive their Tailwind classes inline without workarounds (e.g. no need for `@apply` or a custom `marked` renderer override).
+- **Simplicity**: The component has no async logic, no `onMounted` hook, and no reactive state — it is a pure, stateless template.
+- **Acceptable maintenance cost**: Legal text rarely changes. When it does, editing HTML in a Vue file is straightforward for any engineer on the project.
 
 ## Consequences
 
 ### Positive
 
-- Content stays in a human-readable `.md` file — easy to update without touching Vue components.
-- `marked` is lightweight, well-maintained, and produces standard HTML.
-- Piping through `sanitizeHtml` (DOMPurify) keeps the XSS protection established in ADR-007; no new security surface is introduced.
-- No network request at runtime — the asset is bundled with the SPA.
-- Straightforward testability: `parseMarkdown` is a pure async function with no Vue dependencies.
+- Zero runtime dependency added.
+- No XSS risk from `v-html` binding (content is static, not user-supplied).
+- No sanitization step needed (DOMPurify is not required for this page).
+- Simpler component: no script block, no imports, no async lifecycle hooks.
 
 ### Negative
 
-- Adds `marked` as a new runtime dependency.
-- Runtime parsing adds a negligible CPU cost at page load (acceptable for a small static document).
-- Vite's `?raw` import is a build-tool convention; future bundler changes may require updating import syntax.
+- Content must be edited as HTML, not Markdown — less ergonomic for non-developers.
+- No CMS or Markdown workflow is available for this page.
+- Future static content pages would need a separate decision if they require a more maintainable authoring format.
 
 ## Alternatives Considered
 
-- **Pre-compiled HTML (`.html` asset):** Content would need manual re-compilation whenever the Markdown changes, increasing maintenance friction and risk of desync. Rejected.
-- **CMS or remote fetch:** Adds a network dependency and latency for a static, infrequently-changing legal page. Overly complex. Rejected.
-- **`markdown-it` instead of `marked`:** Also a valid choice. `marked` was selected because it is more widely used in the Vue ecosystem, has a simpler async API, and has no harder dependencies.
-- **Inline HTML in the Vue component:** Mixes content and presentation, making future legal text updates harder for non-developers. Rejected.
-
-## Notes
-
-- Any future Markdown-rendered page must use the same `parseMarkdown` utility and must not bind raw `marked` output directly to `v-html`.
-- If the Markdown content requires additional HTML tags beyond DOMPurify's defaults, follow the governance rules in ADR-007 (add to `ADD_TAGS`/`ADD_ATTR`, backed by a test fixture).
+- **`marked` + DOMPurify (original proposal)**: Adds a runtime dependency and async logic for content that is truly static. Rejected in favour of simplicity.
+- **Pre-compiled HTML asset**: Would require a manual compilation step on every content update. Rejected.
+- **CMS or remote fetch**: Overly complex for a small, rarely-changing legal page. Rejected.
