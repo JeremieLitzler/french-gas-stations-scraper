@@ -12,5 +12,7 @@
     </AppLink>
     <span>|</span>
     <AppLink to="https://www.netlify.com/">Hosted on Netlify</AppLink>
+    <span>|</span>
+    <AppLink to="/mentions-legales">Mentions légales</AppLink>
   </footer>
 </template>
