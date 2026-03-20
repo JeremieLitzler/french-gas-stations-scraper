@@ -187,7 +187,7 @@ describe('TC-12: warning messages include station name and URL', () => {
     })
     await flushPromises()
 
-    const warningList = wrapper.find('[aria-label="Station fetch warnings"]')
+    const warningList = wrapper.find('[aria-label="Avertissements de récupération des stations"]')
     expect(warningList.exists()).toBe(true)
 
     const text = warningList.text()
@@ -210,7 +210,7 @@ describe('TC-13: no warning messages rendered when warnings list is empty', () =
     })
     await flushPromises()
 
-    const warningList = wrapper.find('[aria-label="Station fetch warnings"]')
+    const warningList = wrapper.find('[aria-label="Avertissements de récupération des stations"]')
     expect(warningList.exists()).toBe(false)
   })
 })
