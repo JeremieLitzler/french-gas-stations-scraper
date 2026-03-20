@@ -22,10 +22,19 @@ WT_NAME="$(basename "$WORKTREE")"
 BRANCH="$(git -C "$WORKTREE" branch --show-current)"
 DEVELOP="${BARE_REPO}/develop"
 
-echo "==> Merging PR (rebase)..."
-# Run from bare repo root so `gh` does not attempt a local `git switch develop`
-# (which would fail because develop is already checked out in its own worktree).
-(cd "$BARE_REPO" && gh pr merge "$PR_URL" --rebase --delete-branch)
+echo "==> Checking PR state..."
+PR_STATE="$(gh pr view "$PR_URL" --json state --jq '.state' 2>/dev/null || echo "UNKNOWN")"
+
+if [ "$PR_STATE" = "MERGED" ]; then
+  echo "    PR already merged — skipping merge step."
+elif [ "$PR_STATE" = "CLOSED" ]; then
+  echo "    PR is closed (not merged) — skipping merge step."
+else
+  echo "==> Merging PR (rebase)..."
+  # Run from bare repo root so `gh` does not attempt a local `git switch develop`
+  # (which would fail because develop is already checked out in its own worktree).
+  (cd "$BARE_REPO" && gh pr merge "$PR_URL" --rebase --delete-branch)
+fi
 
 echo "==> Removing worktree '${WT_NAME}'..."
 git -C "$BARE_REPO" worktree remove --force "$WT_NAME" 2>/dev/null || true
