@@ -32,7 +32,7 @@
     "vue-router": "^5.0.3"
   },
   "devDependencies": {
-    "@netlify/functions": "^5.1.2",
+    "@netlify/functions": "^5.1.5",
     "@semantic-release/changelog": "^6.0.3",
     "@semantic-release/git": "^10.0.1",
     "@tsconfig/node22": "^22.0.2",
