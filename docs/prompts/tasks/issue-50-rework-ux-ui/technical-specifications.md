@@ -11,12 +11,16 @@
 ### Modified
 
 - `index.html` — `<title>` changed to "Coup de pompe"; `<meta name="apple-mobile-web-app-title">` updated to match; `<meta name="description">` added.
-- `src/pages/index.vue` — `<h1 class="text-2xl font-bold mb-4">Coup de pompe</h1>` added above `<StationPrices />`.
+- `src/pages/index.vue` — `<h1>` has `text-center` added to center the app title on the page (bug fix).
 - `src/components/StationPrices.vue` — Heading changed from "Prices" to "Prix"; description translated to French.
 - `src/components/StationManager.vue` — Heading changed from "Station List" to "Liste des stations"; description translated to French; `<Suspense>` block wrapped in a `<details>`/`<summary>` element (closed by default, `<summary>` in French).
 - `src/components/StationManagerTable.vue` — Column header "Name" changed to "Nom"; new-row name placeholder changed to "Nom de la station".
 - `src/components/layout/AppFooter.vue` — Added `|` separator and `<AppLink to="/mentions-legales">Mentions légales</AppLink>`.
 - `package.json` / `package-lock.json` — `marked` added as a runtime dependency.
+
+### Bug fixes (post-PR)
+
+- `src/components/StationPricesContent.vue` — Translated all English UI strings to French: fuel type management button labels ("Définir par défaut", "Mettre à jour le défaut", "Effacer le défaut"), default indicator badge ("Par défaut"), price table headers ("Nom de la station", "Prix"), success message ("Récupération terminée."), warning list aria-label and warning item text ("Impossible de charger les prix pour").
 
 ## Technical Choices
 
