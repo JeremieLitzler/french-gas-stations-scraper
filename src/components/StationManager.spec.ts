@@ -646,6 +646,54 @@ describe('TC-30: Success message does not appear when saving a new station via a
 })
 
 // ---------------------------------------------------------------------------
+// Issue #50 TC-09: Station table is wrapped in a <details> element, closed by default
+// ---------------------------------------------------------------------------
+
+describe('Issue #50 TC-09: Station table is collapsed by default inside a <details> element', () => {
+  it('renders a <details> element that wraps the station table', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const details = wrapper.find('details')
+    expect(details.exists()).toBe(true)
+  })
+
+  it('<details> element does not have the open attribute by default', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const details = wrapper.find('details')
+    expect(details.attributes('open')).toBeUndefined()
+  })
+
+  it('<details> element contains a <summary> child element', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const summary = wrapper.find('details > summary')
+    expect(summary.exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue #50 TC-10: Station table expands when the user clicks the summary
+// ---------------------------------------------------------------------------
+
+describe('Issue #50 TC-10: Station table expands when the <summary> is clicked', () => {
+  it('adds the open attribute to <details> after clicking <summary>', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const summary = wrapper.find('details > summary')
+    await summary.trigger('click')
+
+    const details = wrapper.find('details')
+    // After a click the browser toggles `open`; in happy-dom the attribute appears
+    expect(details.attributes('open')).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-31: Success message is per-row — editing one row does not affect another
 // ---------------------------------------------------------------------------
 

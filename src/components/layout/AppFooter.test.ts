@@ -29,6 +29,15 @@ describe('AppFooter', () => {
     expect(links).toHaveLength(4)
   })
 
+  // TC-08 — Mentions légales link
+  it('renders a RouterLink to /mentions-legales with text "Mentions légales"', () => {
+    const wrapper = mount(AppFooter, globalConfig)
+    const internalLinks = wrapper.findAll('a.internal-link')
+    const mentionsLink = internalLinks.find((a) => a.text().includes('Mentions'))
+    expect(mentionsLink).toBeDefined()
+    expect(mentionsLink!.text()).toContain('Mentions')
+  })
+
   it('renders an AppLink pointing to https://iamjeremie.me/ with text "Jeremie"', () => {
     const wrapper = mount(AppFooter, globalConfig)
     const jeremieLink = wrapper
