@@ -176,16 +176,21 @@ The script pushes the branch and opens the PR. It prints `PR: <url>` — report 
 bash scripts/pipeline/pr-complete.sh <pr-url>
 ```
 
-Merges the PR with rebase and deletes the remote branch. Skips gracefully if the PR was already merged or closed by the user on GitHub.
+Merges the PR with rebase. Branch deletion (local + remote) is handled by Task 8. Skips gracefully if the PR was already merged or closed by the user on GitHub.
 
 ### Task 8: Remove worktree and refresh develop
 
+Run these as **two separate commands** — do not chain them. `worktree-cleanup.sh` removes the CWD (the feature worktree), so the shell resets to `develop/`; `refresh-develop.sh` must then be called from there.
+
 ```bash
 bash scripts/pipeline/worktree-cleanup.sh <worktree>
+```
+
+```bash
 bash scripts/pipeline/refresh-develop.sh
 ```
 
-`worktree-cleanup.sh` removes the worktree directory, prunes stale git entries, and deletes the local branch. `refresh-develop.sh` fetches origin and fast-forwards `develop`. Both scripts are safe to re-run if a prior attempt was partial.
+`worktree-cleanup.sh` removes the worktree directory, prunes stale git entries, and deletes the local and remote branch. `refresh-develop.sh` fetches origin and fast-forwards `develop`. Both scripts are safe to re-run if a prior attempt was partial.
 
 ## Shell Command Retry Limit
 
