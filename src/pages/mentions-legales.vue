@@ -1,5 +1,13 @@
 <template>
-  <div class="max-w-3xl mx-auto px-4 py-8">
+  <div>
+    <RouterLink
+      to="/"
+      class="fixed top-4 left-4 z-10 inline-flex items-center bg-white border border-gray-300 rounded-full px-3 py-1 text-sm shadow hover:bg-gray-50"
+    >
+      ← Accueil
+    </RouterLink>
+
+    <div class="max-w-3xl mx-auto px-4 py-8 pt-16">
     <h1 class="text-3xl font-bold mb-4">Mentions Légales</h1>
 
     <h2 class="text-2xl font-semibold mt-6 mb-2">Définitions</h2>
@@ -288,5 +296,6 @@
       Tout litige relatif à l'utilisation du site est régi par le droit français. Sauf disposition
       légale contraire, la compétence exclusive est attribuée aux tribunaux compétents de Privas.
     </p>
+    </div>
   </div>
 </template>
