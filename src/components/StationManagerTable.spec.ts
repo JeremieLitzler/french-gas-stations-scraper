@@ -113,3 +113,20 @@ describe('TC-SCROLL-03: Existing station-manager behaviour is unaffected by the 
     expect(deleteButtons.length).toBeGreaterThanOrEqual(1)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Issue #50 TC-12: Column header "Name" is now "Nom" (French)
+// ---------------------------------------------------------------------------
+
+describe('Issue #50 TC-12: Column headers are in French', () => {
+  it('renders "Nom" as the first column header and not "Name"', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const headers = wrapper.findAll('th')
+    const headerTexts = headers.map((header) => header.text())
+
+    expect(headerTexts).toContain('Nom')
+    expect(headerTexts).not.toContain('Name')
+  })
+})

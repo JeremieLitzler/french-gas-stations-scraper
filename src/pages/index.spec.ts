@@ -79,6 +79,30 @@ beforeEach(() => {
 })
 
 // ---------------------------------------------------------------------------
+// Issue #50 TC-11: Home page displays an <h1> with the app name
+// ---------------------------------------------------------------------------
+
+describe('Issue #50 TC-11: Home page displays an <h1> with the app name', () => {
+  it('renders exactly one <h1> element containing "Coup de pompe"', async () => {
+    const IndexPage = (await import('./index.vue')).default
+    const wrapper = mount(IndexPage, {
+      global: {
+        stubs: {
+          StationManager: true,
+          StationPrices: true,
+          AppLoader: { template: '<div class="app-loader-stub" />' },
+        },
+      },
+    })
+    await flushPromises()
+
+    const heading = wrapper.find('h1')
+    expect(heading.exists()).toBe(true)
+    expect(heading.text()).toContain('Coup de pompe')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-08: AppLoader fallback is shown when children are suspended
 // ---------------------------------------------------------------------------
 

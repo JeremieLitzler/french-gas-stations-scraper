@@ -33,6 +33,13 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/mentions-legales': RouteRecordInfo<
+      '/mentions-legales',
+      '/mentions-legales',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
   }
 
   /**
@@ -49,6 +56,12 @@ declare module 'vue-router/auto-routes' {
     'src/pages/index.vue': {
       routes:
         | '/'
+      views:
+        | never
+    }
+    'src/pages/mentions-legales.vue': {
+      routes:
+        | '/mentions-legales'
       views:
         | never
     }

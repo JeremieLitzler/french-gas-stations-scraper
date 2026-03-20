@@ -409,6 +409,26 @@ describe('TC-23: selected fuel type resets when results change', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Issue #50 TC-13: Section heading is in French (not English "Prices")
+// ---------------------------------------------------------------------------
+
+describe('Issue #50 TC-13: Section heading is translated to French', () => {
+  it('does not contain the English word "Prices" in the rendered output', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).not.toContain('Prices')
+  })
+
+  it('contains the French heading "Prix" in the rendered output', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Prix')
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-24 — Security: station names rendered as text, not HTML
 // ---------------------------------------------------------------------------
 
