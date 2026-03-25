@@ -70,6 +70,9 @@ function mountComponent() {
         TableRow: { template: '<tr><slot /></tr>' },
         TableHead: { template: '<th><slot /></th>' },
         TableCell: { template: '<td><slot /></td>' },
+        PreferencesExport: { template: '<div />' },
+        PreferencesImport: { template: '<div />' },
+        PreferencesDiffDialog: { template: '<div />' },
       },
     },
   })
