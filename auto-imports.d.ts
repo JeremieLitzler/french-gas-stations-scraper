@@ -92,6 +92,8 @@ declare global {
   const useDefaultFuelType: typeof import('./src/composables/useDefaultFuelType').useDefaultFuelType
   const useId: typeof import('vue').useId
   const useModel: typeof import('vue').useModel
+  const usePreferencesExport: typeof import('./src/composables/usePreferencesExport').usePreferencesExport
+  const usePreferencesImport: typeof import('./src/composables/usePreferencesImport').usePreferencesImport
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
@@ -117,6 +119,9 @@ declare global {
   // @ts-ignore
   export type { FuelPrice } from './src/types/fuel-price'
   import('./src/types/fuel-price')
+  // @ts-ignore
+  export type { PreferencesFile, DiffRowKind, StationDiffRow, FuelTypeDiff, PreferencesDiff } from './src/types/preferences'
+  import('./src/types/preferences')
   // @ts-ignore
   export type { PriceRow } from './src/types/price-row'
   import('./src/types/price-row')

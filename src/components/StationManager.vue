@@ -7,6 +7,10 @@
         >https://www.prix-carburants.gouv.fr/</AppLink
       >
     </p>
+    <div class="flex gap-3 mb-4">
+      <PreferencesExport />
+      <PreferencesImport />
+    </div>
     <details>
       <summary class="cursor-pointer mb-2">Afficher / masquer la liste</summary>
       <Suspense>
@@ -16,6 +20,7 @@
         </template>
       </Suspense>
     </details>
+    <PreferencesDiffDialog />
   </div>
 </template>
 
