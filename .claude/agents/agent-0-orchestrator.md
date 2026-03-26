@@ -42,6 +42,9 @@ Build:
 
 Determine `type` from the issue label or nature (e.g. `feat`, `fix`, `docs`, `refactor`).
 
+Use AskUserQuestion to ask: "Optional branch suffix? Leave blank for none (e.g. `digest` → branch `feat/validate-fuel-default-digest`). Useful for re-tackling the same issue with different settings."
+If the user provides a non-empty value, append `-<suffix>` to the slug. Store the final slug as `[slug]`.
+
 Invoke agent-4-git using the Task tool, instructing it to perform **Task 1 and Task 2 only** (fetch latest from origin and create the branch + worktree). Do not ask it to commit or push yet. Pass:
 
 - `Type: [type]`
