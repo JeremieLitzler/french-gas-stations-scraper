@@ -7,6 +7,7 @@ Follow this workflow to fix it.
 - Never directly edit files in `develop/` from the main conversation
 - Never fix pipeline issues inline during a pipeline run for another issue — this must be a separate worktree
 - ALWAYS use `subagent_type="general-purpose"`
+- Never run git or gh commands directly — always delegate to agent-4-git via the Agent tool
 
 ## Step 1 — Create a GitHub issue
 
@@ -20,14 +21,15 @@ Record the issue number as `[id]` and derive a slug (≤ 30 chars, kebab-case).
 
 ## Step 2 — Create a dedicated worktree
 
-The session runs from `develop/`. The bare repo root is `..`.
+Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
 
-```bash
-git -C .. fetch origin
-git -C .. worktree add ci_<slug> -b ci/<slug> origin/develop
+```
+Perform Task 1 and Task 2 only.
+Type: ci
+Slug: <slug>
 ```
 
-Record the resulting worktree absolute path as `[worktree]`.
+Record the `Worktree: <path>` value printed by the agent as `[worktree]`.
 
 ## Step 3 — Apply the fix
 
@@ -36,6 +38,7 @@ Read and edit the affected files directly in the main conversation. You may read
 - `[worktree]/.claude/agents/agent-*.md` — agent instruction files
 - `[worktree]/CLAUDE.md` — main project instructions
 - `[worktree]/CLAUDE-*.md` — supplementary workflow documents
+- `[worktree]/.claude/commands/*.md` — skill files
 
 Do not edit source code, test files, or pipeline artifacts under `docs/prompts/tasks/`.
 
@@ -47,35 +50,47 @@ For every change:
 
 ## Step 4 — Commit
 
-Stage only the affected files and commit using conventional commits:
+Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
 
-- Files under `.claude/agents/` → `ci(agent): <message>`
-- Files at the repo root (`CLAUDE*.md`) → `docs: <message>`
+```
+Worktree: [worktree]
 
-Use `rtk git add <files>` and `rtk git commit -m "..."`.
+Stage only these files and commit them:
+<list every file you edited in Step 3>
+
+Use commit type ci(agent) for files under .claude/agents/ or .claude/commands/.
+Use commit type docs for CLAUDE*.md files.
+Do not push yet.
+Closes #[id]
+```
 
 ## Step 5 — Push and open a PR
 
-```bash
-rtk git push origin ci/<slug>
-gh pr create --base develop --title "<title>" --body "<body with Closes #[id]>"
+Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
+
 ```
+Worktree: [worktree]
+
+Perform Task 5 and Task 6.
+
+For Task 5: all files were already committed in the previous step — just push the branch.
+For Task 6: derive the PR title from the issue title (#[id]). The PR body must include:
+- a summary of what was wrong and what was fixed
+- Closes #[id]
+Target branch: develop
+```
+
+Record the `PR: <url>` value printed by the agent.
 
 Show the user the PR URL and ask for approval to merge.
 
 ## Step 6 — Merge and clean up
 
-Once approved, remove the worktree first (so the branch is free), then merge from the bare repo root:
+Once approved, invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
 
-```bash
-git -C .. worktree remove --force ci_<slug>
-git -C .. worktree prune
-cd .. && gh pr merge <pr-url> --rebase --delete-branch
-git -C .. fetch origin
 ```
+Worktree: [worktree]
 
-Then pull latest into `develop/`:
-
-```bash
-git pull --rebase origin develop
+Perform Task 7 then Task 8.
+PR URL: <pr-url>
 ```
