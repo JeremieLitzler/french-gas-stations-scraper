@@ -16,6 +16,7 @@
  *   TC-IMP-DIFF-08 — Stations absent from file are not shown in diff
  *   TC-IMP-DIFF-09 — Fuel type diff row produced when values differ
  *   TC-IMP-DIFF-10 — Fuel type diff not produced when values are identical
+ *   TC-IMP-DIFF-11 — Station URL with query params matches stored URL by path (not marked new)
  *   TC-SEC-01      — JSON with prototype-polluting key is rejected
  */
 
@@ -199,6 +200,50 @@ describe('TC-IMP-VAL-08: parseJsonFile rejects station names that fail name vali
       favoriteStations: [{ name: 'a'.repeat(201), url: VALID_URL }],
     })
     expect(parseJsonFile(json)).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-IMP-DIFF-11 — Station URL with query params matches stored URL by path
+// ---------------------------------------------------------------------------
+
+describe('TC-IMP-DIFF-11: computeDiff treats file URLs with query params as matching the stored path-only URL', () => {
+  it('does not mark the station as new when the file URL has extra query params', () => {
+    const stored: Station[] = [{ name: 'Ma Station', url: VALID_URL }]
+    const imported = {
+      fuelTypeDefault: null,
+      favoriteStations: [{ name: 'Ma Station', url: VALID_URL + '?utm_source=export' }],
+    }
+
+    const result = computeDiff(imported, stored, null)
+
+    expect(result).toBeNull()
+  })
+
+  it('still produces a conflict row when the name differs, even with query params on file URL', () => {
+    const stored: Station[] = [{ name: 'Ancien Nom', url: VALID_URL }]
+    const imported = {
+      fuelTypeDefault: null,
+      favoriteStations: [{ name: 'Nouveau Nom', url: VALID_URL + '?ref=import' }],
+    }
+
+    const result = computeDiff(imported, stored, null)
+
+    expect(result).not.toBeNull()
+    expect(result!.stationRows[0].kind).toBe('conflict')
+  })
+
+  it('marks the station as new when the URL path differs (not just query params)', () => {
+    const stored: Station[] = [{ name: 'Ma Station', url: VALID_URL }]
+    const imported = {
+      fuelTypeDefault: null,
+      favoriteStations: [{ name: 'Ma Station', url: VALID_URL_2 }],
+    }
+
+    const result = computeDiff(imported, stored, null)
+
+    expect(result).not.toBeNull()
+    expect(result!.stationRows[0].kind).toBe('new')
   })
 })
 
