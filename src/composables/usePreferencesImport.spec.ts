@@ -415,7 +415,7 @@ describe('TC-07: handleFileSelected warns and preserves stored fuelType when fil
 describe('TC-08: handleFileSelected does not re-fetch already-fetched station URLs', () => {
   it('skips fetch for URLs present in fetchedUrls; fetches only new URLs', async () => {
     const { handleFileSelected } = await freshComposable()
-    const fetchFn = vi.fn(async (): Promise<string[]> => ['Gazole'])
+    const fetchFn = vi.fn(async (_url: string): Promise<string[]> => ['Gazole'])
 
     const alreadyFetched = [VALID_URL]
     const newUrl = VALID_URL_2
@@ -448,7 +448,7 @@ describe('TC-08: handleFileSelected does not re-fetch already-fetched station UR
 describe('TC-09: handleFileSelected does not fetch URLs from disallowed domains', () => {
   it('skips the fetch for a URL on an external domain', async () => {
     const { handleFileSelected } = await freshComposable()
-    const fetchFn = vi.fn(async (): Promise<string[]> => [])
+    const fetchFn = vi.fn(async (_url: string): Promise<string[]> => [])
 
     const externalUrl = 'https://evil.com/station/1'
     // Disallowed URL won't pass station shape validation so we cannot put it
