@@ -33,17 +33,22 @@ If any subagent's output contains a question or request for clarification (i.e. 
 
 ### Step 0 — Task Folder and Branching
 
-Obtain the GitHub issue number and title from the user request (or fetch from GitHub if a URL or issue number is provided).
+**STOP — before reading any file or fetching any data, call AskUserQuestion first.**
+
+Use AskUserQuestion to ask: "Optional branch suffix? Leave blank for none (e.g. `digest` → branch `feat/validate-fuel-default-digest`). Useful for re-tackling the same issue with different settings."
+Store the answer as `[suffix]`. This is a required gate — do not proceed until the user has replied.
+
+Only after receiving the answer: obtain the GitHub issue number and title from the user request (or fetch from GitHub if a URL or issue number is provided).
 
 Build:
 
 - `slug` = a short (≤ 30 characters) kebab-case summary of the issue title (e.g. `back-button-fix`, `article-extract-error`). Do NOT use the full issue title — long slugs cause path-length failures on Windows (MINGW64) that break subagents running shell commands.
+- If `[suffix]` is non-empty, append `-[suffix]` to the slug.
 - `task-folder` = `docs/prompts/tasks/issue-[id of issue]-[slug]/`
 
 Determine `type` from the issue label or nature (e.g. `feat`, `fix`, `docs`, `refactor`).
 
-Use AskUserQuestion to ask: "Optional branch suffix? Leave blank for none (e.g. `digest` → branch `feat/validate-fuel-default-digest`). Useful for re-tackling the same issue with different settings."
-If the user provides a non-empty value, append `-<suffix>` to the slug. Store the final slug as `[slug]`.
+Store the final slug as `[slug]`.
 
 Invoke agent-4-git using the Task tool, instructing it to perform **Task 1 and Task 2 only** (fetch latest from origin and create the branch + worktree). Do not ask it to commit or push yet. Pass:
 
