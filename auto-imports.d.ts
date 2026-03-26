@@ -91,6 +91,7 @@ declare global {
   const useCssVars: typeof import('vue').useCssVars
   const useDefaultFuelType: typeof import('./src/composables/useDefaultFuelType').useDefaultFuelType
   const useId: typeof import('vue').useId
+  const useKnownFuelTypes: typeof import('./src/composables/useKnownFuelTypes').useKnownFuelTypes
   const useModel: typeof import('vue').useModel
   const usePreferencesExport: typeof import('./src/composables/usePreferencesExport').usePreferencesExport
   const usePreferencesImport: typeof import('./src/composables/usePreferencesImport').usePreferencesImport

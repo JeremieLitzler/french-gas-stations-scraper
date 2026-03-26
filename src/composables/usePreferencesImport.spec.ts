@@ -60,6 +60,11 @@ const addStation = vi.fn(async (_s: Station) => {})
 const updateStation = vi.fn(async (_url: string, _s: Station) => {})
 const saveDefaultFuelType = vi.fn(async (_label: string) => {})
 const clearDefaultFuelType = vi.fn(async () => {})
+const fetchFuelTypesForUrl = vi.fn(async (): Promise<string[]> => [])
+
+// Known fuel types that include values used in the existing tests so
+// fuel-type validation passes without triggering warnings.
+const KNOWN_FUEL_TYPES = ['SP95', 'Gasoil', 'E10', 'E85', 'SP98', 'GPL']
 
 // ---------------------------------------------------------------------------
 // Setup
@@ -79,7 +84,7 @@ describe('TC-IMP-VAL-01: handleFileSelected opens the dialog when validation pas
 
     // Stored state has no stations — so the file station is new (diff exists)
     const file = makeFile(validFileContent([{ name: 'Ma Station', url: VALID_URL }], 'SP95'))
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     expect(importError.value).toBeNull()
     expect(isDialogOpen.value).toBe(true)
@@ -96,7 +101,7 @@ describe('TC-IMP-VAL-02: handleFileSelected sets importError for non-JSON conten
     const { handleFileSelected, isDialogOpen, importError } = await freshComposable()
 
     const file = makeFile('not valid json')
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     expect(importError.value).not.toBeNull()
     expect(isDialogOpen.value).toBe(false)
@@ -112,7 +117,7 @@ describe('TC-IMP-VAL-09: handleFileSelected rejects oversized files', () => {
     const { handleFileSelected, isDialogOpen, importError } = await freshComposable()
 
     const file = makeFile(validFileContent(), 1_000_001)
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     expect(importError.value).not.toBeNull()
     expect(isDialogOpen.value).toBe(false)
@@ -130,7 +135,7 @@ describe('TC-IMP-DIFF-01: handleFileSelected informs user when file matches Inde
     const stored: Station[] = [{ name: 'Ma Station', url: VALID_URL }]
     const file = makeFile(validFileContent(stored, 'SP95'))
 
-    await handleFileSelected(file, stored, 'SP95')
+    await handleFileSelected(file, stored, 'SP95', KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     expect(importError.value).not.toBeNull()
     expect(importError.value).toContain('Aucun changement')
@@ -149,7 +154,7 @@ describe('TC-IMP-APPLY-01: applyDiff applies the resolved diff and sets importSu
     // Open dialog with a new station
     const newStation: Station = { name: 'Nouvelle', url: VALID_URL }
     const file = makeFile(validFileContent([newStation], null))
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     await applyDiff(addStation, updateStation, saveDefaultFuelType, clearDefaultFuelType)
 
@@ -169,7 +174,7 @@ describe('TC-IMP-DIFF-03: applyDiff skips deselected new station rows', () => {
 
     const newStation: Station = { name: 'Nouvelle', url: VALID_URL }
     const file = makeFile(validFileContent([newStation], null))
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     // Deselect the new station row
     diff.value!.stationRows[0].selected = false
@@ -191,7 +196,7 @@ describe('TC-IMP-DIFF-05: applyDiff calls updateStation when conflict resolved w
     const stored: Station[] = [{ name: 'Ancien Nom', url: VALID_URL }]
     const fileStation: Station = { name: 'Nouveau Nom', url: VALID_URL }
     const file = makeFile(validFileContent([fileStation], null))
-    await handleFileSelected(file, stored, null)
+    await handleFileSelected(file, stored, null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     // Resolve conflict: choose file name
     diff.value!.stationRows[0].chosenName = 'file'
@@ -213,7 +218,7 @@ describe('TC-IMP-DIFF-06: applyDiff skips updateStation when conflict resolved w
     const stored: Station[] = [{ name: 'Ancien Nom', url: VALID_URL }]
     const fileStation: Station = { name: 'Nouveau Nom', url: VALID_URL }
     const file = makeFile(validFileContent([fileStation], null))
-    await handleFileSelected(file, stored, null)
+    await handleFileSelected(file, stored, null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     // Resolve conflict: keep stored name
     diff.value!.stationRows[0].chosenName = 'stored'
@@ -233,7 +238,7 @@ describe('TC-IMP-DIFF-11: applyDiff calls saveDefaultFuelType when fuel type res
     const { handleFileSelected, applyDiff, diff } = await freshComposable()
 
     const file = makeFile(validFileContent([], 'Gasoil'))
-    await handleFileSelected(file, [], 'SP95')
+    await handleFileSelected(file, [], 'SP95', KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     // Resolve fuel type: choose file value
     diff.value!.fuelTypeDiff!.chosen = 'file'
@@ -253,7 +258,7 @@ describe('TC-IMP-DIFF-11: applyDiff calls clearDefaultFuelType when file fuel ty
     const { handleFileSelected, applyDiff, diff } = await freshComposable()
 
     const file = makeFile(validFileContent([], null))
-    await handleFileSelected(file, [], 'SP95')
+    await handleFileSelected(file, [], 'SP95', KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     diff.value!.fuelTypeDiff!.chosen = 'file'
 
@@ -273,7 +278,7 @@ describe('TC-IMP-DIFF-12: applyDiff skips fuel type write when chosen is "stored
     const { handleFileSelected, applyDiff, diff } = await freshComposable()
 
     const file = makeFile(validFileContent([], 'Gasoil'))
-    await handleFileSelected(file, [], 'SP95')
+    await handleFileSelected(file, [], 'SP95', KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     diff.value!.fuelTypeDiff!.chosen = 'stored'
 
@@ -295,7 +300,7 @@ describe('TC-IMP-APPLY-02: cancelImport closes dialog without modifying IndexedD
 
     const newStation: Station = { name: 'Nouvelle', url: VALID_URL }
     const file = makeFile(validFileContent([newStation], null))
-    await handleFileSelected(file, [], null)
+    await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     expect(isDialogOpen.value).toBe(true)
 
@@ -318,7 +323,7 @@ describe('TC-IMP-DIFF-13: diff has unresolved conflict rows and fuel type diff',
     const stored: Station[] = [{ name: 'Ancien', url: VALID_URL }]
     const fileStation: Station = { name: 'Nouveau', url: VALID_URL }
     const file = makeFile(validFileContent([fileStation], 'Gasoil'))
-    await handleFileSelected(file, stored, 'SP95')
+    await handleFileSelected(file, stored, 'SP95', KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
 
     // Both conflict row and fuel type diff should be unresolved
     expect(diff.value!.stationRows[0].chosenName).toBeNull()

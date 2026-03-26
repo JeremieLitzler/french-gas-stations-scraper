@@ -5,7 +5,7 @@ import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
 import { computed } from 'vue'
 
-const { diff, isDialogOpen, applyDiff, cancelImport } = usePreferencesImport()
+const { diff, isDialogOpen, fuelTypeWarning, applyDiff, cancelImport } = usePreferencesImport()
 const { addStation, updateStation } = useStationStorage()
 const { saveDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
 
@@ -61,6 +61,9 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
         <h2 id="diff-dialog-title" class="text-lg font-semibold">
           Aperçu des changements à importer
         </h2>
+
+        <!-- Fuel type warning: shown when the file's fuelTypeDefault was not recognised -->
+        <p v-if="fuelTypeWarning" role="alert" class="text-sm text-amber-600">{{ fuelTypeWarning }}</p>
 
         <!-- Station diff table -->
         <div v-if="diff.stationRows.length > 0">
