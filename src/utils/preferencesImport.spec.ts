@@ -22,7 +22,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { Station } from '@/types/station'
-import { isFileSizeAcceptable, parseJsonFile, computeDiff } from './preferencesImport'
+import { isFileSizeAcceptable, parseJsonFile, computeDiff, isAllowedStationUrl, normalizeUrl } from './preferencesImport'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -464,5 +464,51 @@ describe('TC-IMP-DIFF-10: computeDiff produces no fuelTypeDiff when values are t
 
     expect(result).not.toBeNull()
     expect(result!.fuelTypeDiff).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// isAllowedStationUrl — Issue #66 export
+// ---------------------------------------------------------------------------
+
+describe('isAllowedStationUrl: returns true only for allowed domain and path prefix', () => {
+  it('returns true for a valid prix-carburants.gouv.fr station URL', () => {
+    expect(isAllowedStationUrl(VALID_URL)).toBe(true)
+  })
+
+  it('returns false for a URL from an external domain', () => {
+    expect(isAllowedStationUrl('https://evil.com/station/1')).toBe(false)
+  })
+
+  it('returns false for the correct domain but wrong path prefix', () => {
+    expect(isAllowedStationUrl('https://www.prix-carburants.gouv.fr/other/1')).toBe(false)
+  })
+
+  it('returns false for a non-URL string', () => {
+    expect(isAllowedStationUrl('not-a-url')).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// normalizeUrl — Issue #66 export
+// ---------------------------------------------------------------------------
+
+describe('normalizeUrl: strips query parameters for consistent URL comparison', () => {
+  it('returns the URL without query params when there are none', () => {
+    const result = normalizeUrl(VALID_URL)
+    expect(result).not.toContain('?')
+    // normalizeUrl may append a trailing slash — the path must be preserved
+    expect(result).toContain('/station/1234')
+  })
+
+  it('strips query parameters from a valid URL', () => {
+    const withQuery = VALID_URL + '?utm_source=export'
+    const result = normalizeUrl(withQuery)
+    expect(result).not.toContain('utm_source')
+  })
+
+  it('returns the input unchanged when the URL is unparseable', () => {
+    const unparseable = 'not-a-url'
+    expect(normalizeUrl(unparseable)).toBe(unparseable)
   })
 })
