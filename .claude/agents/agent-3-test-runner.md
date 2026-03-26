@@ -10,13 +10,48 @@ The orchestrator passes:
 - `Task folder: [task-folder]` — directory where all pipeline artifacts are written
 - `Worktree: [worktree]` — absolute path to the active worktree
 
-Run Vitest from the worktree root using the exact command below. The bare repo root has no `node_modules` — always `cd` to the worktree path first.
+## Running Tests
+
+Always run Vitest from the worktree root using **exactly** the two commands below — never any other invocation. The bare repo root has no `node_modules` — always `cd` to the worktree path first.
+
+### Step 1 — Get failed test details
 
 ```bash
-cd [worktree] && rtk vitest run
+cd [worktree] && npx vitest run --reporter=json 2>/dev/null | jq '{
+  failedTests: [
+    .testResults[]
+    | .name as $file
+    | .assertionResults[]
+    | select(.status == "failed")
+    | {
+        file: $file,
+        test: .fullName,
+        errors: .failureMessages
+      }
+  ]
+}'
 ```
 
-`rtk vitest run` runs Vitest in non-watch mode and shows failures only — saving significant tokens on large test suites.
+### Step 2 — Get summary
+
+```bash
+cd [worktree] && npx vitest run --reporter=json 2>/dev/null | jq -r '
+  (.numTotalTestSuites) as $files |
+  (.numPassedTestSuites) as $filesPassed |
+  (.numFailedTestSuites) as $filesFailed |
+  (.numTotalTests) as $tests |
+  (.numPassedTests) as $passed |
+  (.numFailedTests) as $failed |
+  ((.testResults | map(.endTime - .startTime) | add) / 1000 | round) as $dur |
+  if $failed == 0 then
+    "\($files) test files, \($tests) tests total - all passed.\n\n- Test files: \($files) passed\n- Tests: \($tests) passed (0 failed)\n- Duration: ~\($dur) seconds"
+  else
+    "\($files) test files, \($tests) tests total - \($failed) failed.\n\n- Test files: \($filesPassed) passed, \($filesFailed) failed\n- Tests: \($passed) passed (\($failed) failed)\n- Duration: ~\($dur) seconds"
+  end
+'
+```
+
+Both commands run the full test suite — the first extracts structured failure data, the second produces the human-readable summary. You may combine them into two separate `cd [worktree] && ...` calls.
 
 ## Shell Command Retry Limit
 
@@ -31,7 +66,7 @@ Create `[task-folder]/test-results.md` using this exact template:
 
 ## Test Run
 
-Command: `npm test` (Vitest vX.Y.Z) from the `[worktree name]` worktree.
+Command: `npx vitest run --reporter=json` (Vitest vX.Y.Z) from the `[worktree name]` worktree.
 
 ## Files Run
 
@@ -50,7 +85,7 @@ All tests passed. No failures.
 <else>
 ### Failures
 
-<list each failing test with its stack trace or error output>
+<list each failing test with its file, test name, and error messages from the failedTests output>
 <end-if>
 
 status: passed
