@@ -7,7 +7,7 @@ tools: Read, Write, Bash, WebFetch
 
 # I am a Code Reviewer Agent
 
-Check whether `[worktree]/digest.txt` exists. If it does, read it first to get a comprehensive single-file overview of the entire codebase before examining changed files. If it does not exist, proceed with the steps below as normal.
+If `UseDigest: yes` was passed by the orchestrator, read `[worktree]/digest.txt` first to get a comprehensive single-file overview of the entire codebase before examining changed files.
 
 Read the following files passed by the orchestrator:
 

@@ -67,6 +67,9 @@ If the spec file contains `### ADR Required`, pause the pipeline and use AskUser
 Use AskUserQuestion to show the user a summary of `[task-folder]/business-specifications.md` and ask for approval before proceeding to commit changes.
 If the user does not approve, stop the pipeline and report why.
 
+Use AskUserQuestion to ask the user: "Enable codebase digest for this pipeline run? (Generates `digest.txt` after push — helps coder, reviewer, and test-writer agents in Bug Feedback Loop re-runs load the full codebase in one read.) [yes/no]"
+Store the answer as `UseDigest` (`yes` or `no`).
+
 Invoke agent-4-git using the Task tool, instructing it to perform **Task 3 only** (commit specs output). Pass `Worktree: [worktree]`. Then proceed to Step 1.5.
 
 ### Step 1.5 — Security
@@ -102,6 +105,7 @@ Invoke agent-2-coder using the Task tool. Pass the following to the subagent:
 
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
+- `UseDigest: [UseDigest]`
 
 The subagent reads `[task-folder]/business-specifications.md`, `[task-folder]/security-guidelines.md`, and `[task-folder]/test-cases.md`, and writes `[task-folder]/technical-specifications.md`.
 
@@ -120,6 +124,7 @@ Invoke agent-6-reviewer using the Task tool. Pass the following to the subagent:
 
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
+- `UseDigest: [UseDigest]`
 
 The subagent reviews the changed source files against `[task-folder]/security-guidelines.md` and `[task-folder]/business-specifications.md`, runs `rtk lint` and `npm run type-check` from `[worktree]`, and writes `[task-folder]/review-results.md`.
 
@@ -142,6 +147,7 @@ Invoke agent-3-test-writer using the Task tool. Pass:
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
 - `Pass: 2`
+- `UseDigest: [UseDigest]`
 
 Wait for `status: ready`. Then proceed to Step 3.
 
@@ -174,9 +180,13 @@ Report the branch name and commit message to the user when done.
 
 ### Step 4.5 — Generate Codebase Digest
 
-Invoke agent-4-git using the Task tool, instructing it to perform **Task 5.5 only** (generate codebase digest). Pass `Worktree: [worktree]`.
+Only execute this step if `UseDigest = yes`.
 
-Wait for the agent to report `digest.txt written`. Then proceed to Step 5.
+Spawn a general-purpose agent using the Task tool. Pass it the following instruction:
+
+> Run the `/run-gitingest` command with `Worktree: [worktree]`. Report back when `digest.txt` has been written.
+
+Wait for the agent to confirm completion. Then proceed to Step 5.
 
 ### Step 5 — GitHub management (end)
 
