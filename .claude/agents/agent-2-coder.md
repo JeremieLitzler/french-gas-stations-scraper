@@ -9,7 +9,7 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 
 ## Bug Feedback Loop Re-run
 
-If this is a re-run triggered by a test failure or bug report, check whether `[worktree]/digest.txt` exists. If it does, read it first to get a comprehensive single-file overview of the codebase before reading any individual implementation files. If it does not exist, proceed with reading individual files as normal.
+If `UseDigest: yes` was passed by the orchestrator and this is a re-run triggered by a test failure or bug report, read `[worktree]/digest.txt` first to get a comprehensive single-file overview of the codebase before reading any individual implementation files.
 
 ## Initial run
 
