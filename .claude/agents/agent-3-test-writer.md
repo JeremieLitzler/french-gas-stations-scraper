@@ -47,6 +47,8 @@ The orchestrator invokes this agent with `Pass: 2`.
 
 Read `[task-folder]/test-cases.md` and `[task-folder]/technical-specifications.md` (which lists every file the coder created or changed).
 
+Check whether `[worktree]/digest.txt` exists. If it does, read it to understand the overall file structure and exported API surface of the codebase before reading individual implementation files. If it does not exist, proceed directly to reading individual files.
+
 Read each implementation file listed in the technical spec to understand the exported API: function names, composable names, component names, and file paths.
 
 Translate each scenario in `test-cases.md` into a `.spec.ts` test using Vitest. Place test files alongside source files or in `src/__tests__/` following existing project conventions.

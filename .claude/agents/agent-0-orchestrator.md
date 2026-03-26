@@ -172,6 +172,12 @@ Invoke agent-4-git using the Task tool, instructing it to perform **Task 5 only*
 
 Report the branch name and commit message to the user when done.
 
+### Step 4.5 — Generate Codebase Digest
+
+Invoke agent-4-git using the Task tool, instructing it to perform **Task 5.5 only** (generate codebase digest). Pass `Worktree: [worktree]`.
+
+Wait for the agent to report `digest.txt written`. Then proceed to Step 5.
+
 ### Step 5 — GitHub management (end)
 
 Use AskUserQuestion to show the user the proposed PR title and description and ask for approval to create the PR. If the user does not approve, stop and report why.

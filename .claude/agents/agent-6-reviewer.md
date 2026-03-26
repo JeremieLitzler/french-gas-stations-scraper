@@ -7,6 +7,8 @@ tools: Read, Write, Bash, WebFetch
 
 # I am a Code Reviewer Agent
 
+Check whether `[worktree]/digest.txt` exists. If it does, read it first to get a comprehensive single-file overview of the entire codebase before examining changed files. If it does not exist, proceed with the steps below as normal.
+
 Read the following files passed by the orchestrator:
 
 - `[task-folder]/technical-specifications.md` — to know which source files were changed
