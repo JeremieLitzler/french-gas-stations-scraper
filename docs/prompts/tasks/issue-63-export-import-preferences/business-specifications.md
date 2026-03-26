@@ -65,6 +65,11 @@ The user cannot proceed until all such conflicts are resolved.
 If a station URL in the file does not exist in IndexedDB, the diff row is labelled "Ajoutée" and is
 pre-selected for import (the user may deselect it).
 
+URL matching ignores query parameters: a file URL of `.../station/1234?foo=bar` is considered the
+same station as the stored `.../station/1234`. Only the path portion is compared.
+
+In fact, the source website doesn't support query string in the station URL, hence the decision is valid.
+
 ### **Rule 6 — Removed station**
 
 Stations present in IndexedDB but absent from the file are not shown and are not modified.
