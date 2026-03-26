@@ -1,6 +1,6 @@
 ---
 name: agent-3-test-runner
-description: Runs npm test and writes test-results.md with pass/fail status
+description: Runs Vitest via /run-tests and writes test-results.md with pass/fail status
 model: claude-haiku-4-5-20251001
 tools: Read, Write, Bash
 ---
@@ -12,46 +12,9 @@ The orchestrator passes:
 
 ## Running Tests
 
-Always run Vitest from the worktree root using **exactly** the two commands below — never any other invocation. The bare repo root has no `node_modules` — always `cd` to the worktree path first.
+Use the `/run-tests` skill — it contains the exact `npx vitest run --reporter=json 2>/dev/null | jq ...` commands. Never use `npm test`, `npm run test`, `rtk vitest run`, or any other form.
 
-### Step 1 — Get failed test details
-
-```bash
-cd [worktree] && npx vitest run --reporter=json 2>/dev/null | jq '{
-  failedTests: [
-    .testResults[]
-    | .name as $file
-    | .assertionResults[]
-    | select(.status == "failed")
-    | {
-        file: $file,
-        test: .fullName,
-        errors: .failureMessages
-      }
-  ]
-}'
-```
-
-### Step 2 — Get summary
-
-```bash
-cd [worktree] && npx vitest run --reporter=json 2>/dev/null | jq -r '
-  (.numTotalTestSuites) as $files |
-  (.numPassedTestSuites) as $filesPassed |
-  (.numFailedTestSuites) as $filesFailed |
-  (.numTotalTests) as $tests |
-  (.numPassedTests) as $passed |
-  (.numFailedTests) as $failed |
-  ((.testResults | map(.endTime - .startTime) | add) / 1000 | round) as $dur |
-  if $failed == 0 then
-    "\($files) test files, \($tests) tests total - all passed.\n\n- Test files: \($files) passed\n- Tests: \($tests) passed (0 failed)\n- Duration: ~\($dur) seconds"
-  else
-    "\($files) test files, \($tests) tests total - \($failed) failed.\n\n- Test files: \($filesPassed) passed, \($filesFailed) failed\n- Tests: \($passed) passed (\($failed) failed)\n- Duration: ~\($dur) seconds"
-  end
-'
-```
-
-Both commands run the full test suite — the first extracts structured failure data, the second produces the human-readable summary. You may combine them into two separate `cd [worktree] && ...` calls.
+Replace `[worktree]` in the skill commands with the worktree path passed by the orchestrator.
 
 ## Shell Command Retry Limit
 
