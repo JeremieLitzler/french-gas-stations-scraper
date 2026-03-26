@@ -227,44 +227,7 @@ rtk err npm run build   # errors/warnings only
 
 ### Running tests
 
-**Always** use the exact commands below — never `npm test`, `rtk vitest run`, or any other form.
-
-**Failure details** (structured JSON per failing test):
-
-```bash
-npx vitest run --reporter=json 2>/dev/null | jq '{
-  failedTests: [
-    .testResults[]
-    | .name as $file
-    | .assertionResults[]
-    | select(.status == "failed")
-    | {
-        file: $file,
-        test: .fullName,
-        errors: .failureMessages
-      }
-  ]
-}'
-```
-
-**Summary** (human-readable pass/fail counts and duration):
-
-```bash
-npx vitest run --reporter=json 2>/dev/null | jq -r '
-  (.numTotalTestSuites) as $files |
-  (.numPassedTestSuites) as $filesPassed |
-  (.numFailedTestSuites) as $filesFailed |
-  (.numTotalTests) as $tests |
-  (.numPassedTests) as $passed |
-  (.numFailedTests) as $failed |
-  ((.testResults | map(.endTime - .startTime) | add) / 1000 | round) as $dur |
-  if $failed == 0 then
-    "\($files) test files, \($tests) tests total - all passed.\n\n- Test files: \($files) passed\n- Tests: \($tests) passed (0 failed)\n- Duration: ~\($dur) seconds"
-  else
-    "\($files) test files, \($tests) tests total - \($failed) failed.\n\n- Test files: \($filesPassed) passed, \($filesFailed) failed\n- Tests: \($passed) passed (\($failed) failed)\n- Duration: ~\($dur) seconds"
-  end
-'
-```
+Always use the `/run-tests` skill — never `npm test`, `npm run test`, `rtk vitest run`, or any other form. The skill contains the exact `npx vitest run --reporter=json 2>/dev/null | jq ...` commands for both failure details and summary output.
 
 ### Files & search
 

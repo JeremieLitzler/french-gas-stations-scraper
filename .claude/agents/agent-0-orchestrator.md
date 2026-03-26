@@ -152,7 +152,7 @@ Invoke agent-3-test-runner using the Task tool. Pass the following to the subage
 - `Task folder: [task-folder]`
 - `Worktree: [worktree]`
 
-The subagent runs `npm run test` and writes `[task-folder]/test-results.md`.
+The subagent runs Vitest via the `/run-tests` skill and writes `[task-folder]/test-results.md`.
 
 Wait for `[task-folder]/test-results.md` to end with either `status: passed` or `status: failed`.
 
