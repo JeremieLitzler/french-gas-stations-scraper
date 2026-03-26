@@ -153,6 +153,18 @@ If the last line is `status: passed`:
 - Commit on the current feature branch — never commit directly to develop or main.
 - Push the branch to origin: `rtk git push origin <branch-name>`. Worktree branches have no upstream set, so always specify the remote and branch name explicitly.
 
+### Task 5.5: Generate codebase digest
+
+Run the gitingest script with the worktree path passed by the orchestrator:
+
+```bash
+bash scripts/pipeline/gitingest.sh <worktree>
+```
+
+This produces `<worktree>/digest.txt`. Do **not** stage or commit `digest.txt` — it is excluded by `.gitignore`.
+
+Report `digest.txt written` to the orchestrator when done.
+
 ### Task 6: Create pull request
 
 - Derive the PR title from `[task-folder]/business-specifications.md` (short imperative summary, ≤70 chars).

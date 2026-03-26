@@ -35,6 +35,7 @@ coverage
 deno.lock
 
 # Generated files
+digest.txt
 # auto-imports.d.ts
 # components.d.ts
 # typed-router.d.ts
