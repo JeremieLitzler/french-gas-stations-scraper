@@ -1,3 +1,9 @@
+<script setup lang="ts">
+import { usePreferencesImport } from '@/composables/usePreferencesImport'
+
+const { fuelTypeWarning, doOpenDialog } = usePreferencesImport()
+</script>
+
 <template>
   <div class="station-manager">
     <h2 class="text-xl font-semibold mb-1">Liste des stations</h2>
@@ -11,6 +17,11 @@
       <PreferencesExport />
       <PreferencesImport />
     </div>
+    <!-- fuelTypeWarning is shown here so it appears below both export/import buttons,
+         outside the PreferencesImport component's own layout. -->
+    <p v-if="fuelTypeWarning && !doOpenDialog" role="alert" class="text-sm text-amber-600">
+      {{ fuelTypeWarning }}
+    </p>
     <details>
       <summary class="cursor-pointer mb-2">Afficher / masquer la liste</summary>
       <Suspense>

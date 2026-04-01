@@ -45,7 +45,6 @@ function validatePreferencesShape(raw: unknown): PreferencesFile | null {
   if (!Object.prototype.hasOwnProperty.call(record, 'favoriteStations')) return null
   const fuelTypeDefault = validateFuelTypeDefault(record.fuelTypeDefault)
   if (fuelTypeDefault === undefined) return null
-  // TODO(#66): validate fuelTypeDefault against the known fuel type list.
   const favoriteStations = validateFavoriteStations(record.favoriteStations)
   if (favoriteStations === null) return null
   return { fuelTypeDefault, favoriteStations }
@@ -87,6 +86,14 @@ function validateStation(value: unknown): Station | null {
 // Field validators (replicating useStationStorage rules)
 // ---------------------------------------------------------------------------
 
+/**
+ * Returns true when the URL belongs to the allowed gas-station domain.
+ * Used by the import flow to guard against SSRF via the Netlify proxy.
+ */
+export function isAllowedStationUrl(rawUrl: string): boolean {
+  return isValidUrl(rawUrl)
+}
+
 function isValidUrl(rawUrl: string): boolean {
   try {
     const parsed = new URL(rawUrl)
@@ -96,7 +103,11 @@ function isValidUrl(rawUrl: string): boolean {
   }
 }
 
-function normalizeUrl(url: string): string {
+/**
+ * Strip query parameters from a URL for consistent comparison.
+ * Returns the input unchanged when parsing fails.
+ */
+export function normalizeUrl(url: string): string {
   try {
     const parsed = new URL(url)
     parsed.search = ''
