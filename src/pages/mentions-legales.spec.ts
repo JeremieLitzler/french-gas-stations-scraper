@@ -14,9 +14,11 @@ import MentionsLegales from './mentions-legales.vue'
 // TC-04: Page renders a visible <h1> heading from the Markdown asset
 // ---------------------------------------------------------------------------
 
+const mountOptions = { global: { stubs: { RouterLink: true } } }
+
 describe('TC-04: Page renders a visible <h1> heading from the Markdown asset', () => {
   it('renders at least one <h1> element after mounting', async () => {
-    const wrapper = mount(MentionsLegales)
+    const wrapper = mount(MentionsLegales, mountOptions)
     await flushPromises()
 
     const heading = wrapper.find('h1')
@@ -31,7 +33,7 @@ describe('TC-04: Page renders a visible <h1> heading from the Markdown asset', (
 
 describe('TC-05: External links in the rendered output have rel="noopener noreferrer"', () => {
   it('every <a> element in the rendered output has rel="noopener noreferrer"', async () => {
-    const wrapper = mount(MentionsLegales)
+    const wrapper = mount(MentionsLegales, mountOptions)
     await flushPromises()
 
     const anchors = wrapper.findAll('a')
@@ -49,21 +51,21 @@ describe('TC-05: External links in the rendered output have rel="noopener norefe
 
 describe('TC-06: No raw Markdown syntax is visible in the rendered DOM', () => {
   it('does not contain "## " heading syntax as visible text', async () => {
-    const wrapper = mount(MentionsLegales)
+    const wrapper = mount(MentionsLegales, mountOptions)
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('## ')
   })
 
   it('does not contain "**" bold syntax as visible text', async () => {
-    const wrapper = mount(MentionsLegales)
+    const wrapper = mount(MentionsLegales, mountOptions)
     await flushPromises()
 
     expect(wrapper.text()).not.toContain('**')
   })
 
   it('does not contain "[text](url)" link syntax as visible text', async () => {
-    const wrapper = mount(MentionsLegales)
+    const wrapper = mount(MentionsLegales, mountOptions)
     await flushPromises()
 
     // Link syntax would look like "](https://..."
