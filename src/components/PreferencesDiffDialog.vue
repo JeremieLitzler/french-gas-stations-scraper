@@ -5,7 +5,13 @@ import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
 import { computed } from 'vue'
 
-const { diff, isDialogOpen, fuelTypeWarning, applyDiff, cancelImport } = usePreferencesImport()
+const {
+  diff,
+  doOpenDialog: isDialogOpen,
+  fuelTypeWarning,
+  applyDiff,
+  cancelImport,
+} = usePreferencesImport()
 const { addStation, updateStation } = useStationStorage()
 const { saveDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
 
@@ -57,13 +63,17 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
       aria-labelledby="diff-dialog-title"
       class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
     >
-      <div class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4">
+      <div
+        class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4"
+      >
         <h2 id="diff-dialog-title" class="text-lg font-semibold">
           Aperçu des changements à importer
         </h2>
 
         <!-- Fuel type warning: shown when the file's fuelTypeDefault was not recognised -->
-        <p v-if="fuelTypeWarning" role="alert" class="text-sm text-amber-600">{{ fuelTypeWarning }}</p>
+        <p v-if="fuelTypeWarning" role="alert" class="text-sm text-amber-600">
+          {{ fuelTypeWarning }}
+        </p>
 
         <!-- Station diff table -->
         <div v-if="diff.stationRows.length > 0">
@@ -79,13 +89,11 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow
-                v-for="row in diff.stationRows"
-                :key="row.url"
-                :disable-hover="true"
-              >
+              <TableRow v-for="row in diff.stationRows" :key="row.url" :disable-hover="true">
                 <TableCell>
-                  <span v-if="row.kind === 'new'" class="text-green-600 text-sm font-medium">Ajoutée</span>
+                  <span v-if="row.kind === 'new'" class="text-green-600 text-sm font-medium"
+                    >Ajoutée</span
+                  >
                   <span v-else class="text-amber-600 text-sm font-medium">Conflit</span>
                 </TableCell>
                 <TableCell class="text-xs break-all max-w-xs">{{ row.url }}</TableCell>
@@ -93,12 +101,11 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
                 <TableCell class="text-sm">{{ row.storedStation?.name ?? '—' }}</TableCell>
                 <TableCell>
                   <!-- New station: checkbox to include/exclude -->
-                  <label v-if="row.kind === 'new'" class="flex items-center gap-2 cursor-pointer text-sm">
-                    <input
-                      type="checkbox"
-                      :checked="row.selected"
-                      @change="onToggleNew(row)"
-                    />
+                  <label
+                    v-if="row.kind === 'new'"
+                    class="flex items-center gap-2 cursor-pointer text-sm"
+                  >
+                    <input type="checkbox" :checked="row.selected" @change="onToggleNew(row)" />
                     Inclure
                   </label>
                   <!-- Conflict: radio buttons to choose which name to keep -->

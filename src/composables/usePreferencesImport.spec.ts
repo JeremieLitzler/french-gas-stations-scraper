@@ -92,7 +92,12 @@ beforeEach(() => {
 
 describe('TC-IMP-VAL-01: handleFileSelected opens the dialog when validation passes', () => {
   it('sets isDialogOpen to true and diff to non-null after a valid file with changes', async () => {
-    const { handleFileSelected, isDialogOpen, diff, importError } = await freshComposable()
+    const {
+      handleFileSelected,
+      doOpenDialog: isDialogOpen,
+      diff,
+      importError,
+    } = await freshComposable()
 
     // Stored state has no stations — so the file station is new (diff exists)
     const file = makeFile(validFileContent([{ name: 'Ma Station', url: VALID_URL }], 'SP95'))
@@ -110,7 +115,7 @@ describe('TC-IMP-VAL-01: handleFileSelected opens the dialog when validation pas
 
 describe('TC-IMP-VAL-02: handleFileSelected sets importError for non-JSON content', () => {
   it('sets importError and does not open the dialog', async () => {
-    const { handleFileSelected, isDialogOpen, importError } = await freshComposable()
+    const { handleFileSelected, doOpenDialog: isDialogOpen, importError } = await freshComposable()
 
     const file = makeFile('not valid json')
     await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
@@ -126,7 +131,7 @@ describe('TC-IMP-VAL-02: handleFileSelected sets importError for non-JSON conten
 
 describe('TC-IMP-VAL-09: handleFileSelected rejects oversized files', () => {
   it('sets importError and does not open dialog when file exceeds 1 MB', async () => {
-    const { handleFileSelected, isDialogOpen, importError } = await freshComposable()
+    const { handleFileSelected, doOpenDialog: isDialogOpen, importError } = await freshComposable()
 
     const file = makeFile(validFileContent(), 1_000_001)
     await handleFileSelected(file, [], null, KNOWN_FUEL_TYPES, [], fetchFuelTypesForUrl)
@@ -142,7 +147,7 @@ describe('TC-IMP-VAL-09: handleFileSelected rejects oversized files', () => {
 
 describe('TC-IMP-DIFF-01: handleFileSelected informs user when file matches IndexedDB', () => {
   it('sets importError with a "no changes" message and does not open the dialog', async () => {
-    const { handleFileSelected, isDialogOpen, importError } = await freshComposable()
+    const { handleFileSelected, doOpenDialog: isDialogOpen, importError } = await freshComposable()
 
     const stored: Station[] = [{ name: 'Ma Station', url: VALID_URL }]
     const file = makeFile(validFileContent(stored, 'SP95'))
@@ -161,7 +166,12 @@ describe('TC-IMP-DIFF-01: handleFileSelected informs user when file matches Inde
 
 describe('TC-IMP-APPLY-01: applyDiff applies the resolved diff and sets importSuccess', () => {
   it('calls addStation for a selected new station and sets importSuccess to true', async () => {
-    const { handleFileSelected, applyDiff, importSuccess, isDialogOpen } = await freshComposable()
+    const {
+      handleFileSelected,
+      applyDiff,
+      importSuccess,
+      doOpenDialog: isDialogOpen,
+    } = await freshComposable()
 
     // Open dialog with a new station
     const newStation: Station = { name: 'Nouvelle', url: VALID_URL }
@@ -307,8 +317,13 @@ describe('TC-IMP-DIFF-12: applyDiff skips fuel type write when chosen is "stored
 
 describe('TC-IMP-APPLY-02: cancelImport closes dialog without modifying IndexedDB', () => {
   it('sets isDialogOpen to false and does not call add/update', async () => {
-    const { handleFileSelected, cancelImport, isDialogOpen, diff, importSuccess } =
-      await freshComposable()
+    const {
+      handleFileSelected,
+      cancelImport,
+      doOpenDialog: isDialogOpen,
+      diff,
+      importSuccess,
+    } = await freshComposable()
 
     const newStation: Station = { name: 'Nouvelle', url: VALID_URL }
     const file = makeFile(validFileContent([newStation], null))
@@ -492,9 +507,7 @@ describe('TC-10: handleFileSelected handles a malformed fetchFuelTypesForUrl res
       }),
     )
     // This should not throw
-    await expect(
-      handleFileSelected(file, [], null, [], [], fetchFn),
-    ).resolves.not.toThrow()
+    await expect(handleFileSelected(file, [], null, [], [], fetchFn)).resolves.not.toThrow()
 
     // SP95 was not found in any fetched result → warning shown
     expect(fuelTypeWarning.value).not.toBeNull()

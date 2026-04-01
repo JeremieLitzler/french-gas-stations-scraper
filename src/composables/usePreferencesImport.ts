@@ -34,7 +34,7 @@ const SAFE_FUEL_TYPE_PATTERN = /^[A-Za-z0-9\- ]+$/
 const diff: Ref<PreferencesDiff | null> = ref(null)
 const importError: Ref<string | null> = ref(null)
 const importSuccess: Ref<boolean> = ref(false)
-const isDialogOpen: Ref<boolean> = ref(false)
+const doOpenDialog: Ref<boolean> = ref(false)
 const fuelTypeWarning: Ref<string | null> = ref(null)
 const isImporting: Ref<boolean> = ref(false)
 
@@ -75,29 +75,33 @@ export function usePreferencesImport() {
    */
   const applyDiff = async (
     addStation: (station: import('@/types/station').Station) => Promise<void>,
-    updateStation: (originalUrl: string, updated: import('@/types/station').Station) => Promise<void>,
+    updateStation: (
+      originalUrl: string,
+      updated: import('@/types/station').Station,
+    ) => Promise<void>,
     saveDefaultFuelType: (label: string) => Promise<void>,
     clearDefaultFuelType: () => Promise<void>,
   ): Promise<void> => {
     if (diff.value === null) return
     await applyStationRows(diff.value.stationRows, addStation, updateStation)
     await applyFuelType(diff.value.fuelTypeDiff, saveDefaultFuelType, clearDefaultFuelType)
-    isDialogOpen.value = false
+    doOpenDialog.value = false
     diff.value = null
     importSuccess.value = true
   }
 
   const cancelImport = (): void => {
-    isDialogOpen.value = false
+    doOpenDialog.value = false
     diff.value = null
     importSuccess.value = false
+    fuelTypeWarning.value = null
   }
 
   const resetState = (): void => {
     importError.value = null
     importSuccess.value = false
     diff.value = null
-    isDialogOpen.value = false
+    doOpenDialog.value = false
     fuelTypeWarning.value = null
   }
 
@@ -105,7 +109,7 @@ export function usePreferencesImport() {
     diff,
     importError,
     importSuccess,
-    isDialogOpen,
+    doOpenDialog,
     fuelTypeWarning,
     isImporting,
     handleFileSelected,
@@ -151,12 +155,13 @@ async function runImportFlow(
   }
   if (computed === null) {
     if (!resolvedFuelType.warned) {
-      importError.value = 'Aucun changement détecté — le fichier est identique à vos préférences actuelles.'
+      importError.value =
+        'Aucun changement détecté — le fichier est identique à vos préférences actuelles.'
     }
     return
   }
   diff.value = computed
-  isDialogOpen.value = true
+  doOpenDialog.value = true
 }
 
 type FuelTypeResolution = { accepted: string | null; warned: boolean }
