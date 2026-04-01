@@ -10,12 +10,7 @@ const { stations } = useStationStorage()
 const { defaultFuelType } = useDefaultFuelType()
 const { results } = useStationPrices()
 const { knownFuelTypes } = useKnownFuelTypes(results)
-const {
-  importError,
-  importSuccess,
-  isImporting,
-  handleFileSelected,
-} = usePreferencesImport()
+const { importError, importSuccess, isImporting, handleFileSelected } = usePreferencesImport()
 
 const onFileChange = async (event: Event): Promise<void> => {
   const input = event.target as HTMLInputElement
@@ -37,23 +32,31 @@ const onFileChange = async (event: Event): Promise<void> => {
 
 <template>
   <div class="flex flex-col gap-2">
-    <AppLoader v-if="isImporting" />
-    <template v-else>
-      <!-- Use a styled label as the visible trigger for the hidden file input.
+    <!-- Use a styled label as the visible trigger for the hidden file input.
            A plain <label> is used (not a <button> inside a <label>) to avoid
            nesting interactive elements, which is invalid HTML. -->
-      <label
-        class="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-cta-base text-cta-neutral-light shadow hover:bg-cta-darker cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-cta-darker"
-      >
-        Importer des préférences
-        <input type="file" accept=".json,application/json" class="sr-only" @change="onFileChange" />
-      </label>
-      <p v-if="importError" role="alert" class="text-sm text-red-600">{{ importError }}</p>
-      <!-- fuelTypeWarning is shown inside PreferencesDiffDialog when the dialog is open;
+    <label
+      for="importPreferences"
+      :class="[
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium h-9 px-4 py-2 bg-cta-base text-cta-neutral-light shadow focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-cta-darker',
+        isImporting ? 'opacity-50 cursor-not-allowed' : 'hover:bg-cta-darker cursor-pointer',
+      ]"
+    >
+      {{ isImporting ? 'Importation en cours...' : 'Importer des préférences' }}
+    </label>
+    <input
+      id="importPreferences"
+      type="file"
+      accept=".json,application/json"
+      class="sr-only"
+      :disabled="isImporting"
+      @change="onFileChange"
+    />
+    <p v-if="importError" role="alert" class="text-sm text-red-600">{{ importError }}</p>
+    <!-- fuelTypeWarning is shown inside PreferencesDiffDialog when the dialog is open;
            this fallback covers the edge case where validation warns but no diff is computed. -->
-      <p v-if="importSuccess" role="status" class="text-sm text-green-600">
-        Préférences importées avec succès.
-      </p>
-    </template>
+    <p v-if="importSuccess" role="status" class="text-sm text-green-600">
+      Préférences importées avec succès.
+    </p>
   </div>
 </template>
