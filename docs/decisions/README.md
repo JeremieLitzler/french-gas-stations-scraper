@@ -22,6 +22,8 @@ Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 | [ADR-008](./ADR-008-client-side-storage.md)                       | IndexedDB Over localStorage for Client-Side Persistence | Accepted | 2026-03-04 |
 | [ADR-009](./ADR-009-cross-composable-reactivity-pattern.md)       | Cross-Composable Reactivity Pattern                     | Accepted | 2026-03-18 |
 | [ADR-010](./ADR-010-markdown-runtime-parsing.md)                  | Static Content Rendering Strategy for the Mentions Légales Page | Accepted | 2026-03-20 |
+| [ADR-011](./ADR-011-github-oauth-app-auth.md)                     | GitHub OAuth App Authentication via Netlify Functions with HTTP-Only Cookie | Accepted | 2026-04-30 |
+| [ADR-012](./ADR-012-github-repo-as-sync-backend.md)               | User-Owned GitHub Repository as Remote Sync Backend             | Accepted | 2026-04-30 |
 
 ## How to Add a New ADR
 
