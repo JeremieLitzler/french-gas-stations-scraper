@@ -37,20 +37,25 @@ Logout is implemented by a Netlify function that clears the cookie.
 
 ```mermaid
 sequenceDiagram
-    participant Browser
-    participant Start as github-auth-start<br/>(Netlify fn)
+    actor User as Browser (User)
+    participant SPA as Vue SPA
+    participant NF_Login as Netlify fn<br/>github-auth-start
+    participant NF_CB as Netlify fn<br/>github-auth-callback
     participant GitHub as GitHub OAuth
-    participant Callback as github-auth-callback<br/>(Netlify fn)
 
-    Browser->>Start: GET /.netlify/functions/github-auth-start
-    Start->>Browser: Set state cookie (short-lived)<br/>Redirect → GitHub authorize URL
-    Browser->>GitHub: GET /login/oauth/authorize?client_id=...&state=...
-    GitHub-->>Browser: User authorizes → redirect to callback URL
-    Browser->>Callback: GET /.netlify/functions/github-auth-callback?code=...&state=...
-    Callback->>Callback: Validate state cookie (CSRF check)
-    Callback->>GitHub: POST /login/oauth/access_token (server-to-server)
-    GitHub-->>Callback: { access_token, token_type, scope }
-    Callback-->>Browser: Set-Cookie: gh_token=...; HttpOnly; SameSite=Strict; Max-Age=28800; Secure<br/>Redirect → /settings?auth=success
+    User->>SPA: Clicks "Login with GitHub"
+    SPA->>NF_Login: GET /.netlify/functions/github-auth-start
+    NF_Login-->>User: 302 Redirect → github.com/login/oauth/authorize?client_id=...&scope=repo&state=...
+    User->>GitHub: Browser follows redirect (GitHub authorization page)
+    User->>GitHub: Authorizes the app
+    GitHub-->>User: 302 Redirect → /.netlify/functions/github-auth-callback?code=...&state=...
+    User->>NF_CB: Browser follows redirect
+    NF_CB->>GitHub: POST github.com/login/oauth/access_token (code + client_secret)
+    GitHub-->>NF_CB: { access_token, scope, token_type }
+    NF_CB-->>User: 302 Redirect → /settings?auth=success
+    Note over NF_CB,User: Set-Cookie: gh_token=...&#59; HttpOnly&#59; SameSite=Strict&#59; Max-Age=28800
+    User->>SPA: Browser loads /settings
+    SPA->>User: Settings page — authenticated state shown
 ```
 
 ### Credentials Setup
