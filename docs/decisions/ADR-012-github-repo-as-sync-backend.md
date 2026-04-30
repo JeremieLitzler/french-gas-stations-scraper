@@ -55,9 +55,9 @@ The user can override the default by setting `revalidateCacheDays` in the Settin
 On any preference change (station add/edit/delete, default fuel update):
 
 1. Write the updated value to IndexedDB immediately (optimistic local update).
-2. Fetch the current remote file SHA (required by the GitHub Contents API `PUT`).
+2. Fetch the current remote file SHA via a `GET` on the proxy. If the file does not exist (404), treat SHA as absent — the `PUT` without a SHA creates the file.
 3. Show a diff dialog to the user before committing (reusing the export/import diff UI from issue #63).
-4. On confirm: serialize the full preferences object and `PUT` it to the proxy.
+4. On confirm: serialize the full preferences object and `PUT` it to the proxy (with SHA if the file already exists, without SHA for first-time creation).
 5. On 409 conflict (SHA mismatch — another device wrote concurrently): surface a user-facing error and prompt a manual reload.
 
 ## Rationale
@@ -83,7 +83,7 @@ On any preference change (station add/edit/delete, default fuel update):
 
 - ⚠️ GitHub API rate limit: 5 000 authenticated requests/hour — not an issue for personal use with a cache-first strategy
 - ⚠️ 409 conflict on concurrent writes from multiple devices requires manual intervention (no automatic merge)
-- ⚠️ User must create and configure the repository and file path manually before sync works
+- ⚠️ User must create the GitHub repository manually before sync works — the JSON file itself is created automatically on the first write (Sub-Issue D sends a `PUT` with no SHA, which GitHub treats as a file creation)
 - ⚠️ First-time setup requires the user to understand what `owner/repo` means — mitigated by UI guidance
 - ⚠️ Platform dependency on GitHub's API availability — app degrades gracefully to local-only when the API is unreachable
 
