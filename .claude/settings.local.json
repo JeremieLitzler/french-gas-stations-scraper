@@ -15,11 +15,12 @@
       "Bash(npm run:*)",
       "Bash(rtk vitest:*)",
       "Bash(npx vitest:*)",
-      "Bash(bash scripts/pipeline/fetch-origin.sh)",
-      "Bash(bash scripts/pipeline/worktree-create.sh*)",
+      "Bash(bash scripts/pipeline/*)",
       "Read(//e/Git/GitHub/french-gas-stations-scraper.git/fix_validate-fuel-default-v2/src/utils//**)",
       "Read(//e/Git/GitHub/french-gas-stations-scraper.git/fix_validate-fuel-default-v2/src/types//**)",
-      "Read(//e/Git/GitHub/french-gas-stations-scraper.git/fix_validate-fuel-default-v2/src/composables//**)"
+      "Read(//e/Git/GitHub/french-gas-stations-scraper.git/fix_validate-fuel-default-v2/src/composables//**)",
+      "Read(//e/Git/GitHub/SocialMediaPublisherApp-develop/.claude/**)",
+      "Read(//e/Git/GitHub/SocialMediaPublisherApp-develop/.claude/deprecated-agents/**)"
     ]
   }
 }

@@ -114,8 +114,8 @@ No need to congratulate or use language that use unnecessary output tokens. Go t
 
 ## Critical Rules
 
-1. **Pipeline-first**: When asked to tackle/work on/implement/fix a GitHub issue, always use the `/tackle` skill. Never do git operations (branch, checkout, worktree) directly from the main conversation. All code changes go through the pipeline in a worktree.
-2. **No hardcoded paths**: Never hardcode absolute paths or worktree-specific paths (e.g. `develop/`, `feat_foo/`) in any `.md` file under `.claude/`. Absolute paths break portability across machines; worktree paths are runtime values passed by the orchestrator, not constants. Always use placeholders (`[worktree]`, `[task-folder]`) or derive paths at runtime.
+1. **Pipeline-first**: When asked to tackle/work on/implement/fix a GitHub issue, use the manual `jli-` command chain, starting with `/jli-sets-up <issue-number>` and following each command's "Next" hint (see `AGENT-COMMAND-MIGRATION.md` at the project root). Never do git operations (branch, checkout, worktree) directly from the main conversation. All code changes go through a worktree. The old `/tackle` orchestrator flow is deprecated and kept only for history.
+2. **No hardcoded paths**: Never hardcode absolute paths or worktree-specific paths (e.g. `develop/`, `feat_foo/`) in any `.md` file under `.claude/`. Absolute paths break portability across machines; worktree paths are runtime values, not constants. Always use placeholders (`[worktree]`, `[task-folder]`) or derive paths at runtime.
 3. **Spec-first**: Before implementing anything, read the relevant spec files.
 4. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
 5. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
@@ -252,6 +252,9 @@ rtk gain                # summary stats
 rtk discover            # find missed savings opportunities
 ```
 
-## Agent Pipeline Issue Handling
+## Pipeline Issue Handling
 
-When the user reports a problem with an agent's behaviour or instructions, use the `/fix-pipeline` skill.
+Two maintenance commands, by target:
+
+- To change the **active** `jli-` command chain (add/reorder a step, adjust a command's behaviour or hints), use `/jli-tweaks-command-chain <change>`.
+- When the user reports a problem with the **deprecated** orchestrator-era agents (under `.claude/deprecated-agents/`) or the `CLAUDE*.md` instructions, use the `/fix-pipeline` skill.

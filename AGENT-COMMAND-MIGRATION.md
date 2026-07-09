@@ -1,0 +1,183 @@
+# Agent-to-Command Migration
+
+This document describes how the orchestrator-driven multi-agent pipeline was migrated into a
+**manually-chained set of `jli-` slash commands**. The new commands are the supported way to
+develop a feature; the old `tackle` / orchestrator flow is deprecated.
+
+## Why
+
+The pipeline was driven by `agent-0-orchestrator`, which spawned every specialist agent via
+the Task tool and threaded state through one long-running context. That context overflowed
+easily and left the human no natural place to intervene between phases. The manual chain
+fixes both: each command is a single, stateless step the human runs by hand, with a `/clear`
+allowed between any two steps to keep context small.
+
+## Worktree layout and run location
+
+The repo uses one bare repo with sibling worktrees under a shared parent:
+
+```
+<parent>/<repo-name>.git              <- bare repo
+<parent>/<repo-name>-develop          <- develop worktree
+<parent>/<repo-name>_<type>-<slug>    <- a feature worktree
+```
+
+`/jli-sets-up` and `/jli-cleans` run from the **develop worktree**. Every other
+command runs from inside the **feature worktree** — you open it in its own editor window
+(`code <worktree>`) after setup, and all later commands run in that window.
+
+## How state flows
+
+All state lives in the task folder under the feature worktree:
+`docs/prompts/tasks/issue-<id>-<slug>/`. Each command reads the artifacts written by earlier
+commands and writes its own. Because the phase/commit/ship commands run *inside* the feature
+worktree, the task folder is a simple relative path — you pass it as a `@`-mention
+(`@docs/prompts/tasks/issue-<id>-<slug>`), never an absolute path. The argument is required on
+every command, so each one rebuilds what it needs from disk after a `/clear`.
+
+The **specification phase is the input exception**: `/jli-writes-spec` reads the `README.md`
+request created by `/jli-sets-up` rather than a prior pipeline artifact.
+
+## Command ↔ agent mapping
+
+| Command | Runs from | Replaces (agent) |
+|---|---|---|
+| `/jli-sets-up <issue-num + title>` | develop | `agent-4-git` Tasks 1–2 (fetch + worktree) |
+| `/jli-writes-spec @<task-folder>` | feature worktree | `agent-1-specs` |
+| `/jli-verifies-security @<task-folder>` | feature worktree | `agent-5-security` |
+| `/jli-writes-tests-spec @<task-folder>` | feature worktree | `agent-3-test-writer` (pass 1: test cases) |
+| `/jli-codes @<task-folder>` | feature worktree | `agent-2-coder` |
+| `/jli-reviews-code @<task-folder>` | feature worktree | `agent-6-reviewer` |
+| `/jli-writes-tests @<task-folder>` | feature worktree | `agent-3-test-writer` (pass 2: `*.spec.ts`) |
+| `/jli-runs-tests @<task-folder>` | feature worktree | `agent-3-test-runner` |
+| `/jli-commits @<task-folder>` | feature worktree | `agent-4-git` commit tasks (3 / 3.5 / 3.7 / 4 / 5-commit) |
+| `/jli-ships @<task-folder>` | feature worktree | `agent-4-git` Tasks 5-push / 6 / 7 (push, PR, merge) |
+| `/jli-cleans <worktree>` | develop | `agent-4-git` Task 8 (worktree cleanup + refresh develop) |
+
+`agent-0-orchestrator` is **dissolved** into the "Next" hint at the end of each command — no
+command replaces it. The deprecated agents (`agent-0` through `agent-6`) are maintained via
+the existing `/fix-pipeline` skill; this repo never had an `agent-7`.
+
+`agent-4-git`'s responsibilities were split into four commands — `setup` (bootstrap),
+`commit` (its own step between phases), `ship` (push + PR + merge), and `cleanup` (worktree
+removal + refresh develop). `cleanup` is separate because it cannot run from inside the
+worktree it removes.
+
+Where the old pipeline ran tests via the `/run-tests` skill, `/jli-runs-tests` now inlines
+those exact `npx vitest run --reporter=json | jq …` commands directly, so the chain command
+is self-contained.
+
+## The chain
+
+The full workflow, including the two-editor split and the loop-backs:
+
+```mermaid
+flowchart TD
+    subgraph INST1["VSCode instance 1 — develop worktree"]
+        setup["/jli-sets-up"]
+        cleanup["/jli-cleans &lt;worktree&gt;"]
+    end
+
+    subgraph INST2["VSCode instance 2 — feature worktree"]
+        direction TB
+        spec["/jli-writes-spec"] --> sec["/jli-verifies-security"]
+        sec --> tw1["/jli-writes-tests-spec"]
+        tw1 --> code["/jli-codes"]
+        code --> review["/jli-reviews-code"]
+        review --> tw2["/jli-writes-tests"]
+        tw2 --> trun["/jli-runs-tests"]
+        trun --> ship["/jli-ships"]
+    end
+
+    setup -->|"code &lt;worktree&gt; (open a new editor window)"| spec
+    ship -->|"back to develop worktree"| cleanup
+
+    review -. "changes requested" .-> code
+    trun -. "failed: code bug" .-> code
+    trun -. "failed: bad test" .-> tw2
+    code -. "review specs" .-> spec
+
+    commit{{"/jli-commits — run after every phase<br/>(between each step above and the next)"}}
+    commit -. "each phase" .-> INST2
+
+    clear{{"/clear — may be run between any two steps;<br/>resets context, keeps the task folder on disk"}}
+    clear -. "any stage" .-> INST2
+
+    classDef editor fill:#eef,stroke:#557,stroke-width:1px;
+    classDef note fill:#efe,stroke:#5a5,stroke-width:1px,stroke-dasharray:4 3;
+    classDef reset fill:#fee,stroke:#a55,stroke-width:1px,stroke-dasharray:4 3;
+    class setup,cleanup editor;
+    class commit note;
+    class clear reset;
+```
+
+Setup (`/jli-sets-up`) and cleanup (`/jli-cleans`) run in the **develop-worktree
+editor**; every phase command runs in a **separate editor window** opened on the feature
+worktree. `/clear` is available at any stage — each command rebuilds what it needs from the
+task folder, so clearing context between steps is safe. The same chain in text:
+
+```
+[develop worktree]
+/jli-sets-up
+  > code <worktree>            (open the feature worktree; everything below runs there)
+
+[feature worktree]
+  > /jli-writes-spec        > /jli-commits
+  > /jli-verifies-security  > /jli-commits
+  > /jli-writes-tests-spec  > /jli-commits      (writes test-cases.md)
+  > /jli-codes              > /jli-commits
+  > /jli-reviews-code       > /jli-commits
+  > /jli-writes-tests       > /jli-commits      (writes *.spec.ts)
+  > /jli-runs-tests         > /jli-commits
+  > /jli-ships                  (push + PR + merge)
+
+[back in develop worktree]
+  > /jli-cleans <worktree>
+```
+
+Loop-backs (each command's hint states the branch it took):
+- `/jli-reviews-code` > `status: changes requested` > back to `/jli-codes`.
+- `/jli-runs-tests` > `status: failed` > back to `/jli-codes` if the code is wrong, or to
+  `/jli-writes-tests` if the test is wrong (the human diagnoses which from the failure).
+- `/jli-codes` > `status: review specs` > back to `/jli-writes-spec`.
+
+The two test phases are separate commands: `/jli-writes-tests-spec` runs **before** coding
+and writes the plain-language `test-cases.md`; `/jli-writes-tests` runs **after** review and
+turns those cases into `*.spec.ts` files.
+
+## Why the commands are self-contained
+
+Each `.claude/commands/jli-*.md` file inlines its own adapted instructions and contains **no
+orchestrator vocabulary and no reference to any `agent-*.md` file**. This is deliberate: the
+agent files are written for orchestrator invocation ("the orchestrator passes…", "notify the
+orchestrator"), and asking the model to read one and mentally strip that language is fragile.
+By sharing no text and no file references, the manual chain and the old pipeline cannot be
+confused for one another.
+
+## Human approval gates
+
+The gate is the human deciding to run the next command. Two points are made explicit in the
+hints:
+- `/jli-writes-spec` and `/jli-codes` warn when their artifact contains `### ADR Required` —
+  approve the ADR (add it under `docs/decisions/`, update the index) before continuing.
+- `/jli-ships` pauses for confirmation before opening the PR and again before merging,
+  because those actions are outward-facing and irreversible.
+
+## Maintaining the chain
+
+Two maintenance commands, by target:
+
+- `/jli-tweaks-command-chain <change>` — edits the **active chain only**: the
+  `.claude/commands/jli-*.md` files and this document. It preserves the chain invariants
+  (self-containment, argument guard, run location, status-line contract, Next hint)
+  and keeps the diagram/mapping here in sync.
+- `/fix-pipeline <issue>` — maintains the **deprecated** orchestrator-era agents (now under
+  `.claude/deprecated-agents/`) and the `CLAUDE*.md` instructions.
+
+## Deprecated
+
+- `/tackle` and `agent-0-orchestrator.md` — superseded by the `jli-` chain. They carry a
+  deprecation banner and remain only for history.
+- `agent-0` through `agent-6` brain files were moved to `.claude/deprecated-agents/` so
+  Claude Code no longer lists them as dispatchable subagent types. The `jli-` commands are
+  the execution path; the deprecated agents are reached only via `/fix-pipeline`.
