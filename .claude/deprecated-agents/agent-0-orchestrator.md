@@ -5,6 +5,10 @@ model: sonnet
 tools: Read, Write, Task, AskUserQuestion
 ---
 
+> **Deprecated.** This orchestrator-driven flow is superseded by the manual `jli-` command
+> chain (start with `/jli-sets-up`). See `AGENT-COMMAND-MIGRATION.md` at the project root.
+> This file is kept for history only and is reached only via `/fix-pipeline`.
+
 # I am an Orchestrator Agent
 
 I coordinate the multi-agent pipeline for this repository. I use the Task tool to spawn specialist subagents and AskUserQuestion for human approval gates.

@@ -1,5 +1,9 @@
 A pipeline issue has been reported: $ARGUMENTS
 
+This command maintains the **deprecated** orchestrator-era agent files under
+`.claude/deprecated-agents/` and the `CLAUDE*.md` instructions. To change the active `jli-`
+command chain instead, use `/jli-tweaks-command-chain`.
+
 Follow this workflow to fix it.
 
 ## What NOT to do
@@ -7,7 +11,6 @@ Follow this workflow to fix it.
 - Never directly edit files in `develop/` from the main conversation
 - Never fix pipeline issues inline during a pipeline run for another issue — this must be a separate worktree
 - ALWAYS use `subagent_type="general-purpose"`
-- Never run git or gh commands directly — always delegate to agent-4-git via the Agent tool
 
 ## Step 1 — Create a GitHub issue
 
@@ -21,24 +24,22 @@ Record the issue number as `[id]` and derive a slug (≤ 30 chars, kebab-case).
 
 ## Step 2 — Create a dedicated worktree
 
-Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
+The session runs from `develop/`. The bare repo root is `..`.
 
-```
-Perform Task 1 and Task 2 only.
-Type: ci
-Slug: <slug>
+```bash
+git -C .. fetch origin
+git -C .. worktree add ci_<slug> -b ci/<slug> origin/develop
 ```
 
-Record the `Worktree: <path>` value printed by the agent as `[worktree]`.
+Record the resulting worktree absolute path as `[worktree]`.
 
 ## Step 3 — Apply the fix
 
 Read and edit the affected files directly in the main conversation. You may read and edit:
 
-- `[worktree]/.claude/agents/agent-*.md` — agent instruction files
+- `[worktree]/.claude/deprecated-agents/agent-*.md` — agent instruction files
 - `[worktree]/CLAUDE.md` — main project instructions
 - `[worktree]/CLAUDE-*.md` — supplementary workflow documents
-- `[worktree]/.claude/commands/*.md` — skill files
 
 Do not edit source code, test files, or pipeline artifacts under `docs/prompts/tasks/`.
 
@@ -50,47 +51,35 @@ For every change:
 
 ## Step 4 — Commit
 
-Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
+Stage only the affected files and commit using conventional commits:
 
-```
-Worktree: [worktree]
+- Files under `.claude/deprecated-agents/` → `ci(agent): <message>`
+- Files at the repo root (`CLAUDE*.md`) → `docs: <message>`
 
-Stage only these files and commit them:
-<list every file you edited in Step 3>
-
-Use commit type ci(agent) for files under .claude/agents/ or .claude/commands/.
-Use commit type docs for CLAUDE*.md files.
-Do not push yet.
-Closes #[id]
-```
+Use `rtk git add <files>` and `rtk git commit -m "..."`.
 
 ## Step 5 — Push and open a PR
 
-Invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
-
+```bash
+rtk git push origin ci/<slug>
+gh pr create --base develop --title "<title>" --body "<body with Closes #[id]>"
 ```
-Worktree: [worktree]
-
-Perform Task 5 and Task 6.
-
-For Task 5: all files were already committed in the previous step — just push the branch.
-For Task 6: derive the PR title from the issue title (#[id]). The PR body must include:
-- a summary of what was wrong and what was fixed
-- Closes #[id]
-Target branch: develop
-```
-
-Record the `PR: <url>` value printed by the agent.
 
 Show the user the PR URL and ask for approval to merge.
 
 ## Step 6 — Merge and clean up
 
-Once approved, invoke agent-4-git via the Agent tool (`subagent_type="general-purpose"`). Pass the full content of `.claude/agents/agent-4-git.md` as the prompt, then append:
+Once approved, remove the worktree first (so the branch is free), then merge from the bare repo root:
 
+```bash
+git -C .. worktree remove --force ci_<slug>
+git -C .. worktree prune
+cd .. && gh pr merge <pr-url> --rebase --delete-branch
+git -C .. fetch origin
 ```
-Worktree: [worktree]
 
-Perform Task 7 then Task 8.
-PR URL: <pr-url>
+Then pull latest into `develop/`:
+
+```bash
+git pull --rebase origin develop
 ```
