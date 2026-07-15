@@ -10,6 +10,14 @@ Run all git commands from the worktree root (your current directory) — never f
 repo root, and never commit directly to `develop` or `main` (you are on the feature branch
 the worktree created). Parse the issue `[id]` from the task-folder name (`issue-<id>-<slug>`).
 
+## Sub-issue task folders
+
+If the task folder is a `sub-issue-<n>` subfolder, its own artifacts
+(`technical-specifications.md`, `review-results.md`, `test-results.md`) live in that
+subfolder while the shared specs sit in the **parent**; parse `[id]` from `issue-<id>-<slug>`
+or `sub-issue-<id>`. Otherwise it is a flat folder holding everything (see
+`AGENT-COMMAND-MIGRATION.md` for the rationale).
+
 ## What this command does
 
 This is the commit step run between phases. Inspect what changed, then create one

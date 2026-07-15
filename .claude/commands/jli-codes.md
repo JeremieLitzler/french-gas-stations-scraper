@@ -9,6 +9,14 @@ opened (e.g. `@docs/prompts/tasks/issue-<id>-<slug>`). If it is empty, stop and 
 Run from the worktree root (your current directory). All file paths are relative to it —
 never read or write outside this worktree.
 
+## Sub-issue task folders
+
+If the task folder is a `sub-issue-<n>` subfolder, read the shared specs
+(`business-specifications.md`, `security-guidelines.md`, `test-cases.md`) from its **parent**
+folder and write this command's outputs into the **subfolder**; parse `[id]` from
+`issue-<id>-<slug>` or `sub-issue-<id>`. Otherwise it is a flat folder holding everything
+(see `AGENT-COMMAND-MIGRATION.md` for the rationale).
+
 ## What this command does
 
 Read `[task-folder]/business-specifications.md`, `[task-folder]/security-guidelines.md`, and

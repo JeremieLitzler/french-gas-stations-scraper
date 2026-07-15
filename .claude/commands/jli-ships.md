@@ -11,6 +11,14 @@ task-folder name. The pipeline scripts resolve the bare repo automatically. This
 outward-facing and irreversible — honour the two approval gates below. It does NOT remove the
 worktree (you are standing in it); cleanup is a separate command run from `develop`.
 
+## Sub-issue task folders
+
+If the task folder is a `sub-issue-<n>` subfolder, read `business-specifications.md` (for the
+PR title) from its **parent** folder and read `test-results.md` from the subfolder; parse
+`[id]` from `issue-<id>-<slug>` or `sub-issue-<id>` (so the PR closes the sub-issue).
+Otherwise it is a flat folder holding everything (see `AGENT-COMMAND-MIGRATION.md` for the
+rationale).
+
 ## Step 1 — Push and open the PR
 
 Confirm `test-results.md` in the task folder ends with `status: passed`. If not, stop and
