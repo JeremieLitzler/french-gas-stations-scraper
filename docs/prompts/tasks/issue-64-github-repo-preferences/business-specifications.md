@@ -20,10 +20,10 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 ### Rules
 
-1. The user can initiate a GitHub OAuth login flow from the Settings page. On success, an HTTP-only cookie containing the access token is set by the Netlify function that handles the OAuth callback.
+1. The user can initiate a GitHub OAuth login flow from the Settings page once `owner/repo`, file path, and `revalidate-cache-days` are all filled in — the "Login with GitHub" button stays disabled until then (see Sub-Issue B). On success, an HTTP-only cookie containing the access token is set by the Netlify function that handles the OAuth callback.
 2. The login flow uses the GitHub OAuth App authorization URL. The app requests only the minimum scopes needed to read and write a single file in one user-owned repository (`repo` scope or `public_repo` if the target repo is always public — see sub-issue B).
 3. After the callback, the user is redirected back to the Settings page with a visible success or error state.
-4. The user can log out; logout clears the HTTP-only cookie and removes the stored repo config from the Settings UI (but not from IndexedDB — station data is kept).
+4. The user can log out; logout clears the HTTP-only cookie only — it does not disconnect the account from GitHub or touch stored data. The repo config (`owner/repo`, file path, `revalidate-cache-days`) and station data both remain in IndexedDB and in the Settings UI; the config fields become editable again (see Sub-Issue E).
 5. If the cookie is absent or expired when the app loads, the user is treated as unauthenticated; no error is shown unless they attempt a sync, add, update or delete action.
 6. The HTTP-only cookie has a lifetime of **8 hours** (matching a typical browser session). After expiry, the user must re-authenticate. The cookie is not refreshed automatically; expiry is detected on the next GitHub API call returning 401.
 
@@ -35,12 +35,12 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 ### How to test locally
 
 1. Start the app with `netlify dev` so Netlify Functions are available.
-2. Navigate to the Settings page; confirm a "Login with GitHub" button is visible and all GitHub Sync fields are disabled.
-3. Click "Login with GitHub"; confirm the browser redirects to GitHub's OAuth authorization page.
-4. Authorize the app on GitHub; confirm the browser is redirected back to the Settings page with a success indicator and the fields are now enabled.
-5. Reload the page; confirm the user remains logged in (cookie persists across reloads).
-6. Click "Logout"; confirm the GitHub Sync fields are disabled again and no token cookie is present (inspect cookies in DevTools → Application → Cookies).
-7. To simulate an expired/absent cookie: delete the cookie in DevTools, reload the page, and confirm the user is treated as unauthenticated with no error banner.
+2. Navigate to the Settings page; confirm a "Login with GitHub" button is visible but disabled, and the `owner/repo`, file path, and `revalidate-cache-days` fields are enabled and empty.
+3. Fill in `owner/repo`, file path, and `revalidate-cache-days`; confirm "Login with GitHub" becomes enabled, then click it; confirm the browser redirects to GitHub's OAuth authorization page.
+4. Authorize the app on GitHub; confirm the browser is redirected back to the Settings page with a success indicator and the `owner/repo`/file path fields are now disabled (read-only) while `revalidate-cache-days` stays editable.
+5. Reload the page; confirm the user remains logged in (cookie persists across reloads) and the fields keep their disabled/enabled states.
+6. Click "Logout"; confirm the `owner/repo`/file path fields become enabled again (still holding their previous values) and no token cookie is present (inspect cookies in DevTools → Application → Cookies).
+7. To simulate an expired/absent cookie: delete the cookie in DevTools, reload the page, and confirm the user is treated as unauthenticated with no error banner and the config fields are enabled.
 
 #### Going live
 
@@ -52,24 +52,22 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 ## Sub-Issue B — Repo Configuration
 
-**Depends on:** Sub-Issue A (user must be authenticated)
+**Depends on:** nothing — `owner/repo`, file path, and `revalidate-cache-days` must be enterable before login, since they gate the "Login with GitHub" button (Sub-Issue A, rule 1)
 
 ### Rules
 
-1. The Settings page exposes two text inputs: `owner/repo` (e.g. `alice/my-stations`) and file path (e.g. `stations.json`). Both fields are required before any sync can occur.
-2. Configuration is validated on save: the Netlify proxy must be able to confirm the file path exists or the repo is reachable. If not, a human-readable error is shown.
-3. The configuration (`owner/repo`, file path, and `revalidate-cache-days`) is stored both in IndexedDB (for local persistence across reloads) and in the user's remote JSON file under a `"settings"` section (see "Remote JSON file structure" below). For unauthenticated users, these fields are empty.
-4. The scope requested during OAuth must cover private repositories if the user configures a private repo (`repo` scope); private vs. public is not pre-validated — the first sync attempt reveals access issues.
+1. The Settings page exposes three inputs — `owner/repo` (e.g. `alice/my-stations`), file path (e.g. `stations.json`), and `revalidate-cache-days` — editable regardless of authentication state, and all three required before login can be initiated.
+2. Saving always persists the configuration to IndexedDB. Server-side validation (confirming the file path exists or the repo is reachable via the Netlify proxy) requires an access token, so it only runs once the user is authenticated; while unauthenticated, values save without validation. If validation fails, a human-readable error is shown.
+3. Once authenticated, `owner/repo` and file path become read-only; changing them requires logging out first (Sub-Issue A, rule 4). `revalidate-cache-days` remains editable at all times. For users who have never authenticated, all three fields are empty; a previously-authenticated, now logged-out user sees them prefilled from IndexedDB.
+4. The scope requested during OAuth must cover private repositories if the user configures a private repo (`repo` scope); private vs. public is not pre-validated — the first authenticated sync attempt reveals access issues.
 
 ### How to test locally
 
-1. Start the app with `netlify dev` and log in via GitHub (see Sub-Issue A).
-2. Navigate to the Settings page; confirm the `owner/repo` and file path inputs are enabled.
-3. Enter a valid `owner/repo` (e.g. your own GitHub username and a test repo) and a file path (e.g. `stations.json`); click Save.
-4. Confirm a success message appears and no error is shown.
-5. Reload the page; confirm the `owner/repo` and file path fields retain their saved values (loaded from IndexedDB).
-6. Enter an invalid `owner/repo` (e.g. `nonexistent-user/nonexistent-repo`); click Save; confirm a human-readable error is displayed.
-7. Log out (Sub-Issue A) and reload; confirm the `owner/repo` and file path fields are empty and disabled.
+1. Start the app with `netlify dev`. While unauthenticated, enter a valid `owner/repo` (e.g. your own GitHub username and a test repo), a file path (e.g. `stations.json`), and a `revalidate-cache-days` value; confirm they save to IndexedDB without a validation call.
+2. Log in via GitHub (see Sub-Issue A); confirm the saved values persist and `owner/repo`/file path are now read-only.
+3. Reload the page; confirm the `owner/repo` and file path fields still show the saved values (loaded from IndexedDB) and remain read-only.
+4. Log out, change `owner/repo` to an invalid value (e.g. `nonexistent-user/nonexistent-repo`), then log back in; confirm a human-readable validation error is displayed post-login.
+5. Log out; confirm the `owner/repo` and file path fields become editable again, still showing their previous values.
 
 #### Going live
 
@@ -86,7 +84,7 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 1. On application load, if the user is authenticated and repo config is present, the app compares the age of the IndexedDB data against the configurable `revalidate-cache-days` parameter (default: 7 days, editable from Settings UI).
 2. If IndexedDB data is younger than the threshold, the remote repo is not consulted; IndexedDB is used as-is.
-3. If IndexedDB data is older than the threshold (or absent), the app fetches the JSON file from the remote repo via a Netlify proxy function and merges it into IndexedDB, replacing the existing data. The JSON file includes a `"settings"` section (see "Remote JSON file structure" below); the app reads `owner`, `repo`, and `revalidateCacheDays` from it and updates IndexedDB accordingly.
+3. If IndexedDB data is older than the threshold (or absent), the app fetches the JSON file from the remote repo via a Netlify proxy function and merges its `stations` and `defaultFuel` into IndexedDB, replacing the existing data. The remote file never carries `owner`, `repo`, or `revalidateCacheDays` — those stay exclusively in IndexedDB (Sub-Issue B).
 4. After a successful remote read, the IndexedDB timestamp is updated to the current date and time.
 5. Each user-triggered update (add/edit/delete station, change fuel default) also resets the timestamp.
 
@@ -117,14 +115,14 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 ### Rules
 
 1. Whenever the user saves a change to their station list or fuel type default, the updated data is first written to IndexedDB, then a write request is sent to the remote repo via Netlify function.
-2. Before writing, the current file content is fetched from the remote repo and a diff is presented to the user (reusing the diff UI implemented in issue #63). The user must confirm before the write is committed.
+2. If the remote file already exists, its current content is fetched and a diff is presented to the user (reusing the diff UI implemented in issue #63); the user must confirm before the write is committed. If the remote file does not yet exist, it is created directly with no diff or confirmation step.
 3. The write uses the GitHub Contents API `PUT /repos/{owner}/{repo}/contents/{path}` with the file's current `sha` to avoid overwrite conflicts.
 4. If the remote write fails, IndexedDB retains the update and a non-blocking error is shown; the write is not retried automatically.
-5. The JSON written to the remote repo always includes the `"settings"` section (see "Remote JSON file structure" below), preserving the current `owner`, `repo`, and `revalidateCacheDays` values alongside `stations` and `defaultFuel`.
+5. The JSON written to the remote repo always contains only `stations` and `defaultFuel` — never `owner`, `repo`, or `revalidateCacheDays`.
+6. If the user cancels the diff dialog, no write is sent; a persistent notice states that local data differs from the remote file, shown until the next successful write.
 
 ### Edge cases integrated
 
-- If the remote file does not yet exist, the diff shows an empty baseline; the user confirms to create the file.
 - If the `sha` is stale (concurrent edit from another device), the Netlify function receives a 409; the app shows a conflict error and asks the user to refresh and retry.
 
 ### How to test locally
@@ -150,16 +148,16 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 1. The Settings page gains a "GitHub Sync" section with: login/logout control, `owner/repo` field, file path field, and a `revalidate-cache-days` number input.
 2. `revalidate-cache-days` accepts a positive integer; values ≤ 0 are rejected with an inline validation message.
-3. All fields in this section are disabled when the user is not authenticated.
+3. `owner/repo` and file path are disabled once the user is authenticated — a message instructs the user to log out to change them (Sub-Issue B, rule 3). `revalidate-cache-days` is always editable, whether authenticated or not.
 
 ### How to test locally
 
 1. Start the app with `netlify dev`.
-2. Navigate to the Settings page while unauthenticated; confirm all GitHub Sync fields (`owner/repo`, file path, `revalidate-cache-days`) are disabled/greyed out.
-3. Log in (Sub-Issue A); confirm all fields become enabled.
+2. Navigate to the Settings page while unauthenticated; confirm all GitHub Sync fields (`owner/repo`, file path, `revalidate-cache-days`) are enabled.
+3. Log in (Sub-Issue A); confirm `owner/repo` and file path become disabled while `revalidate-cache-days` stays enabled.
 4. Enter `0` or a negative number in `revalidate-cache-days`; confirm an inline validation error appears and the form cannot be saved.
 5. Enter a valid positive integer (e.g. `7`); confirm it saves successfully.
-6. Log out; confirm all fields are disabled again.
+6. Log out; confirm `owner/repo` and file path become enabled again.
 
 #### Going live
 
@@ -195,36 +193,13 @@ Before coding or testing any part of this feature, a GitHub OAuth App must be re
 
 ### Rules
 
-1. A new Netlify function handles the OAuth callback: receives the temporary `code`, exchanges it for an access token using the Client Secret (stored as a Netlify environment variable), and sets an HTTP-only `SameSite=Strict` cookie with a `Max-Age` of 28800 seconds (8 hours) before redirecting.
+1. The OAuth callback and cookie behavior (server-side code exchange, `HttpOnly`/`SameSite=Strict`, 8-hour lifetime) follow ADR-011; see Sub-Issue A for the user-facing login/logout behavior.
 2. A new Netlify function proxies GitHub Contents API calls (read and write) using the token from the cookie. It validates that the requested `owner/repo` matches the stored config to prevent SSRF abuse.
 3. Neither function exposes the Client Secret or the access token in any response body or redirect URL.
 
 ### OAuth Flow
 
-The following sequence diagram describes the full OAuth flow across browser, Netlify Functions, and GitHub:
-
-```mermaid
-sequenceDiagram
-    actor User as Browser (User)
-    participant SPA as Vue SPA
-    participant NF_Login as Netlify fn<br/>github-auth-start
-    participant GitHub as GitHub OAuth
-    participant NF_CB as Netlify fn<br/>github-auth-callback
-
-    User->>SPA: Clicks "Login with GitHub"
-    SPA->>NF_Login: GET /.netlify/functions/github-auth-start
-    NF_Login-->>User: 302 Redirect → github.com/login/oauth/authorize?client_id=...&scope=repo&state=...
-    User->>GitHub: Browser follows redirect (GitHub authorization page)
-    User->>GitHub: Authorizes the app
-    GitHub-->>User: 302 Redirect → /.netlify/functions/github-auth-callback?code=...&state=...
-    User->>NF_CB: Browser follows redirect
-    NF_CB->>GitHub: POST github.com/login/oauth/access_token (code + client_secret)
-    GitHub-->>NF_CB: { access_token, scope, token_type }
-    NF_CB-->>User: 302 Redirect → /settings?auth=success
-    Note over NF_CB,User: Set-Cookie: gh_token=...; HttpOnly; SameSite=Strict; Max-Age=28800
-    User->>SPA: Browser loads /settings
-    SPA->>User: Settings page — authenticated state shown
-```
+See ADR-011's OAuth Flow diagram for the full sequence across the SPA, the Netlify functions (`github-auth-start`, `github-auth-callback`), and GitHub.
 
 ### How to test locally
 
@@ -246,25 +221,16 @@ sequenceDiagram
 5. Confirm the cookie `SameSite=Strict` attribute is present; this is critical for CSRF protection on the production domain.
 6. Verify neither `GITHUB_CLIENT_SECRET` nor the raw `gh_token` value appears anywhere in Netlify function response bodies or redirect URLs (check Netlify function logs in the Netlify dashboard).
 
-### ADR Required
+### Architectural decisions documented
 
-The feature introduces two new architectural patterns not yet documented:
-
-1. **GitHub OAuth App flow with server-side token exchange via Netlify Functions** — The app currently has no authentication layer. Storing the access token in an HTTP-only cookie and relying on a Netlify function for the OAuth callback is a significant, high-impact decision affecting security posture, deployment config (env vars), and how the SPA detects auth state.
-
-2. **Remote repository as user-data backend via GitHub Contents API** — The app currently stores all user data client-side only (ADR-008). Using a user-owned GitHub repo as a durable sync target is a new persistence tier that interacts with the existing IndexedDB layer and requires a cache-invalidation strategy. This warrants a dedicated ADR.
+The two new architectural patterns this feature introduces are documented in [ADR-011](../../../decisions/ADR-011-github-oauth-app-auth.md) (GitHub OAuth App flow with server-side token exchange) and [ADR-012](../../../decisions/ADR-012-github-repo-as-sync-backend.md) (user-owned GitHub repo as sync backend). ADR-012 still needs the amendments listed in `spec-review.md` (drop the remote `"settings"` section, mock-`Date.now()` test note, drop the Firebase mention) applied separately.
 
 ## Remote JSON File Structure
 
-The JSON file stored in the user's GitHub repository has the following shape. For users who have never authenticated, the `settings` fields are empty/absent locally; for authenticated users, the settings are persisted both in IndexedDB and in the remote file:
+The JSON file stored in the user's GitHub repository has the following shape — it never carries repo configuration, only station data:
 
 ```json
 {
-  "settings": {
-    "owner": "alice",
-    "repo": "my-stations",
-    "revalidateCacheDays": 7
-  },
   "stations": [
     { "name": "Station A", "url": "https://..." },
     { "name": "Station B", "url": "https://..." }
@@ -273,8 +239,6 @@ The JSON file stored in the user's GitHub repository has the following shape. Fo
 }
 ```
 
-- For unauthenticated users, the `settings` section is absent from any local representation; these fields are only populated once the user logs in and saves repo config.
-- The `settings` section is always written alongside `stations` and `defaultFuel` on every remote write (Sub-Issue D).
-- On remote read (Sub-Issue C), if the `settings` section is present, its values override the locally stored settings.
+- `owner`, `repo`, and `revalidate-cache-days` live only in IndexedDB (Sub-Issue B); they are never written to or read from the remote file.
 
 status: ready

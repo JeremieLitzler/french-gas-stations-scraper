@@ -5,7 +5,7 @@
 
 ## Context
 
-Issue #64 introduces preference sync: stations, default fuel type, and repository configuration should persist beyond a single device and survive browser storage clearing.
+Issue #64 introduces preference sync: stations and default fuel type should persist beyond a single device and survive browser storage clearing. Repository configuration (`owner`, `repo`, `revalidateCacheDays`) is a local-only setting, not part of the synced data — it stays in IndexedDB and is never written to or read from the remote file.
 
 The app currently stores all data client-side only (ADR-008: IndexedDB). A remote persistence tier is needed for sync.
 
@@ -23,42 +23,15 @@ All GitHub API calls are routed through a Netlify function (`github-api-proxy`) 
 
 ### Remote JSON File Structure
 
-```json
-{
-  "settings": {
-    "owner": "username",
-    "repo": "my-gas-stations",
-    "filePath": "preferences.json",
-    "revalidateCacheDays": 7
-  },
-  "stations": [
-    { "name": "Station name", "url": "https://..." }
-  ],
-  "defaultFuel": "SP95"
-}
-```
-
-For unauthenticated users the `settings` section is absent from IndexedDB and the remote file does not exist. Fields are only populated and persisted after the user authenticates and saves their repo configuration.
+See business-specifications.md, "Remote JSON File Structure", for the exact schema — `stations` and `defaultFuel` only. Repo configuration (`owner`, `repo`, `revalidateCacheDays`) stays in IndexedDB and is never written to the remote file.
 
 ### Cache Invalidation Strategy
 
-To avoid a GitHub API call on every page load, a timestamp is stored in IndexedDB alongside the data. On app load:
-
-1. Compare `Date.now()` against the stored timestamp.
-2. If the difference exceeds `revalidateCacheDays` (default: 7 days), fetch the remote JSON via the proxy, merge it into IndexedDB, and reset the timestamp.
-3. Otherwise, use the local IndexedDB data directly.
-
-The user can override the default by setting `revalidateCacheDays` in the Settings UI.
+A timestamp stored in IndexedDB alongside the data avoids a GitHub API call on every page load — the app compares `Date.now()` against it before deciding whether to fetch. See business-specifications.md, Sub-Issue C, for the exact threshold rule and edge cases.
 
 ### Write Flow
 
-On any preference change (station add/edit/delete, default fuel update):
-
-1. Write the updated value to IndexedDB immediately (optimistic local update).
-2. Fetch the current remote file SHA via a `GET` on the proxy. If the file does not exist (404), treat SHA as absent — the `PUT` without a SHA creates the file.
-3. Show a diff dialog to the user before committing (reusing the export/import diff UI from issue #63).
-4. On confirm: serialize the full preferences object and `PUT` it to the proxy (with SHA if the file already exists, without SHA for first-time creation).
-5. On 409 conflict (SHA mismatch — another device wrote concurrently): surface a user-facing error and prompt a manual reload.
+On any preference change, the app writes optimistically to IndexedDB, then to the remote file via the proxy using the GitHub Contents API's `sha`-based optimistic concurrency (an absent `sha` creates the file; a stale `sha` returns 409). See business-specifications.md, Sub-Issue D, for the exact diff-confirmation and conflict-handling rules.
 
 ## Rationale
 
@@ -91,7 +64,7 @@ On any preference change (station add/edit/delete, default fuel update):
 
 1. **Netlify Blobs**: Platform-specific, not user-owned, would require tying storage to the Netlify site identity — rejected.
 2. **Dedicated Express/Node backend + PostgreSQL**: Correct at scale but overkill for a single-user preferences file — rejected.
-3. **Firebase / Supabase**: Third-party dependency with their own auth and pricing — rejected in favour of the user's existing GitHub account.
+3. **Supabase**: Third-party dependency with its own auth and pricing — rejected in favour of the user's existing GitHub account. Could be reconsidered if the app becomes a profitable service.
 4. **Browser sync via BroadcastChannel**: Syncs across tabs but not across devices — does not solve the persistence problem.
 
 ## Notes
