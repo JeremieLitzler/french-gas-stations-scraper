@@ -9,11 +9,26 @@ opened (e.g. `@docs/prompts/tasks/issue-<id>-<slug>`). If it is empty, stop and 
 Run from the worktree root (your current directory). All paths below are relative to it; read
 and write only inside this worktree.
 
+## Sub-issue task folders and the "review specs" loop-back
+
+The task folder given may be a `sub-issue-<n>` subfolder. If so, the request `README.md` and
+the shared `business-specifications.md` you write live in the **parent** folder, not the
+subfolder.
+
+When re-run as a `status: review specs` loop-back from `/jli-codes`, read the feedback first:
+it is the `### Specifications Need Review` section of `technical-specifications.md` — a sibling
+file in a flat task folder, or **inside the sub-issue subfolder** you were given. Amend the
+shared `business-specifications.md` accordingly; because it is shared, keep the change minimal
+and tell the user it affects every sub-issue of the parent. (Rationale in
+`AGENT-COMMAND-MIGRATION.md`.)
+
 ## What this command does
 
-Read the feature request in `[task-folder]/README.md` (this is the input — this phase does
-not read any other artifact). Using the project context in `CLAUDE.md` and `README.md`,
-write a detailed business spec to `[task-folder]/business-specifications.md`.
+Read the feature request in the task folder's `README.md` (for a sub-issue subfolder, in its
+parent). On a first run this is the only input; on a `review specs` loop-back also read the
+feedback described above. Using the project context in `CLAUDE.md` and the project `README.md`,
+write the business spec to `business-specifications.md` — in the task folder, or its parent for
+a sub-issue subfolder.
 
 The spec describes WHAT the system does — goals, rules, constraints, observable outcomes —
 never HOW. Use the Example Mapping method.
@@ -53,8 +68,9 @@ architectural choice with its context, rationale, and consequences. In doubt, as
 
 ## Output contract
 
-Create `[task-folder]/business-specifications.md`. End it with `status: ready` as the last
-line. Do NOT use horizontal rules (`---`) anywhere in the file.
+Create or update `business-specifications.md` in the task folder (its parent for a sub-issue
+subfolder). End it with `status: ready` as the last line. Do NOT use horizontal rules (`---`)
+anywhere in the file.
 
 ## Shell command retry limit
 

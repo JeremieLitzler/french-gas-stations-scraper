@@ -49,7 +49,8 @@ command must still hold ALL of these invariants:
 2. **Argument guard** — opens by requiring its argument and printing a usage line when empty.
    The argument is the task folder as a `@`-mention relative to the worktree
    (`@docs/prompts/tasks/issue-<id>-<slug>`) for the phase/commit/ship commands;
-   `jli-sets-up` takes an issue number; `jli-cleans` takes a worktree name/path.
+   `jli-sets-up` takes an issue number (from-scratch mode) or a merged-spec folder
+   (continue mode); `jli-cleans` takes a worktree name/path.
 3. **Run location** — phase/commit/ship commands run from inside the feature worktree and
    treat the task-folder argument as relative to it (no path derivation). `jli-sets-up`
    and `jli-cleans` run from the `develop` worktree.

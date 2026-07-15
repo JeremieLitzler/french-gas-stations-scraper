@@ -8,6 +8,14 @@ opened (e.g. `@docs/prompts/tasks/issue-<id>-<slug>`). If it is empty, stop and 
 
 Run from the worktree root (your current directory) — that is where `node_modules` lives.
 
+## Sub-issue task folders
+
+If the task folder is a `sub-issue-<n>` subfolder, read any shared specs
+(`business-specifications.md`, `security-guidelines.md`, `test-cases.md`) from its **parent**
+folder and write this command's outputs into the **subfolder**; parse `[id]` from
+`issue-<id>-<slug>` or `sub-issue-<id>`. Otherwise it is a flat folder holding everything
+(see `AGENT-COMMAND-MIGRATION.md` for the rationale).
+
 ## What this command does
 
 Run Vitest in non-watch mode from the worktree using the exact commands below. Do NOT use
