@@ -60,14 +60,7 @@ sequenceDiagram
 
 ### Credentials Setup
 
-The OAuth App is registered at github.com → Settings → Developer settings → OAuth Apps → New OAuth App. Two separate apps are recommended: one for local development (callback URL `http://localhost:8888/.netlify/functions/github-auth-callback`) and one for production.
-
-Credentials are stored as:
-
-- **Local dev**: `.env` file at the repo root (never committed); `netlify dev` injects them automatically.
-- **Production**: Netlify dashboard → Site settings → Environment variables.
-
-Environment variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
+See the "GitHub OAuth App setup" runbook in business-specifications.md, Sub-Issue F, for the full registration and environment-variable steps. Environment variables: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`.
 
 ## Rationale
 
