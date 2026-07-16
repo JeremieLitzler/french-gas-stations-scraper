@@ -16,14 +16,17 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 ## Sub-Issue A — GitHub OAuth Login / Logout
 
-**Depends on:** nothing
+**Depends on:** nothing for the login/logout logic itself. Rendering that logic in the Settings
+UI (field layout, enabled/disabled states) is Sub-Issue E's responsibility; this sub-issue owns
+only the login-readiness check, auth-state detection, and the login/logout actions themselves,
+which Sub-Issue E's page consumes once built.
 
 ### Rules
 
-1. The user can initiate a GitHub OAuth login flow from the Settings page once `owner/repo`, file path, and `revalidate-cache-days` are all filled in — the "Login with GitHub" button stays disabled until then (see Sub-Issue B). On success, an HTTP-only cookie containing the access token is set by the Netlify function that handles the OAuth callback.
+1. The system exposes a login-readiness check: the user can initiate the GitHub OAuth login flow once repository configuration (`owner/repo`, file path, and `revalidate-cache-days`) is complete and valid. Sub-Issue E's Settings page consumes this check to decide when its "Login with GitHub" button is enabled (see Sub-Issue E, rule 4). On success, an HTTP-only cookie containing the access token is set by the Netlify function that handles the OAuth callback.
 2. The login flow uses the GitHub OAuth App authorization URL. The app requests only the minimum scopes needed to read and write a single file in one user-owned repository (`repo` scope or `public_repo` if the target repo is always public — see sub-issue B).
 3. After the callback, the user is redirected back to the Settings page with a visible success or error state.
-4. The user can log out; logout clears the HTTP-only cookie only — it does not disconnect the account from GitHub or touch stored data. The repo config (`owner/repo`, file path, `revalidate-cache-days`) and station data both remain in IndexedDB and in the Settings UI; the config fields become editable again (see Sub-Issue E).
+4. The user can log out; logout clears the HTTP-only cookie only — it does not disconnect the account from GitHub or touch stored data. The repo config (`owner/repo`, file path, `revalidate-cache-days`) and station data both remain in IndexedDB. Whether the config fields become editable again in the UI is Sub-Issue E's concern (see Sub-Issue E, rule 3).
 5. If the cookie is absent or expired when the app loads, the user is treated as unauthenticated; no error is shown unless they attempt a sync, add, update or delete action.
 6. The HTTP-only cookie has a lifetime of **8 hours** (matching a typical browser session). After expiry, the user must re-authenticate. The cookie is not refreshed automatically; expiry is detected on the next GitHub API call returning 401.
 
@@ -34,13 +37,16 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 
 ### How to test locally
 
+*(Verifying the field-enabled/disabled states referenced above requires Sub-Issue E's Settings
+page. Until then, verify the login-readiness check and auth state directly.)*
+
 1. Start the app with `netlify dev` so Netlify Functions are available.
-2. Navigate to the Settings page; confirm a "Login with GitHub" button is visible but disabled, and the `owner/repo`, file path, and `revalidate-cache-days` fields are enabled and empty.
-3. Fill in `owner/repo`, file path, and `revalidate-cache-days`; confirm "Login with GitHub" becomes enabled, then click it; confirm the browser redirects to GitHub's OAuth authorization page.
-4. Authorize the app on GitHub; confirm the browser is redirected back to the Settings page with a success indicator and the `owner/repo`/file path fields are now disabled (read-only) while `revalidate-cache-days` stays editable.
-5. Reload the page; confirm the user remains logged in (cookie persists across reloads) and the fields keep their disabled/enabled states.
-6. Click "Logout"; confirm the `owner/repo`/file path fields become enabled again (still holding their previous values) and no token cookie is present (inspect cookies in DevTools → Application → Cookies).
-7. To simulate an expired/absent cookie: delete the cookie in DevTools, reload the page, and confirm the user is treated as unauthenticated with no error banner and the config fields are enabled.
+2. With no cookie present, confirm the login-readiness check reports "not ready" while repo config is incomplete, and "ready" once `owner/repo`, file path, and `revalidate-cache-days` are all valid.
+3. Trigger the login action; confirm the browser redirects to GitHub's OAuth authorization page.
+4. Authorize the app on GitHub; confirm the browser is redirected back to the Settings page with a success indicator and the cookie is present.
+5. Reload the page; confirm the user remains logged in (cookie persists across reloads).
+6. Trigger the logout action; confirm no token cookie is present afterward (inspect cookies in DevTools → Application → Cookies).
+7. To simulate an expired/absent cookie: delete the cookie in DevTools, reload the page, and confirm the user is treated as unauthenticated with no error banner.
 
 #### Going live
 
@@ -149,6 +155,7 @@ This issue is split into sub-issues. Each section below corresponds to one sub-i
 1. The Settings page gains a "GitHub Sync" section with: login/logout control, `owner/repo` field, file path field, and a `revalidate-cache-days` number input.
 2. `revalidate-cache-days` accepts a positive integer; values ≤ 0 are rejected with an inline validation message.
 3. `owner/repo` and file path are disabled once the user is authenticated — a message instructs the user to log out to change them (Sub-Issue B, rule 3). `revalidate-cache-days` is always editable, whether authenticated or not.
+4. The "Login with GitHub" button's enabled/disabled state is driven by Sub-Issue A's login-readiness check (Sub-Issue A, rule 1), evaluated against the current values of `owner/repo`, file path, and `revalidate-cache-days`.
 
 ### How to test locally
 
