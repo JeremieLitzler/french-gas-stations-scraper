@@ -83,12 +83,19 @@ async function exchangeCodeForAccessToken(
       return null
     }
     // GitHub returns HTTP 200 even for a rejected code (e.g. bad_verification_code),
-    // with an error body instead of access_token — the type check below catches that.
-    const payload = await response.json()
-    return typeof payload.access_token === 'string' ? payload.access_token : null
+    // with an error body instead of access_token — the type guard below catches that.
+    const payload: unknown = await response.json()
+    return isAccessTokenPayload(payload) ? payload.access_token : null
   } catch {
     return null
   }
+}
+
+function isAccessTokenPayload(payload: unknown): payload is { access_token: string } {
+  if (typeof payload !== 'object' || payload === null) {
+    return false
+  }
+  return typeof (payload as Record<string, unknown>).access_token === 'string'
 }
 
 function redirectToSettingsError(isSecureRequest: boolean): HandlerResponse {
@@ -100,6 +107,7 @@ function redirectToSettingsSuccess(accessToken: string, isSecureRequest: boolean
   const tokenCookie = buildSessionCookie(TOKEN_COOKIE_NAME, accessToken, {
     maxAgeSeconds: TOKEN_COOKIE_MAX_AGE_SECONDS,
     isSecureRequest,
+    sameSite: 'Strict',
   })
   const expiredStateCookie = buildExpiredCookie(STATE_COOKIE_NAME, isSecureRequest)
   return redirectResponse(SETTINGS_SUCCESS_PATH, [tokenCookie, expiredStateCookie])

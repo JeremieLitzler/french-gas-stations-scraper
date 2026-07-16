@@ -28,9 +28,13 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
   const state = randomUUID()
   const authorizeUrl = buildAuthorizeUrl(credentials.clientId, redirectUri, state)
+  // `Lax`, not `Strict`: GitHub's redirect back to the callback is a cross-site
+  // top-level GET navigation, and a `Strict` cookie is withheld on that hop — the
+  // state round-trip check in github-auth-callback would never see it.
   const stateCookie = buildSessionCookie(STATE_COOKIE_NAME, state, {
     maxAgeSeconds: STATE_COOKIE_MAX_AGE_SECONDS,
     isSecureRequest: isHttpsRequest(event),
+    sameSite: 'Lax',
   })
 
   return redirectResponse(authorizeUrl, [stateCookie])
