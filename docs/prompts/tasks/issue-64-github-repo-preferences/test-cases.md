@@ -234,10 +234,10 @@
 - **Action:** GET `/.netlify/functions/github-auth-callback?error=access_denied`.
 - **Expected:** Response is a 302 to `/settings?auth=error`. No cookie is set.
 
-### F-4: github-api-proxy rejects request for mismatched owner/repo
-- **Precondition:** User is authenticated. Request targets an `owner/repo` different from the one stored in config.
-- **Action:** Call the proxy with a different `owner/repo`.
-- **Expected:** The proxy returns an error (4xx) without forwarding the request to GitHub.
+### F-4: github-api-proxy forwards owner/repo/path unchanged to GitHub
+- **Precondition:** User is authenticated. The request specifies an `owner/repo` and file `path`.
+- **Action:** Call the proxy with a given `owner/repo`/`path`.
+- **Expected:** The GitHub Contents API call the proxy issues targets exactly that `owner/repo`/`path` — no substitution, inference, or override occurs before forwarding. (No mismatch check exists server-side; GitHub's own OAuth token scope is the authorization boundary, per `security-guidelines.md` rule 4.)
 
 ### F-5: github-api-proxy does not expose the access token in the response
 - **Precondition:** User is authenticated.
