@@ -1,84 +1,63 @@
 # Technical Specifications — Sub-Issue A (#82): GitHub OAuth Login / Logout
 
+## Re-run context
+
+This command previously ended with `status: review specs` because `test-cases.md` assumed a
+Settings page (Sub-Issues B/E) that did not exist yet. That mismatch has since been resolved by
+rescoping `business-specifications.md` and `test-cases.md` (commits `b393c8d`, `f8dc3c6`) to scope
+Sub-Issue A to the login-readiness check, auth-state detection, and login/logout actions only. The
+composable committed in `5c8d4d7` already satisfies every rescoped Sub-Issue A rule and test case
+(A-1 through A-10) without changes. This run made one small addition (below) and re-verified the
+rest.
+
 ## Summary of files created/changed
 
-- `src/composables/useGitHubAuth.ts` — new. Singleton composable (ADR-002) owning login/logout,
-  auth-callback-param handling, and authenticated/error state: `isAuthenticated`, `authError`,
-  `initializeAuthState`, `canInitiateLogin`, `login`, `logout`, `handleUnauthorized`.
-
-No Settings page, repo-config fields, or IndexedDB schema for `owner`/`repo`/`revalidate-cache-days`
-were created — see "Specifications Need Review" below.
+- `src/types/repo-config.ts` — new. Extracted `RepoConfigDraft` (previously declared inline in
+  `useGitHubAuth.ts`) into `src/types/`, per this project's "type-first" convention (types are
+  defined in `src/types/` before the logic that uses them).
+- `src/composables/useGitHubAuth.ts` — changed. Removed the inline `RepoConfigDraft` interface;
+  imports it from `@/types/repo-config` instead. No behavioral change.
 
 ## Non-trivial decisions
 
-- **Composable-only scope, no Settings page.** Sub-Issue A's own test cases (A-1, A-2, A-3, A-5,
-  A-6, A-7) reference a Settings page with `owner/repo`, file path, and `revalidate-cache-days`
-  fields, but that page and its persistence/validation are owned by Sub-Issues B (#83) and E (#84),
-  neither implemented yet. Per explicit user direction, this command implements only the
-  login/logout composable and leaves the page to those sub-issues, accepting that several test
-  cases are not satisfiable yet (see below).
-- **`canInitiateLogin(config)` takes the repo-config draft as a parameter instead of owning it.**
-  Business rule 1 ties the login button's enabled state to three field values this composable
-  does not own. Accepting them as a parameter lets the future Settings page (Sub-Issue E) reuse
-  this gating logic without `useGitHubAuth` reaching into IndexedDB keys that belong to Sub-Issue B.
-- **Auth state persisted via the existing IndexedDB wrapper (`get`/`set`/`del`), not `localStorage`.**
-  ADR-008 mandates IndexedDB for client-side persistence in this app; introducing a second storage
-  mechanism for one boolean would contradict that decision without a stated reason to deviate.
-- **The persisted flag is a non-sensitive UI hint, not an auth check.** The `gh_token` cookie is
-  HttpOnly (ADR-011) — the SPA cannot read it to confirm the user is still logged in. `initializeAuthState`
-  trusts the `auth=success` redirect param (set only by the trusted server-side callback function)
-  and, on later reloads, a persisted boolean written at that same moment. This means a user who
-  manually crafts `?auth=success` in the URL would see a false "authenticated" UI state; this is
-  bounded because no real GitHub API call succeeds without the actual cookie, and `handleUnauthorized`
-  (invoked by future Sub-Issue C/D composables on a 401) corrects it on the first real request.
-  Verifying auth server-side on every load would need a dedicated status endpoint, out of scope here.
-- **`handleUnauthorized` is exported but has no caller yet.** Security-guidelines.md rule 5 assigns
-  the UI re-auth prompt to "the composable that calls the proxy" — that composable belongs to
-  Sub-Issues C/D. `useGitHubAuth` exposes the hook now so those composables have a stable contract
-  to call into once built, rather than inventing a second copy of the same state-clearing logic later.
-- **`requestServerLogout` swallows fetch failures.** `logout()` always clears the local UI state
-  even if the network call to the Netlify logout function fails, so a flaky connection cannot leave
-  the UI stuck showing an authenticated session the user explicitly tried to leave (self-review fix).
+- **`RepoConfigDraft` moved to `src/types/`, not kept inline.** It's consumed by
+  `canInitiateLogin` here, but its fields (`owner/repo`, file path, `revalidate-cache-days`) are
+  owned by Sub-Issue B and rendered by Sub-Issue E — both will need the same shape. A single
+  exported type in `src/types/` avoids each sub-issue declaring its own copy.
+- **No other code changes.** The composable already implements every rescoped Sub-Issue A rule
+  (business-specifications.md rules 1, 3–6; edge cases) and passes a manual trace against all ten
+  rescoped test cases:
+  - A-1/A-2 — `canInitiateLogin` returns `false`/`true` based on `hasRequiredRepoConfig` and
+    `hasValidCacheDays`.
+  - A-3 — `login()` sets `window.location.href` to the OAuth start endpoint.
+  - A-4/A-9 — `initializeAuthState` reads the `auth` query param, applies success/error state via
+    `applyAuthCallbackResult`, and strips the param via `stripAuthCallbackParam`.
+  - A-5/A-8 — `restoreStoredAuthState` reads the persisted flag and always clears `authError`,
+    so a plain reload with no callback param shows the stored state with no stale error.
+  - A-6/A-7 — `logout()` only touches the `githubAuthenticated` IndexedDB key (never station data
+    or repo config keys) and always clears local state even when `requestServerLogout` rejects.
+  - A-10 — `handleUnauthorized()` is exported for the future proxy-calling composable (Sub-Issues
+    C/D) to invoke on a 401.
+- **Deviation from ADR-011's stated auth-detection method, carried over from the prior run.**
+  ADR-011 says the SPA detects auth state "by calling the GitHub API proxy... checking whether it
+  returns a valid response or a 401." That proxy-calling composable doesn't exist yet (Sub-Issues
+  C/D), so `initializeAuthState` instead trusts a persisted non-sensitive IndexedDB boolean,
+  written only in response to the trusted server-side `auth=success` redirect. This was already
+  documented and accepted in the prior run; carrying it forward rather than re-litigating it here.
+  It remains bounded: no real GitHub API call succeeds without the actual `HttpOnly` cookie, and
+  `handleUnauthorized` corrects the flag on the first real 401 once Sub-Issues C/D wire it in.
 
 ## Self-code review
 
-Three issues found and fixed after the first draft:
+No new logic was introduced (only a type extraction), so no new bugs were introduced. Re-checked
+the three fixes from the prior run's self-review are still in place and unaffected by the type
+move:
 
-1. **`logout()` could throw on network failure, leaving the UI stuck authenticated.** The `fetch`
-   call to `github-auth-logout` was unguarded; any network error would reject before the local
-   `isAuthenticated`/`authError` state was cleared. Extracted `requestServerLogout()`, which
-   catches and discards the error — the client-side state now always clears on explicit logout.
-2. **`stripAuthCallbackParam` relied on implicit `URL` → string coercion for `history.replaceState`.**
-   Changed to an explicit `url.toString()` call instead of passing the `URL` object directly.
-3. **Stale `authError` could survive across composable re-initialization within the same SPA session.**
-   `restoreStoredAuthState` only set `isAuthenticated` and left a prior `authError` (e.g. from an
-   earlier failed action) visible on a later, unrelated visit to the auth-consuming page. Routed it
-   through the shared `updateAuthState(authenticated, null)` helper so every explicit re-init clears
-   any leftover error, matching business rule 5 ("no error is shown unless [a sync action] is attempted").
+1. `requestServerLogout()` still catches/discards `fetch` failures so `logout()` cannot leave the
+   UI stuck authenticated on a network error (A-7).
+2. `stripAuthCallbackParam` still calls `url.toString()` explicitly rather than relying on
+   implicit `URL` coercion.
+3. `restoreStoredAuthState` still routes through `updateAuthState(stored === true, null)`, clearing
+   any stale `authError` on every re-initialization.
 
-## Specifications Need Review
-
-Please review current code and results.
-
-The following `test-cases.md` scenarios for Sub-Issue A assume a Settings page with `owner/repo`,
-file path, and `revalidate-cache-days` fields already exists, but that page is owned by Sub-Issues B
-(#83) and E (#84), neither implemented at the time of this command:
-
-- **A-1** — fields enabled / login button disabled on first visit: no page exists to hold these fields.
-- **A-2** — login button disabled until all three fields are filled: same, plus depends on B/E's field state.
-- **A-5** — `owner/repo`/file path disabled on reload while authenticated: field disable/enable state is Sub-Issue E's responsibility.
-- **A-6** — logout re-enables `owner/repo`/file path fields: same.
-- **A-7** — config fields enabled when unauthenticated: same.
-
-`useGitHubAuth.ts` implements everything Sub-Issue A can own independently (`login`, `logout`,
-callback-param handling, `canInitiateLogin` as a pure function of an externally-supplied config,
-`handleUnauthorized`), and A-3, A-8 are satisfiable once a page wires this composable in. A-4, A-9
-are backend behavior already covered by Sub-Issue F (#81). A-10 is satisfiable once Sub-Issues C/D
-call `handleUnauthorized` on a 401.
-
-Recommend either: (a) re-sequencing so Sub-Issue E's page (or a minimal shared fields component) is
-built before or alongside Sub-Issue A so its own test cases are checkable in isolation, or (b) moving
-A-1, A-2, A-5, A-6, A-7 into Sub-Issue E's test-cases.md, since they test field behavior E owns, and
-leaving Sub-Issue A's test cases scoped to what `useGitHubAuth` alone controls.
-
-status: review specs
+status: ready

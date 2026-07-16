@@ -27,6 +27,7 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { get, set, del } from '@/utils/indexedDb'
+import type { RepoConfigDraft } from '@/types/repo-config'
 
 const AUTH_STATE_KEY = 'githubAuthenticated'
 const LOGIN_START_PATH = '/.netlify/functions/github-auth-start'
@@ -36,12 +37,6 @@ const CALLBACK_ERROR_MESSAGE = 'La connexion à GitHub a échoué. Merci de rée
 const SESSION_EXPIRED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
 
 type AuthCallbackResult = 'success' | 'error'
-
-export interface RepoConfigDraft {
-  ownerRepo: string
-  filePath: string
-  revalidateCacheDays: number | null
-}
 
 // Module-level state — all consumers share the same reference (ADR-002).
 const isAuthenticated: Ref<boolean> = ref(false)
