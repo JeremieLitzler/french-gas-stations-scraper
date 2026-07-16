@@ -1,0 +1,9 @@
+### Prerequisite: `netlify dev` running locally with GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET set.
+### Uses the VS Code "REST Client" extension (humao.rest-client).
+
+@baseUrl = http://localhost:8888/.netlify/functions
+
+### F-1: redirects to GitHub's authorize URL with client_id, scope=repo, and a state parameter.
+### The response won't be followed automatically — inspect the `Location` header and the
+### `Set-Cookie: gh_oauth_state=...` header below.
+GET {{baseUrl}}/github-auth-start
