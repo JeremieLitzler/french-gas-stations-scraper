@@ -1,0 +1,32 @@
+### Prerequisite: `netlify dev` running locally, and a `gh_token` value obtained by completing
+### the flow in github-auth-callback.http (or copied from DevTools → Application → Cookies
+### after logging in through the app).
+### Uses the VS Code "REST Client" extension (humao.rest-client).
+
+@baseUrl = http://localhost:8888/.netlify/functions
+@ghToken = paste-gh_token-cookie-value-here
+@owner = your-github-username
+@repo = your-test-repo
+@path = stations.json
+
+### F-4/F-5: reads a file via the Contents API using owner/repo/path exactly as given.
+### Expect the proxied GitHub response body, and no gh_token value anywhere in it.
+GET {{baseUrl}}/github-api-proxy?owner={{owner}}&repo={{repo}}&path={{path}}
+Cookie: gh_token={{ghToken}}
+
+### Read without a token cookie — expect 401 { "error": "Not authenticated" }.
+GET {{baseUrl}}/github-api-proxy?owner={{owner}}&repo={{repo}}&path={{path}}
+
+### Write (create/update) — include `sha` (from the read response above) when updating an
+### existing file; omit it to create a new file.
+PUT {{baseUrl}}/github-api-proxy
+Cookie: gh_token={{ghToken}}
+Content-Type: application/json
+
+{
+  "owner": "{{owner}}",
+  "repo": "{{repo}}",
+  "path": "{{path}}",
+  "message": "test: update stations.json via github-api-proxy.http",
+  "content": "eyJzdGF0aW9ucyI6W10sImRlZmF1bHRGdWVsIjoiU1A5NSJ9"
+}

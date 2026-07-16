@@ -1,0 +1,25 @@
+### Prerequisite: `netlify dev` running locally with GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET set.
+### Uses the VS Code "REST Client" extension (humao.rest-client).
+###
+### The success path needs a real `code` from GitHub and the `state` value GitHub echoes
+### back, since the code exchange happens server-side against the real GitHub API:
+###   1. Run the github-auth-start.http request; copy the `state` query param from the
+###      `Location` header and the `gh_oauth_state` value from `Set-Cookie`.
+###   2. Open that `Location` URL in a browser and authorize the app.
+###   3. Copy the `code` and `state` GitHub redirects back with, and paste them below.
+
+@baseUrl = http://localhost:8888/.netlify/functions
+@state = ec3864dc-5447-4d8b-8ea5-93d645a9d134
+@code = paste-code-value-here
+
+### F-2: exchanges code for a token and sets the gh_token cookie.
+### Expect a 302 to /settings?auth=success and a Set-Cookie: gh_token=...; HttpOnly; SameSite=Strict; Max-Age=28800
+GET {{baseUrl}}/github-auth-callback?code={{code}}&state={{state}}
+Cookie: gh_oauth_state={{state}}
+
+### F-3: GitHub-side error redirects to the error state, no cookie set.
+GET {{baseUrl}}/github-auth-callback?error=access_denied
+
+### A-9 (Sub-Issue A): mismatched state is rejected — same expected result as the error case.
+GET {{baseUrl}}/github-auth-callback?code={{code}}&state=some-other-state
+Cookie: gh_oauth_state={{state}}

@@ -1,0 +1,16 @@
+### Prerequisite: `netlify dev` running locally.
+### Uses the VS Code "REST Client" extension (humao.rest-client).
+
+@baseUrl = http://localhost:8888/.netlify/functions
+@ghToken = paste-gh_token-cookie-value-here
+
+### F-7: clears the gh_token cookie. Expect 200 { "success": true } and
+### Set-Cookie: gh_token=; ...; Max-Age=0
+POST {{baseUrl}}/github-auth-logout
+Cookie: gh_token={{ghToken}}
+
+### F-7: succeeds even with no gh_token cookie present.
+POST {{baseUrl}}/github-auth-logout
+
+### Wrong method is rejected — expect 405 { "error": "Method not allowed" }.
+GET {{baseUrl}}/github-auth-logout
