@@ -54,3 +54,42 @@ cd develop && claude
 ```
 
 Opening from the bare repo root means project instructions and skills are not loaded.
+
+### Running Netlify functions locally
+
+`npm run dev:netlify` runs `netlify dev` wrapped in [Proton Pass CLI](https://proton.me/support/proton-pass-cli)
+(`pass-cli`), which injects secrets from your Proton Pass vault as environment variables
+for the duration of the command — no plaintext secrets on disk.
+
+Requirements:
+
+- [Proton Pass CLI](https://proton.me/support/proton-pass-cli) installed and logged in
+  (`pass-cli login`).
+- A `.env.proton-pass` file at the repo root (gitignored, not committed) declaring the
+  Proton Pass references to resolve — at minimum `GITHUB_CLIENT_ID` and
+  `GITHUB_CLIENT_SECRET` for the GitHub OAuth app used by `netlify/functions/`.
+
+With both in place, `npm run dev:netlify` starts `netlify dev` with those variables
+available to the functions, equivalent to `netlify dev --functions netlify/functions`.
+
+You'll need to replace the `[vault-id]` and `[item-id]` placeholders in `.env.proton-pass`
+with real IDs. `pass-cli` doesn't take a vault/item name directly on the `pass://` reference,
+so resolve both IDs by name via `--output json` and `jq`:
+
+```bash
+# 1. Share id, by vault name (e.g. "Common")
+SHARE_ID=$(pass-cli vault list --output json | jq -r '.vaults[] | select(.name == "Common") | .share_id')
+
+# 2. Item id, by item name — `item list` takes the vault NAME (or --share-id), not the vault id
+ITEM_ID=$(pass-cli item list "Common" --output json | jq -r '.items[] | select(.content.title == "(local) French Gas Stations Scrapper GitHub OAuth") | .id')
+
+echo "$SHARE_ID"
+echo "$ITEM_ID"
+```
+
+Then paste both values into `.env.proton-pass`:
+
+```
+GITHUB_CLIENT_ID=pass://$SHARE_ID/$ITEM_ID/Client ID
+GITHUB_CLIENT_SECRET=pass://$SHARE_ID/$ITEM_ID/Client Secret
+```
