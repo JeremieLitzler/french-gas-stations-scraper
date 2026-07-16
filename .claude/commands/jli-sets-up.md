@@ -107,9 +107,17 @@ errors that the branch already exists — delete the stale local branch, then re
 **Sub-issue variant:**
 - The shared parent specs folder already exists in the worktree — do NOT recreate, copy, or
   duplicate the shared specs.
-- Create the per-sub-issue subfolder `[worktree]/<parent-folder>/sub-issue-<sub-id>/` (it
-  starts empty; the implementation-phase commands fill it with `technical-specifications.md`,
-  `review-results.md`, and `test-results.md`).
+- Create the per-sub-issue subfolder with the script — it fails loudly if the parent folder
+  is missing (merged spec not actually present) or the subfolder already exists (would
+  otherwise silently reuse stale output from a prior cycle), instead of relying on an ad hoc
+  `mkdir`:
+
+  ```bash
+  bash scripts/pipeline/sub-issue-folder-create.sh [worktree] <parent-id> <parent-slug> <sub-id>
+  ```
+
+  It starts empty; the implementation-phase commands fill it with
+  `technical-specifications.md`, `review-results.md`, and `test-results.md`.
 - The `@`-mention every downstream command takes is this subfolder:
   `docs/prompts/tasks/issue-<parent-id>-<parent-slug>/sub-issue-<sub-id>`.
 
