@@ -9,9 +9,8 @@
 
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BARE_REPO="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-DEVELOP="${BARE_REPO}/develop"
+BARE_REPO="$(git rev-parse --path-format=absolute --git-common-dir)"
+DEVELOP="$(pwd)"
 
 echo "==> Fetching origin..."
 git -C "$BARE_REPO" fetch origin
