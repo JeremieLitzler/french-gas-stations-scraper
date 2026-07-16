@@ -1,9 +1,12 @@
 // Cookie parsing/building shared by all GitHub OAuth Netlify functions.
 import type { HandlerEvent } from '@netlify/functions'
 
+type SameSitePolicy = 'Strict' | 'Lax'
+
 interface SessionCookieOptions {
   maxAgeSeconds: number
   isSecureRequest: boolean
+  sameSite: SameSitePolicy
 }
 
 export function parseCookies(cookieHeader: string | undefined): Record<string, string> {
@@ -28,7 +31,7 @@ export function buildSessionCookie(
   const attributes = [
     `${name}=${value}`,
     'HttpOnly',
-    'SameSite=Strict',
+    `SameSite=${options.sameSite}`,
     'Path=/',
     `Max-Age=${options.maxAgeSeconds}`,
   ]
@@ -38,8 +41,10 @@ export function buildSessionCookie(
   return attributes.join('; ')
 }
 
+// SameSite has no bearing on cookie deletion (the browser matches name/domain/path
+// only), so the expired cookie always clears regardless of the policy used here.
 export function buildExpiredCookie(name: string, isSecureRequest: boolean): string {
-  return buildSessionCookie(name, '', { maxAgeSeconds: 0, isSecureRequest })
+  return buildSessionCookie(name, '', { maxAgeSeconds: 0, isSecureRequest, sameSite: 'Strict' })
 }
 
 export function isHttpsRequest(event: HandlerEvent): boolean {
