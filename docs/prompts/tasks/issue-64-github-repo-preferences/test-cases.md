@@ -2,57 +2,60 @@
 
 ## Sub-Issue A — GitHub OAuth Login / Logout
 
-### A-1: Fields enabled and login button disabled on first visit
-- **Precondition:** No `gh_token` cookie is set. `owner/repo`, file path, and `revalidate-cache-days` are empty.
-- **Action:** Navigate to the Settings page.
-- **Expected:** The `owner/repo`, file path, and `revalidate-cache-days` fields are enabled and empty. A "Login with GitHub" button is visible but disabled.
+*(Rescoped: this sub-issue owns only the login-readiness check, auth-state detection, and the
+login/logout actions — not the Settings page or its fields, which are Sub-Issue E's
+responsibility. Field-visibility scenarios formerly listed here now live under Sub-Issue E.)*
 
-### A-2: Login button stays disabled until all config fields are filled in
-- **Precondition:** No `gh_token` cookie is set. `owner/repo` and file path are filled in; `revalidate-cache-days` is empty.
-- **Action:** Observe the "Login with GitHub" button.
-- **Expected:** The button remains disabled.
+### A-1: Login-readiness check reports not ready when repo config is incomplete
+- **Precondition:** A repo-config draft (`owner/repo`, file path, `revalidate-cache-days`) has at least one value empty or invalid.
+- **Action:** Evaluate the login-readiness check against the draft.
+- **Expected:** The check reports "not ready".
 
-### A-3: Login flow redirects to GitHub authorization page
-- **Precondition:** No `gh_token` cookie is set. `owner/repo`, file path, and `revalidate-cache-days` are all filled in, enabling the "Login with GitHub" button.
-- **Action:** Click "Login with GitHub" on the Settings page.
-- **Expected:** The browser redirects to GitHub's OAuth authorization URL (`github.com/login/oauth/authorize`), including the `client_id`, `scope`, and `state` query parameters.
+### A-2: Login-readiness check reports ready when repo config is complete and valid
+- **Precondition:** `owner/repo` and file path are non-empty; `revalidate-cache-days` is a positive integer.
+- **Action:** Evaluate the login-readiness check against the draft.
+- **Expected:** The check reports "ready".
 
-### A-4: Successful OAuth callback sets cookie and redirects to Settings
-*(Manual/integration test — exercises the `github-auth-callback` Netlify function via a real OAuth redirect; not verifiable in a Vitest unit test.)*
-- **Precondition:** The user completes GitHub authorization (code returned by GitHub).
-- **Action:** The `github-auth-callback` Netlify function receives the `code` and valid `state` parameter.
-- **Expected:** The function exchanges the code for a token, sets the `gh_token` cookie (`HttpOnly`, `SameSite=Strict`, `Max-Age=28800`), and redirects to `/settings?auth=success`. The Settings page shows an authenticated state.
+### A-3: Triggering login navigates to the GitHub OAuth start endpoint
+- **Precondition:** None.
+- **Action:** Trigger the login action.
+- **Expected:** The browser navigates to the GitHub OAuth start endpoint. (That endpoint's own redirect to GitHub's authorization page with `client_id`/`scope`/`state` is Sub-Issue F's behavior, covered by F-1.)
 
-### A-5: Authenticated state persists across page reloads
-- **Precondition:** `gh_token` cookie is present and valid.
-- **Action:** Reload the Settings page.
-- **Expected:** The user remains authenticated. `owner/repo` and file path fields are disabled (read-only), showing their saved values. `revalidate-cache-days` remains enabled.
+### A-4: A successful-callback indicator marks the user authenticated
+- **Precondition:** The app loads with a success indicator present in the URL (set by Sub-Issue F's callback function after a completed OAuth exchange, covered by F-2).
+- **Action:** The app processes the page load.
+- **Expected:** The user is shown as authenticated; no error is present; the success indicator is removed from the URL afterward.
 
-### A-6: Logout clears the cookie and re-enables config fields
-- **Precondition:** User is authenticated (`gh_token` cookie present); `owner/repo` and file path are disabled and show saved values.
-- **Action:** Click "Logout".
-- **Expected:** The `gh_token` cookie is cleared. `owner/repo` and file path fields become enabled again, still showing their previous values. Station data in IndexedDB is unchanged.
+### A-5: Authenticated state persists across a plain reload
+- **Precondition:** The user previously completed a successful login in this browser. The URL carries no callback indicator this time.
+- **Action:** Reload the page.
+- **Expected:** The user remains shown as authenticated.
 
-### A-7: Absent or expired cookie — unauthenticated state with no error banner
-*(Manual test — requires deleting/expiring a browser cookie.)*
-- **Precondition:** The `gh_token` cookie is absent or expired.
-- **Action:** Navigate to the Settings page without performing any sync action.
-- **Expected:** The user is shown as unauthenticated. No error banner is displayed. Config fields are enabled.
+### A-6: Logout clears the authenticated state without touching station data
+- **Precondition:** The user is shown as authenticated.
+- **Action:** Trigger the logout action.
+- **Expected:** The user is shown as unauthenticated afterward, with no error. Station data and repo config values in IndexedDB are unchanged.
 
-### A-8: OAuth callback with error parameter shows error in UI
-- **Precondition:** GitHub returns `error=access_denied` in the callback URL.
-- **Action:** The `github-auth-callback` function receives the error parameter.
-- **Expected:** The function redirects to `/settings?auth=error`. The Settings page displays a human-readable error message. No cookie is set.
+### A-7: Logout clears local authenticated state even if the server-side call fails
+- **Precondition:** The user is shown as authenticated; the network request to the logout endpoint fails (e.g. offline).
+- **Action:** Trigger the logout action.
+- **Expected:** The user is still shown as unauthenticated locally afterward.
 
-### A-9: state parameter mismatch in OAuth callback is rejected
-- **Precondition:** The `state` parameter in the callback does not match the one generated at login start.
-- **Action:** The `github-auth-callback` function receives a mismatched `state`.
-- **Expected:** The function does not exchange the code for a token. The response is an error redirect (or equivalent failure). No cookie is set.
+### A-8: No prior session and no callback indicator — unauthenticated with no error banner
+- **Precondition:** The user has never logged in. The URL carries no success/error indicator.
+- **Action:** Load the app.
+- **Expected:** The user is shown as unauthenticated. No error is displayed.
 
-### A-10: Token expiry detected on GitHub API call
-- **Precondition:** User has a `gh_token` cookie that has been revoked on GitHub's side (simulated by revoking in GitHub OAuth settings).
-- **Action:** User triggers any action that calls the GitHub API proxy.
-- **Expected:** The proxy receives a 401 from GitHub, clears the `gh_token` cookie, and the UI prompts the user to log in again.
+### A-9: An error-callback indicator shows a human-readable error
+- **Precondition:** The app loads with an error indicator present in the URL (set by Sub-Issue F's callback function after a failed OAuth exchange, covered by F-3).
+- **Action:** The app processes the page load.
+- **Expected:** The user is shown as unauthenticated. A human-readable error message is displayed. The error indicator is removed from the URL afterward.
+
+### A-10: A 401 from a GitHub API call clears the authenticated state and prompts re-login
+*(Verifiable end-to-end once Sub-Issues C/D wire their proxy-calling composable(s) into this hook.)*
+- **Precondition:** The user is shown as authenticated; a GitHub API call made through the proxy returns 401 (e.g. the token was revoked).
+- **Action:** The calling composable reports the 401 to the auth composable.
+- **Expected:** The user is shown as unauthenticated afterward, with a message prompting re-login.
 
 ---
 
@@ -214,6 +217,11 @@
 - **Precondition:** User is authenticated; `owner/repo` and file path are disabled.
 - **Action:** Click "Logout".
 - **Expected:** `owner/repo` and file path fields become enabled again, retaining their values. `revalidate-cache-days` remains enabled throughout (it was never disabled).
+
+### E-7: Login button reflects the login-readiness check
+- **Precondition:** User is unauthenticated on the Settings page. `owner/repo` and file path are filled in; `revalidate-cache-days` is empty.
+- **Action:** Observe the "Login with GitHub" button, then fill in a valid positive integer for `revalidate-cache-days`.
+- **Expected:** The button is disabled while any field is empty or invalid, and becomes enabled once `owner/repo`, file path, and `revalidate-cache-days` are all filled in and valid (Sub-Issue A's login-readiness check).
 
 ---
 
