@@ -14,9 +14,9 @@
    - Where: `github-auth-start` (generates and stores the state) and `github-auth-callback` (verifies it matches before exchanging the code).
    - Why: Without state verification, an attacker can trick the browser into completing an authorization with a code the attacker chose, binding the victim's session to the attacker's GitHub account.
 
-4. **In the GitHub API proxy function, validate that the requested `owner/repo` matches the value stored in the user's session or IndexedDB-persisted config before forwarding any GitHub Contents API call.**
+4. **Forward `owner`/`repo`/`path` to the GitHub Contents API exactly as supplied by the authenticated SPA request — never substitute, infer, or independently source these values server-side.**
    - Where: `github-api-proxy` Netlify function.
-   - Why: Without this check, an authenticated user (or a forged request) could use the proxy to read or write arbitrary GitHub repositories, constituting an SSRF / confused-deputy attack.
+   - Why: No server-side session or config store exists for these values (IndexedDB is client-only, ADR-008); the proxy's real authorization boundary is GitHub's own OAuth token scope (`repo`/`public_repo`) — the user's token cannot reach a repository they don't already own or have write access to, so a forged request gains nothing beyond what the token itself already permits.
 
 5. **Treat any 401 response from the GitHub API as a definitive signal that the token is invalid: clear the `gh_token` cookie server-side and surface a re-authentication prompt in the UI — do not silently retry with the same token.**
    - Where: `github-api-proxy` Netlify function (server-side cookie clear) and the composable that calls the proxy (UI prompt).
@@ -25,15 +25,5 @@
 6. **Do not pass the raw access token to the Vue SPA at any point (not in a response body, not in a query parameter, not in a custom header the SPA can read).**
    - Where: all Netlify functions (`github-auth-callback`, `github-api-proxy`).
    - Why: Any value readable by JavaScript is readable by XSS payloads; the token must remain opaque to the browser and flow only through the `HttpOnly` cookie.
-
-### ADR Required
-
-Two new architectural patterns introduced by this feature are not yet documented:
-
-1. **GitHub OAuth App flow with server-side token exchange via Netlify Functions** — The app has no existing authentication layer. Storing the access token in an HTTP-only cookie, using a Netlify function for the code-for-token exchange, and detecting auth state from the cookie's presence is a high-impact decision affecting security posture, deployment configuration (environment variables), and SPA auth-state detection.
-
-2. **Remote user-owned GitHub repository as a durable sync backend via the GitHub Contents API** — The app currently stores all user data client-side only (ADR-008). Adding a user-owned GitHub repo as a remote persistence and sync tier — with a cache-invalidation strategy keyed on `revalidateCacheDays` — represents a new persistence layer that interacts with IndexedDB and warrants a dedicated ADR.
-
-The orchestrator must pause and ask the human to approve both ADRs before coding starts.
 
 status: ready
