@@ -90,6 +90,7 @@ declare global {
   const useCssModule: typeof import('vue').useCssModule
   const useCssVars: typeof import('vue').useCssVars
   const useDefaultFuelType: typeof import('./src/composables/useDefaultFuelType').useDefaultFuelType
+  const useGitHubAuth: typeof import('./src/composables/useGitHubAuth').useGitHubAuth
   const useId: typeof import('vue').useId
   const useKnownFuelTypes: typeof import('./src/composables/useKnownFuelTypes').useKnownFuelTypes
   const useModel: typeof import('vue').useModel
@@ -126,6 +127,9 @@ declare global {
   // @ts-ignore
   export type { PriceRow } from './src/types/price-row'
   import('./src/types/price-row')
+  // @ts-ignore
+  export type { RepoConfigDraft } from './src/types/repo-config'
+  import('./src/types/repo-config')
   // @ts-ignore
   export type { StationData } from './src/types/station-data'
   import('./src/types/station-data')
