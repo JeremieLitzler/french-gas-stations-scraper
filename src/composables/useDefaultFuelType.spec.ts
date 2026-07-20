@@ -139,6 +139,26 @@ describe('TC-20: updateDefaultFuelType replaces the stored default and updates r
 })
 
 // ---------------------------------------------------------------------------
+// C-7: Remote-preferences sync timestamp (test-cases.md, Sub-Issue C)
+// ---------------------------------------------------------------------------
+
+describe('C-7: IndexedDB timestamp resets after changing the fuel type default', () => {
+  it('writes preferencesLastSyncedAt to the current time', async () => {
+    store.set('defaultFuelType', 'SP95')
+
+    const { loadDefaultFuelType, updateDefaultFuelType } = await freshComposable()
+    await loadDefaultFuelType()
+
+    const now = 1_700_000_000_000
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    await updateDefaultFuelType('Gasoil')
+
+    expect(store.get('preferencesLastSyncedAt')).toBe(now)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-25 — Clicking "Clear default" removes the key from IndexedDB
 // ---------------------------------------------------------------------------
 

@@ -415,6 +415,43 @@ describe('TC-NEW-01: Load merges only the missing defaults, not already-present 
 // Regression: DataCloneError — Vue Proxy objects must not reach IndexedDB set()
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// C-4, C-6: Remote-preferences sync timestamp (test-cases.md, Sub-Issue C)
+// ---------------------------------------------------------------------------
+
+describe('C-4: IndexedDB timestamp resets after adding a station', () => {
+  it('writes preferencesLastSyncedAt to the current time', async () => {
+    const { loadStations, addStation } = await freshComposable()
+    await loadStations()
+
+    const now = 1_700_000_000_000
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    await addStation({
+      name: 'Timestamp Station',
+      url: 'https://www.prix-carburants.gouv.fr/station/55555555',
+    })
+
+    expect(store.get('preferencesLastSyncedAt')).toBe(now)
+  })
+})
+
+describe('C-6: IndexedDB timestamp resets after deleting a station', () => {
+  it('writes preferencesLastSyncedAt to the current time', async () => {
+    store.set('stations', [USER_STATION_A])
+
+    const { loadStations, removeStation } = await freshComposable()
+    await loadStations()
+
+    const now = 1_700_000_000_000
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    await removeStation(USER_STATION_A.url)
+
+    expect(store.get('preferencesLastSyncedAt')).toBe(now)
+  })
+})
+
 describe('TC-NEW-02: set() is never called with Vue Proxy objects (DataCloneError regression)', () => {
   it('addStation does not throw a DataCloneError (structuredClone succeeds on the persisted value)', async () => {
     const { loadStations, addStation } = await freshComposable()

@@ -172,6 +172,26 @@ describe('TC-20b: updateStation throws and does not persist when URL lacks /stat
 // TC-21: updateStation is a no-op when original URL not found
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// C-5: Remote-preferences sync timestamp (test-cases.md, Sub-Issue C)
+// ---------------------------------------------------------------------------
+
+describe('C-5: IndexedDB timestamp resets after editing a station', () => {
+  it('writes preferencesLastSyncedAt to the current time', async () => {
+    store.set('stations', [stationA])
+
+    const { loadStations, updateStation } = await freshComposable()
+    await loadStations()
+
+    const now = 1_700_000_000_000
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+
+    await updateStation(stationA.url, { name: 'New Name', url: stationA.url })
+
+    expect(store.get('preferencesLastSyncedAt')).toBe(now)
+  })
+})
+
 describe('TC-21: updateStation is a no-op when the original URL does not exist', () => {
   it('does not throw and does not write to IndexedDB', async () => {
     store.set('stations', [stationA])
