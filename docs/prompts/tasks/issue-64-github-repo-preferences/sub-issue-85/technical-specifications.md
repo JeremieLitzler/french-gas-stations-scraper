@@ -5,10 +5,13 @@
 - `src/types/remote-preferences.ts` — new. `RemotePreferencesFile` (`{ stations, defaultFuel }`),
   the exact shape of the JSON file synced to the user's GitHub repo, shared by this sub-issue and
   the future Sub-Issue D write path.
-- `src/utils/preferencesSyncTimestamp.ts` — new. Pure IndexedDB-backed helpers:
-  `markPreferencesSynced()` (writes `Date.now()` under `preferencesLastSyncedAt`) and
+- `src/utils/preferencesSyncTimestamp.ts` — new, changed in review pass 2. Pure IndexedDB-backed
+  helpers: `markPreferencesSynced()` (writes `Date.now()` under `preferencesLastSyncedAt`),
   `isPreferencesStale(revalidateCacheDays)` (compares the stored timestamp's age against the
-  threshold; treats an absent timestamp as stale).
+  threshold; treats an absent timestamp as stale), `getPreferencesSyncedAt()` (reads the raw
+  stored value), and `restorePreferencesSyncedAt(timestamp)` (writes back a captured value, or
+  deletes the key when it was previously absent) — the latter two added in review pass 2 to let
+  a rolled-back remote merge undo the timestamp resets it triggered along the way.
 - `src/composables/useRemotePreferencesSync.ts` — new. Singleton composable exposing
   `syncError` and `syncOnLoad(isAuthenticated, repoConfig, applyRemotePreferences, onUnauthorized)`.
   Skips entirely when unauthenticated, repo config is incomplete, or local data is still fresh;
@@ -123,5 +126,21 @@
    write across both IndexedDB keys would require a new multi-key primitive in `indexedDb.ts`; a
    compensating rollback of the one setter that can succeed-then-be-followed-by-a-failure is the
    minimal fix that restores the stated guarantee without that broader change.
+
+## Review fixes applied (review-results.md, sub-issue-85, second pass)
+
+5. **The rollback from fix #4 left the sync timestamp marked fresh despite the merge failing.**
+   `replaceStations` (called both for the initial station write and for the rollback itself) and
+   `saveDefaultFuelType`/`clearDefaultFuelType` all call `markPreferencesSynced()` unconditionally
+   as part of their contract for direct user edits (Sub-Issue C rule 5). During a failed merge,
+   this meant the rollback's own `replaceStations(previousStations)` call re-stamped the timestamp
+   to "now" a second time, even though neither call was a successful remote read (rule 4) nor a
+   real user edit — so a failed merge left IndexedDB looking freshly synced, and the next page
+   load's `isPreferencesStale` check would skip retrying the fetch that had just failed, for a
+   full `revalidateCacheDays` period, with no further error shown. Fixed by capturing the
+   timestamp via a new `getPreferencesSyncedAt()` before the merge starts and restoring it via a
+   new `restorePreferencesSyncedAt(timestamp)` after the rollback's `replaceStations` call, so a
+   failed merge leaves both the station data and the staleness state exactly as they were before
+   the sync attempt.
 
 status: ready

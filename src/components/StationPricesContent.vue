@@ -86,6 +86,7 @@ import { useGitHubAuth } from '@/composables/useGitHubAuth'
 import { useRepoConfig } from '@/composables/useRepoConfig'
 import { useRemotePreferencesSync } from '@/composables/useRemotePreferencesSync'
 import { buildPriceRows, deriveFuelTypes, orderFuelTypes } from '@/utils/fuelTypeUtils'
+import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
 import type { PriceRow } from '@/types/price-row'
 import type { Station } from '@/types/station'
 import type { RemotePreferencesFile } from '@/types/remote-preferences'
@@ -114,18 +115,28 @@ const { syncError, syncOnLoad } = useRemotePreferencesSync()
 // already relies on.
 async function applyRemotePreferences(data: RemotePreferencesFile): Promise<void> {
   const previousStations = stations.value
+  const previousSyncedAt = await getPreferencesSyncedAt()
   await replaceStations(data.stations)
-  await applyDefaultFuelOrRollback(data.defaultFuel, previousStations)
+  await applyDefaultFuelOrRollback(data.defaultFuel, previousStations, previousSyncedAt)
 }
 
+// Every setter called during the merge (replaceStations, saveDefaultFuelType,
+// clearDefaultFuelType) marks the sync timestamp fresh as a side effect of its
+// own contract for direct user edits (Sub-Issue C rule 5). A rolled-back merge
+// is neither that nor a successful remote read (rule 4), so the rollback must
+// also restore the pre-merge timestamp — otherwise the failed merge leaves
+// IndexedDB looking freshly synced and the next load skips retrying the fetch
+// that just failed (review-results.md, sub-issue-85, second pass).
 async function applyDefaultFuelOrRollback(
   defaultFuel: string | null,
   previousStations: Station[],
+  previousSyncedAt: number | undefined,
 ): Promise<void> {
   try {
     await applyDefaultFuel(defaultFuel)
   } catch (error) {
     await replaceStations(previousStations)
+    await restorePreferencesSyncedAt(previousSyncedAt)
     throw error
   }
 }
