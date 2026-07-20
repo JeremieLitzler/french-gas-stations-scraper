@@ -96,6 +96,7 @@ declare global {
   const useModel: typeof import('vue').useModel
   const usePreferencesExport: typeof import('./src/composables/usePreferencesExport').usePreferencesExport
   const usePreferencesImport: typeof import('./src/composables/usePreferencesImport').usePreferencesImport
+  const useRepoConfig: typeof import('./src/composables/useRepoConfig').useRepoConfig
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
   const useSlots: typeof import('vue').useSlots
