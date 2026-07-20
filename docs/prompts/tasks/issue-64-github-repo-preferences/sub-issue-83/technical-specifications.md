@@ -74,6 +74,11 @@
   Splitting it further would fragment that one rule into indirection without improving
   readability — same documented exception already given to `github-auth-callback.ts`'s
   `validateCallbackRequest` in Sub-Issue F.
+- `latestSaveRequestId` is a third module-level variable in this file, beyond the two
+  (`repoConfig`, `validationError`) that match the `isAuthenticated`/`authError` precedent set
+  by `useGitHubAuth.ts`. It exists solely to guard against a stale, slower `saveRepoConfig`
+  call overwriting `validationError` after a newer call already resolved; it is never part of
+  the composable's returned reactive surface, unlike the other two.
 
 ## Review-feedback fixes applied (review-results.md, changes requested)
 
@@ -103,5 +108,23 @@
    `validationError` after a later request already set it, showing a stale message. Added a
    `latestSaveRequestId` counter so only the most recently started `saveRepoConfig` call is
    allowed to write `validationError`.
+
+## Second review-feedback fix applied (review-results.md, changes requested)
+
+1. **Finding 1 (undocumented Object Calisthenics deviation — third module-level variable).**
+   Added the exception note above for `latestSaveRequestId`, plus a matching inline comment in
+   `useRepoConfig.ts`, for consistency with how the file's other two deviations are documented.
+
+## Self-review fixes applied (this pass)
+
+1. `saveRepoConfig` — `repoConfig.value = draft` was neither guarded by `latestSaveRequestId`
+   (unlike `validationError`, a few lines below it) nor copied. A slower, stale save could
+   overwrite the reactive `repoConfig` with older data after a newer save already resolved,
+   and the exact object reference passed by the caller was aliased into the singleton's
+   state — if the caller kept mutating that same object (e.g. a form model bound with
+   `v-model`) after calling `saveRepoConfig`, those mutations would silently leak into
+   `repoConfig.value` without another explicit save. Guarded the assignment with the same
+   `requestId` check already used for `validationError`, and assign a shallow copy (`{ ...draft
+   }`), matching `persistRepoConfig`'s existing `{ ...toRaw(draft) }` copy-before-use pattern.
 
 status: ready

@@ -50,6 +50,11 @@ interface OwnerRepo {
 // Module-level state — all consumers share the same reference (ADR-002).
 const repoConfig: Ref<RepoConfigDraft> = ref(emptyRepoConfig())
 const validationError: Ref<string | null> = ref(null)
+
+// Object Calisthenics exception: a third module-level variable, beyond the two above.
+// It exists solely to guard against a stale, slower `saveRepoConfig` call overwriting
+// `validationError` after a newer call already resolved — it is not part of the composable's
+// public reactive surface (unlike `repoConfig`/`validationError`, it is never returned).
 let latestSaveRequestId = 0
 
 function emptyRepoConfig(): RepoConfigDraft {
@@ -149,7 +154,7 @@ export function useRepoConfig() {
   ): Promise<void> => {
     const requestId = ++latestSaveRequestId
     await persistRepoConfig(draft)
-    repoConfig.value = draft
+    if (requestId === latestSaveRequestId) repoConfig.value = { ...draft }
     if (!isAuthenticated) {
       if (requestId === latestSaveRequestId) validationError.value = null
       return
