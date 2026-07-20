@@ -1,5 +1,6 @@
 <template>
   <div>
+    <p v-if="syncError" role="alert" class="text-sm text-amber-700 mb-2">{{ syncError }}</p>
     <p v-if="showFetchSuccess" class="fetch-success" role="status">Récupération terminée.</p>
     <ul v-if="warnings.length > 0" class="station-warnings" aria-label="Avertissements de récupération des stations">
       <li v-for="warning in warnings" :key="warning.url" class="station-warning-item">
@@ -81,15 +82,35 @@ import {
 import { useStationPrices } from '@/composables/useStationPrices'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
+import { useGitHubAuth } from '@/composables/useGitHubAuth'
+import { useRepoConfig } from '@/composables/useRepoConfig'
+import { useRemotePreferencesSync } from '@/composables/useRemotePreferencesSync'
 import { buildPriceRows, deriveFuelTypes, orderFuelTypes } from '@/utils/fuelTypeUtils'
 import type { PriceRow } from '@/types/price-row'
 import type { Station } from '@/types/station'
+import type { RemotePreferencesFile } from '@/types/remote-preferences'
 
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
-const { stations, loadStations } = useStationStorage()
+const { stations, loadStations, replaceStations } = useStationStorage()
 const { results, warnings, fetchCompleted, loadAllStationPrices, removeStationPrice, addStationPrice, renameStation } = useStationPrices()
 const { defaultFuelType, loadDefaultFuelType, saveDefaultFuelType, updateDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
+const { isAuthenticated, initializeAuthState, handleUnauthorized } = useGitHubAuth()
+const { repoConfig, loadRepoConfig } = useRepoConfig()
+const { syncError, syncOnLoad } = useRemotePreferencesSync()
+
+// Applies a merged remote read (Sub-Issue C, issue #64) through
+// useStationStorage/useDefaultFuelType's own setters, per the
+// composable-caller-responsibility convention — useRemotePreferencesSync
+// never calls those composables itself.
+async function applyRemotePreferences(data: RemotePreferencesFile): Promise<void> {
+  await replaceStations(data.stations)
+  if (data.defaultFuel === null) {
+    await clearDefaultFuelType()
+    return
+  }
+  await saveDefaultFuelType(data.defaultFuel)
+}
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
@@ -238,8 +259,19 @@ watch(stations, (newStations: Station[], oldStations: Station[]) => {
   applyStationListChange(newStations, oldStations)
 })
 
-await loadStations()
-await loadDefaultFuelType()
+// The auth flag, repo config, station list, and default fuel type live under
+// separate IndexedDB keys with no data dependency between them, so loading
+// them in parallel is safe (see GitHubSyncSettings.vue for the same pattern).
+await Promise.all([
+  initializeAuthState(),
+  loadRepoConfig(),
+  loadStations(),
+  loadDefaultFuelType(),
+])
+// Must run after the loads above (needs isAuthenticated/repoConfig) and
+// before loadAllStationPrices below, so a fresh remote station list is what
+// gets priced rather than the stale local one it may just have replaced.
+await syncOnLoad(isAuthenticated.value, repoConfig.value, applyRemotePreferences, handleUnauthorized)
 await loadAllStationPrices(stations.value)
 isInitialized = true
 
