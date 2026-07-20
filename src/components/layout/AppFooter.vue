@@ -14,5 +14,7 @@
     <AppLink to="https://www.netlify.com/">Hébergé sur Netlify</AppLink>
     <span>|</span>
     <AppLink to="/mentions-legales">Mentions légales</AppLink>
+    <span>|</span>
+    <AppLink to="/settings">Paramètres</AppLink>
   </footer>
 </template>
