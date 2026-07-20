@@ -1,8 +1,8 @@
 // POST — clears the `gh_token` cookie. Succeeds even if it was already absent; never
 // touches IndexedDB-persisted repo config, only ends the GitHub session.
 import type { Handler, HandlerEvent } from '@netlify/functions'
-import { buildExpiredCookie, isHttpsRequest } from './lib/cookies'
-import { jsonResponse } from './lib/http-responses'
+import { buildExpiredCookie, isHttpsRequest } from '../lib/cookies'
+import { jsonResponse } from '../lib/http-responses'
 
 const TOKEN_COOKIE_NAME = 'gh_token'
 
