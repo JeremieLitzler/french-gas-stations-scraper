@@ -1,8 +1,10 @@
-// GET/PUT — proxies GitHub Contents API reads and writes using the token from the
-// `gh_token` cookie. `owner`/`repo`/`path` are forwarded exactly as supplied by the SPA;
-// there is no server-side cross-check (security-guidelines.md rule 4) — GitHub's own
-// OAuth token scope is the authorization boundary. A 401 from GitHub clears the cookie
-// so the SPA can prompt re-authentication instead of retrying with a dead token.
+// GET/PUT — proxies GitHub Contents API reads and writes, plus a repo-level
+// reachability check (GET without `path`, used by Sub-Issue B's config
+// validation), using the token from the `gh_token` cookie. `owner`/`repo`/`path`
+// are forwarded exactly as supplied by the SPA; there is no server-side
+// cross-check (security-guidelines.md rule 4) — GitHub's own OAuth token scope
+// is the authorization boundary. A 401 from GitHub clears the cookie so the
+// SPA can prompt re-authentication instead of retrying with a dead token.
 import type { Handler, HandlerEvent, HandlerResponse } from '@netlify/functions'
 import { buildExpiredCookie, isHttpsRequest, parseCookies } from '../lib/cookies'
 import { jsonResponse } from '../lib/http-responses'
@@ -19,6 +21,12 @@ interface ReadContentsRequest {
   path: string
 }
 
+interface RepoCheckRequest {
+  kind: 'repoCheck'
+  owner: string
+  repo: string
+}
+
 interface WriteContentsRequest {
   kind: 'write'
   owner: string
@@ -29,7 +37,7 @@ interface WriteContentsRequest {
   sha?: string
 }
 
-type ContentsRequest = ReadContentsRequest | WriteContentsRequest
+type ContentsRequest = ReadContentsRequest | RepoCheckRequest | WriteContentsRequest
 
 export const handler: Handler = async (event: HandlerEvent) => {
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'PUT') {
@@ -43,7 +51,7 @@ export const handler: Handler = async (event: HandlerEvent) => {
 
   const contentsRequest = buildContentsRequest(event)
   if (!contentsRequest) {
-    return jsonResponse(400, { error: 'Missing owner, repo, path, message, or content' })
+    return jsonResponse(400, { error: 'Missing owner/repo, or (for writes) message/content' })
   }
 
   return forwardToGithub(contentsRequest, accessToken, isHttpsRequest(event))
@@ -56,12 +64,17 @@ function buildContentsRequest(event: HandlerEvent): ContentsRequest | null {
   return buildWriteRequest(event)
 }
 
-function buildReadRequest(event: HandlerEvent): ReadContentsRequest | null {
+// A `path` query param requests a file read; omitting it requests a
+// repo-level reachability check (used by Sub-Issue B's config validation).
+function buildReadRequest(event: HandlerEvent): ReadContentsRequest | RepoCheckRequest | null {
   const owner = event.queryStringParameters?.owner
   const repo = event.queryStringParameters?.repo
   const path = event.queryStringParameters?.path
-  if (!owner || !repo || !path) {
+  if (!owner || !repo) {
     return null
+  }
+  if (!path) {
+    return { kind: 'repoCheck', owner, repo }
   }
   return { kind: 'read', owner, repo, path }
 }
@@ -125,22 +138,26 @@ function fetchGithubContents(contentsRequest: ContentsRequest, accessToken: stri
     Accept: GITHUB_ACCEPT_HEADER,
     'User-Agent': USER_AGENT,
   }
-  if (contentsRequest.kind === 'read') {
-    return fetch(url, { headers })
+  if (contentsRequest.kind === 'write') {
+    return fetch(url, {
+      method: 'PUT',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(writeBody(contentsRequest)),
+    })
   }
-  return fetch(url, {
-    method: 'PUT',
-    headers: { ...headers, 'Content-Type': 'application/json' },
-    body: JSON.stringify(writeBody(contentsRequest)),
-  })
+  return fetch(url, { headers })
 }
 
 // Percent-encoding each segment prevents a value like `../other-repo` from escaping
-// the intended /repos/{owner}/{repo}/contents/{path} shape.
+// the intended /repos/{owner}/{repo}[/contents/{path}] shape.
 function contentsUrl(contentsRequest: ContentsRequest): string {
-  const { owner, repo, path } = contentsRequest
-  const encodedPath = path.split('/').map(encodeURIComponent).join('/')
-  return `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${encodedPath}`
+  const { owner, repo } = contentsRequest
+  const repoUrl = `${GITHUB_API_BASE}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}`
+  if (contentsRequest.kind === 'repoCheck') {
+    return repoUrl
+  }
+  const encodedPath = contentsRequest.path.split('/').map(encodeURIComponent).join('/')
+  return `${repoUrl}/contents/${encodedPath}`
 }
 
 // Omitting `sha` tells GitHub to create the file; including it updates the existing
