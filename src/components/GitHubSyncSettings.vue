@@ -43,12 +43,16 @@ await Promise.all([initializeAuthState(), loadRepoConfig()])
 
 const ownerRepoDraft = ref(repoConfig.value.ownerRepo)
 const filePathDraft = ref(repoConfig.value.filePath)
-const cacheDaysDraft = ref(
+// Vue's native v-model runtime auto-casts to Number for any <input> whose
+// `type` attribute is "number" (with or without a `.number` modifier), so
+// this ref receives a `number` after the user edits the field even though it
+// is seeded with a string — the type reflects that real runtime contract.
+const cacheDaysDraft = ref<string | number>(
   repoConfig.value.revalidateCacheDays === null ? '' : String(repoConfig.value.revalidateCacheDays),
 )
 
-function parseCacheDays(raw: string): number | null {
-  const trimmed = raw.trim()
+function parseCacheDays(raw: string | number): number | null {
+  const trimmed = String(raw).trim()
   if (trimmed === '') return null
   const parsed = Number(trimmed)
   return Number.isInteger(parsed) ? parsed : null
@@ -65,7 +69,7 @@ const currentDraft = computed<RepoConfigDraft>(() => ({
 // to parse as a positive integer (garbage text, "0", a negative number) is
 // reported as an inline error.
 const cacheDaysError = computed<string>(() => {
-  if (cacheDaysDraft.value.trim() === '') return ''
+  if (String(cacheDaysDraft.value).trim() === '') return ''
   const parsed = currentDraft.value.revalidateCacheDays
   if (parsed !== null && parsed > 0) return ''
   return CACHE_DAYS_ERROR_MESSAGE

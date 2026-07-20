@@ -26,6 +26,40 @@ No new types were added: `RepoConfigDraft` (`src/types/repo-config.ts`, from Sub
 
 **Fix**: `onLogin()` now calls `saveRepoConfig(currentDraft.value, ...)` and awaits it before calling `login()`. This is gated behind the same `loginReady` check that already enables the button, so it only ever persists a draft that's already complete and valid — it doesn't silently save partial/invalid data.
 
+## Post-test-failure fix: revalidate-cache-days type mismatch crashed on user input
+
+**Reported behavior**: `GitHubSyncSettings.spec.ts` (5 scenarios: E-1, E-2, E-3, E-6, E-7) failed
+with `TypeError: ....trim is not a function`, thrown from `parseCacheDays` and `cacheDaysError`.
+
+**Root cause**: `cacheDaysDraft` was declared as `Ref<string>` and both `parseCacheDays(raw:
+string)` and `cacheDaysError` called `.trim()` on it directly. Vue's native `v-model` runtime
+auto-casts the bound value to `Number` for any `<input>` whose `type` attribute is `"number"` —
+this happens whether or not a `.number` modifier is present. Since `Input.vue`'s internal
+`<input v-model="modelValue">` inherits `type="number"` via attribute fallthrough from
+`<Input id="revalidateCacheDays" type="number" ... v-model="cacheDaysDraft" />`
+(`GitHubSyncSettings.vue`), every real edit to that field — not just the test's `setValue()` —
+delivers a `number` to `cacheDaysDraft`, not the `string` its original type declared. This was a
+genuine runtime defect reproducible in a real browser, not a wrong test assertion: typing a
+value into "Fréquence de synchronisation (jours)" would have thrown immediately.
+
+**Fix**: `cacheDaysDraft` is now typed `Ref<string | number>`, matching what Vue's runtime
+actually delivers. `parseCacheDays` now accepts `string | number` and normalizes via
+`String(raw).trim()` instead of `raw.trim()`; `cacheDaysError` does the same
+(`String(cacheDaysDraft.value).trim()`). This preserves the deliberate `type="number"` input
+(native numeric keypad on mobile, spinner UI, `min="1"` semantics) rather than switching to
+`type="text"`, while making the two call sites tolerant of either type Vue may hand them.
+
+**Self-review — two additional cases checked, no further defect found**:
+- Garbage non-numeric text (e.g. `"7abc"`) still correctly resolves `parseCacheDays` to `null`
+  and `cacheDaysError` to the inline error message — `String("7abc").trim()` is non-empty, so
+  the empty-field short-circuit in `cacheDaysError` does not swallow it.
+- A native `<input type="number">` returns `""` from its own `.value` getter for a
+  syntactically-incomplete entry (e.g. the user has typed only `"-"`), independent of this
+  component's code — a browser-level quirk of `type="number"` inputs, not fixable at this
+  layer without dropping the native numeric input type; `revalidate-cache-days` is not listed
+  in `test-cases.md` as needing to handle that specific incomplete-entry state, so it is
+  flagged for awareness rather than changed.
+
 ## Note on a spec/implementation discrepancy inherited from Sub-Issue B (not blocking)
 
 business-specifications.md, Sub-Issue B rule 3, states "For users who have never authenticated, all three fields are empty." However `useRepoConfig.ts`'s `emptyRepoConfig()` (merged in #83) defaults `revalidateCacheDays` to `7`, not empty — consistent with Sub-Issue C rule 1 ("default: 7 days, editable from Settings UI"). This UI reads whatever `useRepoConfig` returns, so first-time users see `revalidate-cache-days` pre-filled with `7` rather than blank. No Sub-Issue E test case (E-1 through E-7) tests the first-load value of this field, so this does not block any test case here — flagging it for awareness rather than as a blocking incoherence, since resolving it would mean changing Sub-Issue B's already-reviewed, already-tested composable.
