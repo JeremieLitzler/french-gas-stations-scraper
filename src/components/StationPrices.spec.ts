@@ -67,6 +67,37 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useGitHubAuth, useRepoConfig, useRemotePreferencesSync (required by
+// StationPricesContent — Sub-Issue C, issue #64). Left unmocked, they call the
+// real (unmocked) @/utils/indexedDb, which throws in this happy-dom test
+// environment (no global indexedDB), rejecting StationPricesContent's
+// top-level Promise.all and leaving it stuck inside its <Suspense> boundary.
+// ---------------------------------------------------------------------------
+
+vi.mock('@/composables/useGitHubAuth', () => ({
+  useGitHubAuth: () => ({
+    isAuthenticated: ref(false),
+    authError: ref(null),
+    initializeAuthState: vi.fn().mockResolvedValue(undefined),
+    handleUnauthorized: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+vi.mock('@/composables/useRepoConfig', () => ({
+  useRepoConfig: () => ({
+    repoConfig: ref({ ownerRepo: '', filePath: '', revalidateCacheDays: null }),
+    loadRepoConfig: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+vi.mock('@/composables/useRemotePreferencesSync', () => ({
+  useRemotePreferencesSync: () => ({
+    syncError: ref(null),
+    syncOnLoad: vi.fn().mockResolvedValue(undefined),
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
