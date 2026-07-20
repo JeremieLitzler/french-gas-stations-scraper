@@ -103,13 +103,39 @@ const { syncError, syncOnLoad } = useRemotePreferencesSync()
 // useStationStorage/useDefaultFuelType's own setters, per the
 // composable-caller-responsibility convention — useRemotePreferencesSync
 // never calls those composables itself.
+//
+// The two setters below are independent IndexedDB writes, so a failure of
+// the second (default fuel) after the first (stations) already succeeded
+// would otherwise leave the station list replaced from remote while the
+// default fuel stays stale — contradicting useRemotePreferencesSync's
+// syncError message, which implies nothing changed (review-results.md,
+// sub-issue-85). Rolling the station list back to its pre-merge value on
+// that failure restores the "local data unchanged" guarantee the caller
+// already relies on.
 async function applyRemotePreferences(data: RemotePreferencesFile): Promise<void> {
+  const previousStations = stations.value
   await replaceStations(data.stations)
-  if (data.defaultFuel === null) {
+  await applyDefaultFuelOrRollback(data.defaultFuel, previousStations)
+}
+
+async function applyDefaultFuelOrRollback(
+  defaultFuel: string | null,
+  previousStations: Station[],
+): Promise<void> {
+  try {
+    await applyDefaultFuel(defaultFuel)
+  } catch (error) {
+    await replaceStations(previousStations)
+    throw error
+  }
+}
+
+async function applyDefaultFuel(defaultFuel: string | null): Promise<void> {
+  if (defaultFuel === null) {
     await clearDefaultFuelType()
     return
   }
-  await saveDefaultFuelType(data.defaultFuel)
+  await saveDefaultFuelType(defaultFuel)
 }
 
 const showFetchSuccess = ref(false)

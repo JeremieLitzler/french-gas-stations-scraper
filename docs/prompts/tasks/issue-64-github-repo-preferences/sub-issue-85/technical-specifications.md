@@ -108,4 +108,20 @@
    parse failure (IndexedDB left untouched, `syncError` shown) — matching C-8's "IndexedDB data is
    not modified" requirement for corrupt data too, not just HTTP failures.
 
+## Review fixes applied (review-results.md, sub-issue-85)
+
+4. **`applyRemotePreferences` was not atomic.** It called `replaceStations(data.stations)` and then
+   `saveDefaultFuelType`/`clearDefaultFuelType` as two independent IndexedDB writes inside one
+   `try/catch` in `refreshFromRemote`. If the first succeeded and the second threw, the station list
+   was already replaced from remote while the default fuel stayed stale — yet `syncError` showed a
+   generic "please reconnect" message that implied nothing had changed, contradicting Sub-Issue C
+   rule 3 ("merges ... into IndexedDB" as one operation) and this file's own item 2 above (which
+   assumed the fallback left "local data in place"). Fixed in `StationPricesContent.vue`: capture
+   `stations.value` before the merge, and if the default-fuel write throws after the station write
+   succeeded, roll the station list back to its pre-merge value via `replaceStations` before
+   re-throwing, so the existing `syncError` message is accurate again. A true single-transaction
+   write across both IndexedDB keys would require a new multi-key primitive in `indexedDb.ts`; a
+   compensating rollback of the one setter that can succeed-then-be-followed-by-a-failure is the
+   minimal fix that restores the stated guarantee without that broader change.
+
 status: ready
