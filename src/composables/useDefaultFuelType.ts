@@ -17,6 +17,7 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import { get, set, del } from '@/utils/indexedDb'
+import { markPreferencesSynced } from '@/utils/preferencesSyncTimestamp'
 
 const DEFAULT_FUEL_TYPE_KEY = 'defaultFuelType'
 
@@ -40,16 +41,19 @@ export function useDefaultFuelType() {
   const saveDefaultFuelType = async (label: string): Promise<void> => {
     await set(DEFAULT_FUEL_TYPE_KEY, label)
     defaultFuelType.value = label
+    await markPreferencesSynced()
   }
 
   const updateDefaultFuelType = async (label: string): Promise<void> => {
     await set(DEFAULT_FUEL_TYPE_KEY, label)
     defaultFuelType.value = label
+    await markPreferencesSynced()
   }
 
   const clearDefaultFuelType = async (): Promise<void> => {
     await del(DEFAULT_FUEL_TYPE_KEY)
     defaultFuelType.value = null
+    await markPreferencesSynced()
   }
 
   return {

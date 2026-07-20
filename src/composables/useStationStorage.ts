@@ -17,6 +17,7 @@ import { ref, toRaw } from 'vue'
 import type { Ref } from 'vue'
 import type { Station } from '@/types/station'
 import { get, set } from '@/utils/indexedDb'
+import { markPreferencesSynced } from '@/utils/preferencesSyncTimestamp'
 
 const STATIONS_KEY = 'stations'
 const MAX_NAME_LENGTH = 200
@@ -100,6 +101,7 @@ export function useStationStorage() {
     const updated = [...stations.value, station]
     await set(STATIONS_KEY, toPlainStations(updated))
     stations.value = updated
+    await markPreferencesSynced()
   }
 
   const removeStation = async (url: string): Promise<void> => {
@@ -108,6 +110,7 @@ export function useStationStorage() {
     if (!hasChanged) return
     await set(STATIONS_KEY, toPlainStations(filtered))
     stations.value = filtered
+    await markPreferencesSynced()
   }
 
   const updateStation = async (originalUrl: string, updated: Station): Promise<void> => {
@@ -120,6 +123,24 @@ export function useStationStorage() {
     )
     await set(STATIONS_KEY, toPlainStations(updatedList))
     stations.value = updatedList
+    await markPreferencesSynced()
+  }
+
+  /**
+   * Bulk-replaces the entire station list (Sub-Issue C, issue #64): applies a
+   * remote GitHub repo copy fetched on app load, dropping any entry that
+   * fails the same validation `addStation` enforces rather than rejecting
+   * the whole batch — mirroring `loadStations`' forgiving treatment of
+   * existing IndexedDB data, since this is bulk data from an external file,
+   * not a single direct user action.
+   */
+  const replaceStations = async (newStations: Station[]): Promise<void> => {
+    const validStations = newStations.filter(
+      (station) => isValidUrl(station.url) && isValidName(station.name),
+    )
+    await set(STATIONS_KEY, toPlainStations(validStations))
+    stations.value = validStations
+    await markPreferencesSynced()
   }
 
   return {
@@ -128,5 +149,6 @@ export function useStationStorage() {
     addStation,
     removeStation,
     updateStation,
+    replaceStations,
   }
 }
