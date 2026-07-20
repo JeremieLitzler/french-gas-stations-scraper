@@ -4,8 +4,8 @@
 // OAuth token scope is the authorization boundary. A 401 from GitHub clears the cookie
 // so the SPA can prompt re-authentication instead of retrying with a dead token.
 import type { Handler, HandlerEvent, HandlerResponse } from '@netlify/functions'
-import { buildExpiredCookie, isHttpsRequest, parseCookies } from './lib/cookies'
-import { jsonResponse } from './lib/http-responses'
+import { buildExpiredCookie, isHttpsRequest, parseCookies } from '../lib/cookies'
+import { jsonResponse } from '../lib/http-responses'
 
 const TOKEN_COOKIE_NAME = 'gh_token'
 const GITHUB_API_BASE = 'https://api.github.com'

@@ -2,9 +2,9 @@
 // short-lived cookie, and redirects the browser to GitHub's authorize page.
 import type { Handler, HandlerEvent } from '@netlify/functions'
 import { randomUUID } from 'node:crypto'
-import { buildSessionCookie, isHttpsRequest } from './lib/cookies'
-import { readGithubOAuthCredentials } from './lib/environment'
-import { jsonResponse, redirectResponse } from './lib/http-responses'
+import { buildSessionCookie, isHttpsRequest } from '../lib/cookies'
+import { readGithubOAuthCredentials } from '../lib/environment'
+import { jsonResponse, redirectResponse } from '../lib/http-responses'
 
 const OAUTH_SCOPE = 'repo'
 const STATE_COOKIE_NAME = 'gh_oauth_state'

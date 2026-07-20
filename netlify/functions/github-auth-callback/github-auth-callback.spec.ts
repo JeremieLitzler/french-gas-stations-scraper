@@ -9,7 +9,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HandlerContext, HandlerEvent, HandlerResponse } from '@netlify/functions'
-import { handler as authStartHandler } from './github-auth-start'
+import { handler as authStartHandler } from '../github-auth-start/github-auth-start'
 import { handler as authCallbackHandler } from './github-auth-callback'
 
 // ---------------------------------------------------------------------------

@@ -7,9 +7,9 @@ import {
   buildSessionCookie,
   isHttpsRequest,
   parseCookies,
-} from './lib/cookies'
-import { readGithubOAuthCredentials, type GithubOAuthCredentials } from './lib/environment'
-import { jsonResponse, redirectResponse } from './lib/http-responses'
+} from '../lib/cookies'
+import { readGithubOAuthCredentials, type GithubOAuthCredentials } from '../lib/environment'
+import { jsonResponse, redirectResponse } from '../lib/http-responses'
 
 const STATE_COOKIE_NAME = 'gh_oauth_state'
 const TOKEN_COOKIE_NAME = 'gh_token'
