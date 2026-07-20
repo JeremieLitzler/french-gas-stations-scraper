@@ -160,11 +160,12 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 ### How to test locally
 
 1. Start the app with `netlify dev`.
-2. Navigate to the Settings page while unauthenticated; confirm all GitHub Sync fields (`owner/repo`, file path, `revalidate-cache-days`) are enabled.
-3. Log in (Sub-Issue A); confirm `owner/repo` and file path become disabled while `revalidate-cache-days` stays enabled.
-4. Enter `0` or a negative number in `revalidate-cache-days`; confirm an inline validation error appears and the form cannot be saved.
-5. Enter a valid positive integer (e.g. `7`); confirm it saves successfully.
-6. Log out; confirm `owner/repo` and file path become enabled again.
+2. Navigate to the Settings page while unauthenticated with empty fields; confirm all GitHub Sync fields (`owner/repo`, file path, `revalidate-cache-days`) are enabled and the "Login with GitHub" button is disabled.
+3. Fill in `owner/repo`, file path, and a valid `revalidate-cache-days`; confirm the "Login with GitHub" button becomes enabled (Sub-Issue A, rule 1).
+4. Log in (Sub-Issue A); confirm `owner/repo` and file path become disabled while `revalidate-cache-days` stays enabled.
+5. Enter `0` or a negative number in `revalidate-cache-days`; confirm an inline validation error appears and the form cannot be saved.
+6. Enter a valid positive integer (e.g. `7`); confirm it saves successfully.
+7. Log out; confirm `owner/repo` and file path become enabled again.
 
 #### Going live
 
