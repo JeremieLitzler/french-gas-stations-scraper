@@ -27,7 +27,7 @@ Run exactly these two commands from the worktree (they are guaranteed to exist i
 `package.json`; do not inspect `package.json` first). Include their output in your findings:
 
 ```bash
-rtk lint           # eslint . --fix, grouped, token-optimized
+npm run lint       # eslint . --fix
 npm run type-check # vue-tsc --build (no rtk equivalent)
 ```
 
@@ -61,10 +61,13 @@ Before reviewing Vue/TypeScript issues, fetch these reference pages to ground th
 
 ## Output contract
 
-Create `[task-folder]/review-results.md`:
-- Show the `rtk lint` and `npm run type-check` output (in fenced blocks if there are errors;
-  otherwise state they passed cleanly for the changed files).
-- A Checklist section: mark each item ✓, or list details per failing item.
+Create `[task-folder]/review-results.md`. Be terse about what's fine and detailed only about
+what `/jli-codes` must act on:
+- Lint/type-check: if both pass cleanly, one line each (`lint: clean`, `type-check: clean`).
+  If either fails, its full output in a fenced block.
+- Checklist: list only the items with findings, each with the concrete file/line and what's
+  wrong. Collapse every passing item into a single closing line (`All other checklist items
+  ✓`) — do not restate what is correct or already compliant.
 - No summary section.
 - End with `status: approved` as the last line. If any finding exists, use
   `status: changes requested` instead. The status line is always last.
