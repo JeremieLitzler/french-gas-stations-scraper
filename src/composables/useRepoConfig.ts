@@ -9,9 +9,12 @@
  * `github-api-proxy` Netlify function with.
  *
  * Per the composable-caller-responsibility convention, this composable never
- * calls `useGitHubAuth()` itself. A 401 from the proxy is reported back to
- * the caller via the optional `onUnauthorized` callback, which the component
- * wires to `useGitHubAuth().handleUnauthorized` in its own `setup()`.
+ * calls `useGitHubAuth()` itself. A 401 from the proxy always resolves
+ * `validationError` to a re-authentication message (security-guidelines.md
+ * rule 5) regardless of wiring; the optional `onUnauthorized` callback is an
+ * additional notification the caller can wire to
+ * `useGitHubAuth().handleUnauthorized` in its own `setup()` to also update
+ * the shared auth state.
  *
  * Object Calisthenics exception: the composable function body exceeds five
  * lines because Vue composable conventions require grouping all returned
@@ -34,6 +37,7 @@ const REPO_NOT_REACHABLE_MESSAGE =
   "Le dépôt GitHub est introuvable ou inaccessible. Vérifiez son nom et vos droits d'accès."
 const VALIDATION_UNAVAILABLE_MESSAGE =
   'Impossible de vérifier le dépôt GitHub pour le moment. Réessayez plus tard.'
+const SESSION_EXPIRED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
 
 type ProxyCheckResult = 'ok' | 'notFound' | 'unauthorized' | 'error'
 type UnauthorizedCallback = (() => void | Promise<void>) | undefined
@@ -46,6 +50,7 @@ interface OwnerRepo {
 // Module-level state — all consumers share the same reference (ADR-002).
 const repoConfig: Ref<RepoConfigDraft> = ref(emptyRepoConfig())
 const validationError: Ref<string | null> = ref(null)
+let latestSaveRequestId = 0
 
 function emptyRepoConfig(): RepoConfigDraft {
   return { ownerRepo: '', filePath: '', revalidateCacheDays: DEFAULT_REVALIDATE_CACHE_DAYS }
@@ -88,11 +93,26 @@ async function checkProxyReachable(ownerRepo: OwnerRepo, path?: string): Promise
   }
 }
 
-async function notifyUnauthorized(onUnauthorized: UnauthorizedCallback): Promise<null> {
-  await onUnauthorized?.()
-  return null
+// Always resolves to SESSION_EXPIRED_MESSAGE — even without an onUnauthorized callback, or
+// if that callback throws — so security-guidelines.md rule 5's UI prompt cannot be silently
+// skipped by a call site that forgets to wire the callback or whose callback fails. The
+// callback itself is an additional notification for the auth composable, not the sole
+// mechanism for surfacing the re-auth prompt.
+async function notifyUnauthorized(onUnauthorized: UnauthorizedCallback): Promise<string> {
+  try {
+    await onUnauthorized?.()
+  } catch {
+    // The session-expired message below is returned regardless of callback failures.
+  }
+  return SESSION_EXPIRED_MESSAGE
 }
 
+// Object Calisthenics exception: this guard-clause chain exceeds five lines because it
+// walks a sequential business rule (owner/repo format, then file-path presence, then the
+// file-exists-or-repo-reachable check business-specifications.md Sub-Issue B rule 2 names) —
+// splitting it further would fragment one coherent validation into indirection without
+// improving readability. Same documented exception as github-auth-callback.ts's
+// validateCallbackRequest (Sub-Issue F).
 async function resolveValidationError(
   draft: RepoConfigDraft,
   onUnauthorized: UnauthorizedCallback,
@@ -104,6 +124,7 @@ async function resolveValidationError(
   const fileCheck = await checkProxyReachable(ownerRepo, filePath)
   if (fileCheck === 'ok') return null
   if (fileCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
+  if (fileCheck === 'error') return VALIDATION_UNAVAILABLE_MESSAGE
   const repoCheck = await checkProxyReachable(ownerRepo)
   if (repoCheck === 'ok') return null
   if (repoCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
@@ -126,13 +147,15 @@ export function useRepoConfig() {
     isAuthenticated: boolean,
     onUnauthorized?: () => void | Promise<void>,
   ): Promise<void> => {
+    const requestId = ++latestSaveRequestId
     await persistRepoConfig(draft)
     repoConfig.value = draft
     if (!isAuthenticated) {
-      validationError.value = null
+      if (requestId === latestSaveRequestId) validationError.value = null
       return
     }
-    validationError.value = await resolveValidationError(draft, onUnauthorized)
+    const error = await resolveValidationError(draft, onUnauthorized)
+    if (requestId === latestSaveRequestId) validationError.value = error
   }
 
   return {

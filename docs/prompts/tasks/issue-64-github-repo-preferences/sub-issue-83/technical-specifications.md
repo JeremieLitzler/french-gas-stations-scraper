@@ -68,5 +68,40 @@
 
 - `useRepoConfig()`'s returned function body groups multiple operations in one composable, same
   documented framework exception already used in `useGitHubAuth.ts` and `useStationStorage.ts`.
+- `resolveValidationError`'s guard-clause chain exceeds five lines because it walks one
+  coherent sequential business rule (owner/repo format, then file-path presence, then the
+  file-exists-or-repo-reachable check `business-specifications.md` Sub-Issue B rule 2 names).
+  Splitting it further would fragment that one rule into indirection without improving
+  readability — same documented exception already given to `github-auth-callback.ts`'s
+  `validateCallbackRequest` in Sub-Issue F.
+
+## Review-feedback fixes applied (review-results.md, changes requested)
+
+1. **Finding 1 (security-guidelines.md rule 5 not self-contained).** `notifyUnauthorized` used
+   to always resolve to `null`, so a 401 during validation surfaced no error unless a future
+   caller remembered to pass `onUnauthorized`. It now always resolves to
+   `SESSION_EXPIRED_MESSAGE`, with the callback invocation wrapped in `try/catch` so a failure
+   in that optional notification can't prevent the message from being set — the re-auth prompt
+   no longer depends on correct call-site wiring.
+2. **Finding 2 (undocumented Object Calisthenics exception).** Added the exception note above,
+   matching the precedent set for `validateCallbackRequest` in Sub-Issue F.
+
+## Additional self-review fixes (this pass)
+
+1. `notifyUnauthorized` — the `onUnauthorized?.()` call was unguarded; if that callback throws
+   (e.g. a future `handleUnauthorized` implementation that persists to IndexedDB and rejects),
+   the rejection would propagate out of `resolveValidationError`/`saveRepoConfig` instead of
+   still surfacing `SESSION_EXPIRED_MESSAGE`. Wrapped in `try/catch`.
+2. `resolveValidationError` — a generic `fileCheck === 'error'` outcome (GitHub 5xx, rate
+   limiting, or a network failure reaching the proxy) used to fall through to a second,
+   redundant repo-level network call before landing on the same `VALIDATION_UNAVAILABLE_MESSAGE`
+   it would have reached immediately. Added an explicit `'error'` branch so only the genuinely
+   ambiguous `'notFound'` outcome triggers the fallback check, per the "file check first, repo
+   check only as fallback" design already documented above.
+3. `saveRepoConfig` — concurrent calls (e.g. a user editing then re-saving before the first
+   validation round-trip resolves) could let an earlier, slower request's result overwrite
+   `validationError` after a later request already set it, showing a stale message. Added a
+   `latestSaveRequestId` counter so only the most recently started `saveRepoConfig` call is
+   allowed to write `validationError`.
 
 status: ready
