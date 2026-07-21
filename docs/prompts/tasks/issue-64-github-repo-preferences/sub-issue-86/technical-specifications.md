@@ -1,0 +1,28 @@
+# Technical Specifications — Sub-Issue D (#86): Write Preferences to Remote Repo on Update
+
+## Summary of files created/changed
+
+- `src/composables/useRemotePreferencesWrite.ts` — new. Singleton composable orchestrating the write-on-update flow: `pushPreferences` (called after a local mutation), `confirmWrite`/`cancelWrite` (diff-dialog actions), reactive `writeDiff`/`isWriteDialogOpen`/`writeError`/`writeSuccess`/`divergedNotice`/`isWriting`.
+- `src/types/preferences.ts` — added `RemoteWritePreview` (`{ beforeJson, afterJson }`), the before/after text shape the write-confirm dialog mode renders.
+- `src/components/PreferencesDiffDialog.vue` — gained a second dialog block driven by `useRemotePreferencesWrite()`: a before/after JSON preview with a single confirm/cancel, sharing the component with issue #63's per-row import merge (business-specifications.md Sub-Issue D rule 2).
+- `src/components/StationManagerTable.vue` — after a successful `addStation`/`updateStation`/`removeStation`, calls a new local `pushStationChange()` helper that builds the current `PreferencesFile` snapshot and calls `pushPreferences`.
+- `src/components/StationPricesContent.vue` — same wiring, after `saveDefaultFuelType`/`updateDefaultFuelType`/`clearDefaultFuelType`, via a local `pushFuelTypeChange()` helper.
+- `src/components/HomePageContent.vue` — renders `writeError`/`divergedNotice`/`writeSuccess` banners, alongside the existing `syncError` banner from Sub-Issue C.
+
+## Non-trivial decisions
+
+- **Reused `buildPreferencesFile` (issue #63, `@/utils/preferencesExport.ts`)** to build the `{ fuelTypeDefault, favoriteStations }` snapshot at both call sites, instead of constructing that object inline in each component. Keeps the shape construction in one place, already covered by the export feature's own tests.
+- **Duplicated `splitOwnerRepo`/`buildProxyUrl`/base64 encode-decode as private functions inside the new composable**, rather than extracting a shared module. `useRepoConfig.ts` and `useRemotePreferencesSync.ts` already each carry their own private copies of `splitOwnerRepo`/`buildProxyUrl` — following that existing precedent avoids touching already-shipped, already-tested Sub-Issue B/C files for a refactor outside this sub-issue's scope.
+- **The "before" JSON shown in the diff is the re-serialized, validated object** (`JSON.stringify(parsed, null, 2)`), not the raw remote file text. The existing remote file is re-parsed through the same `parseJsonFile` shape check Sub-Issue C's read path uses (security-guidelines.md rule 8) before it ever reaches the preview; re-serializing the validated result (rather than displaying the raw text) guarantees only known-shape keys ever reach the confirmation UI and normalizes formatting, on top of the text-interpolation-only rendering rule 8 also requires.
+- **No fetch timeout on this composable's GET/PUT calls**, unlike `useRemotePreferencesSync.ts`'s `fetchWithTimeout`. security-guidelines.md rule 7 scopes the timeout requirement explicitly to "the composable that calls github-api-proxy on application load"; this write flow doesn't gate initial render (Sub-Issue C rule 8 doesn't apply here), so a hang only delays the diff dialog/write feedback, not the app shell.
+- **One `writeError` message pair covers both a 409 conflict (D-7) and a generic write failure (D-8)**, rather than a wider banner taxonomy — both surface identically as a non-blocking notice per rule 4; the message text itself already carries the distinct guidance ("refresh and retry" for a conflict vs. a generic failure message).
+- **Push triggers call `useGitHubAuth()`/`useRepoConfig()`/`useRemotePreferencesWrite()` again directly inside `StationManagerTable.vue`/`StationPricesContent.vue`**, rather than lifting the mutation handlers up into `HomePageContent.vue` and passing callbacks down. Consistent with the project's singleton composable pattern (ADR-002) and how `HomePageContent.vue` itself already aggregates five composables rather than distributing state via props.
+- **`isWriting` guard (self-review fix, see below) lives in the composable, not per-component** — a single flag shared across every call site, since only one write/confirm can be meaningfully in flight at a time regardless of which component triggered it.
+
+## Self-review fixes applied
+
+1. `pushPreferences` (useRemotePreferencesWrite.ts) — a repo-config value that is non-empty but missing the `owner/repo` slash separator (passes `hasCompleteRepoConfig`'s non-empty check but fails `splitOwnerRepo`) previously made the function silently no-op, leaving the user unaware their change wasn't pushed. Now sets `writeError` to an explicit invalid-config message before returning.
+2. `pushPreferences`/`confirmWrite` (useRemotePreferencesWrite.ts) — no guard existed against duplicate in-flight write requests: a double-click on "Confirmer l'envoi," or two blur events firing in quick succession, could send two `PUT`s for the same stale `sha`, or race two `pushPreferences` calls into overwriting each other's diff-dialog state. Added an `isWriting` flag checked and set by both functions, and disabled the dialog's Confirm/Cancel buttons (`PreferencesDiffDialog.vue`) while a write is in flight.
+3. `cancelWrite` (useRemotePreferencesWrite.ts) — previously set the persistent `divergedNotice` unconditionally, even when nothing was pending (e.g. a stray call after the dialog had already closed), which could surface a spurious "local data differs from remote" notice not tied to an actual cancellation. Added a guard: `cancelWrite` now no-ops when there is no pending write.
+
+status: ready

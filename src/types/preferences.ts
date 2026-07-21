@@ -52,3 +52,14 @@ export interface PreferencesDiff {
   stationRows: StationDiffRow[]
   fuelTypeDiff: FuelTypeDiff | null
 }
+
+/**
+ * Before/after JSON text preview for a pending write to the remote GitHub
+ * repo (Sub-Issue D, issue #64) — a single confirm/cancel, not a per-row
+ * merge, since the local state already written to IndexedDB is already the
+ * value being pushed; there is nothing to merge.
+ */
+export interface RemoteWritePreview {
+  beforeJson: string
+  afterJson: string
+}

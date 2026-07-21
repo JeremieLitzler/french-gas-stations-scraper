@@ -96,6 +96,8 @@ declare global {
   const useModel: typeof import('vue').useModel
   const usePreferencesExport: typeof import('./src/composables/usePreferencesExport').usePreferencesExport
   const usePreferencesImport: typeof import('./src/composables/usePreferencesImport').usePreferencesImport
+  const useRemotePreferencesSync: typeof import('./src/composables/useRemotePreferencesSync').useRemotePreferencesSync
+  const useRemotePreferencesWrite: typeof import('./src/composables/useRemotePreferencesWrite').useRemotePreferencesWrite
   const useRepoConfig: typeof import('./src/composables/useRepoConfig').useRepoConfig
   const useRoute: typeof import('vue-router').useRoute
   const useRouter: typeof import('vue-router').useRouter
@@ -123,7 +125,7 @@ declare global {
   export type { FuelPrice } from './src/types/fuel-price'
   import('./src/types/fuel-price')
   // @ts-ignore
-  export type { PreferencesFile, DiffRowKind, StationDiffRow, FuelTypeDiff, PreferencesDiff } from './src/types/preferences'
+  export type { PreferencesFile, DiffRowKind, StationDiffRow, FuelTypeDiff, PreferencesDiff, RemoteWritePreview } from './src/types/preferences'
   import('./src/types/preferences')
   // @ts-ignore
   export type { PriceRow } from './src/types/price-row'

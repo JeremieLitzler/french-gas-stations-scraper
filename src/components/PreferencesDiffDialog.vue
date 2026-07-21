@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { StationDiffRow, FuelTypeDiff } from '@/types/preferences'
 import { usePreferencesImport } from '@/composables/usePreferencesImport'
+import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
+import { useGitHubAuth } from '@/composables/useGitHubAuth'
 import { computed } from 'vue'
 
 const {
@@ -12,8 +14,11 @@ const {
   applyDiff,
   cancelImport,
 } = usePreferencesImport()
+const { writeDiff, isWriteDialogOpen, isWriting, confirmWrite, cancelWrite } =
+  useRemotePreferencesWrite()
 const { addStation, updateStation } = useStationStorage()
 const { saveDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
+const { handleUnauthorized } = useGitHubAuth()
 
 /**
  * Confirmation is blocked until every conflict is resolved:
@@ -51,6 +56,10 @@ const onToggleNew = (row: StationDiffRow): void => {
 
 const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored'): void => {
   fuelTypeDiff.chosen = choice
+}
+
+const onConfirmWrite = async (): Promise<void> => {
+  await confirmWrite(handleUnauthorized)
 }
 </script>
 
@@ -168,6 +177,46 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
         <div class="flex justify-end gap-3 pt-2">
           <Button variant="outline" @click="cancelImport">Annuler</Button>
           <Button :disabled="!isConfirmEnabled" @click="onConfirm">Confirmer l'import</Button>
+        </div>
+      </div>
+    </div>
+  </Teleport>
+
+  <!-- Write-confirm mode (Sub-Issue D, issue #64): before/after preview of the
+       remote file, a single confirm/cancel — the local state already written
+       to IndexedDB is already the value being pushed, so there is nothing to
+       merge (business-specifications.md Sub-Issue D rule 2). Every value below
+       renders through Vue's default text interpolation, never v-html
+       (security-guidelines.md rule 8). -->
+  <Teleport to="body">
+    <div
+      v-if="isWriteDialogOpen && writeDiff"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="write-diff-dialog-title"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+    >
+      <div
+        class="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 flex flex-col gap-4"
+      >
+        <h2 id="write-diff-dialog-title" class="text-lg font-semibold">
+          Aperçu des changements à enregistrer sur GitHub
+        </h2>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <h3 class="text-sm font-medium mb-2">Actuel (GitHub)</h3>
+            <pre class="text-xs bg-gray-50 rounded p-3 overflow-x-auto">{{ writeDiff.beforeJson }}</pre>
+          </div>
+          <div>
+            <h3 class="text-sm font-medium mb-2">Nouveau</h3>
+            <pre class="text-xs bg-gray-50 rounded p-3 overflow-x-auto">{{ writeDiff.afterJson }}</pre>
+          </div>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+          <Button variant="outline" :disabled="isWriting" @click="cancelWrite">Annuler</Button>
+          <Button :disabled="isWriting" @click="onConfirmWrite">Confirmer l'envoi</Button>
         </div>
       </div>
     </div>

@@ -1,5 +1,12 @@
 <template>
   <p v-if="syncError" role="alert" class="text-sm text-amber-700 mb-2">{{ syncError }}</p>
+  <p v-if="writeError" role="alert" class="text-sm text-red-700 mb-2">{{ writeError }}</p>
+  <p v-if="divergedNotice" role="status" class="text-sm text-amber-700 mb-2">
+    {{ divergedNotice }}
+  </p>
+  <p v-if="writeSuccess" role="status" class="text-sm text-green-700 mb-2">
+    Préférences enregistrées sur GitHub.
+  </p>
   <StationPrices />
   <StationManager />
 </template>
@@ -36,6 +43,7 @@ import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
 import { useGitHubAuth } from '@/composables/useGitHubAuth'
 import { useRepoConfig } from '@/composables/useRepoConfig'
 import { useRemotePreferencesSync } from '@/composables/useRemotePreferencesSync'
+import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
 import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
 import type { PreferencesFile } from '@/types/preferences'
 import type { Station } from '@/types/station'
@@ -45,6 +53,11 @@ const { loadDefaultFuelType, saveDefaultFuelType, clearDefaultFuelType } = useDe
 const { isAuthenticated, initializeAuthState, handleUnauthorized } = useGitHubAuth()
 const { repoConfig, loadRepoConfig } = useRepoConfig()
 const { syncError, syncOnLoad } = useRemotePreferencesSync()
+// Sub-Issue D's write-related banners (writeError/divergedNotice/writeSuccess)
+// render here, alongside syncError, since HomePageContent is the common
+// ancestor of both StationPrices and StationManager — the two subtrees whose
+// mutations trigger a remote write (Sub-Issue D rule 1).
+const { writeError, writeSuccess, divergedNotice } = useRemotePreferencesWrite()
 
 // Applies a merged remote read (Sub-Issue C, issue #64) through
 // useStationStorage/useDefaultFuelType's own setters, per the
