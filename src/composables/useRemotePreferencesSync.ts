@@ -178,6 +178,27 @@ async function notifyUnauthorized(onUnauthorized: UnauthorizedCallback): Promise
   }
 }
 
+// Maps a thrown fetchRemotePreferences failure to its syncError message —
+// kept as its own function (review-results.md, sub-issue-85) so
+// resolveRemotePreferences' catch body stays a single statement instead of
+// nesting these branches two levels deep.
+async function handleFetchFailure(
+  error: unknown,
+  onUnauthorized: UnauthorizedCallback,
+): Promise<null> {
+  if (error instanceof RemoteUnauthorizedError) {
+    await notifyUnauthorized(onUnauthorized)
+    syncError.value = ACCESS_REVOKED_MESSAGE
+    return null
+  }
+  if (error instanceof RemoteContentInvalidError) {
+    syncError.value = INVALID_REMOTE_CONTENT_MESSAGE
+    return null
+  }
+  syncError.value = REMOTE_FETCH_FAILED_MESSAGE
+  return null
+}
+
 async function resolveRemotePreferences(
   repoConfig: RepoConfigDraft,
   onUnauthorized: UnauthorizedCallback,
@@ -185,17 +206,7 @@ async function resolveRemotePreferences(
   try {
     return await fetchRemotePreferences(repoConfig)
   } catch (error) {
-    if (error instanceof RemoteUnauthorizedError) {
-      await notifyUnauthorized(onUnauthorized)
-      syncError.value = ACCESS_REVOKED_MESSAGE
-      return null
-    }
-    if (error instanceof RemoteContentInvalidError) {
-      syncError.value = INVALID_REMOTE_CONTENT_MESSAGE
-      return null
-    }
-    syncError.value = REMOTE_FETCH_FAILED_MESSAGE
-    return null
+    return handleFetchFailure(error, onUnauthorized)
   }
 }
 
