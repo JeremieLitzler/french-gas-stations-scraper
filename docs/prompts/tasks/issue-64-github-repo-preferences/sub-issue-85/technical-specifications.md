@@ -143,4 +143,28 @@
    failed merge leaves both the station data and the staleness state exactly as they were before
    the sync attempt.
 
-status: ready
+### Specifications Need Review
+
+`parseRemoteJson` currently rejects the *entire* remote file (returns `null`, IndexedDB
+untouched, generic `REMOTE_FETCH_FAILED_MESSAGE` shown) when **either** `stations` **or**
+`defaultFuel` fails to parse — even if the other field is perfectly valid. This coupling was an
+implementation choice made by analogy to the `stations`-corruption rationale already documented
+above ("Non-trivial decisions", item on malformed `stations`); it was never derived from
+`business-specifications.md`.
+
+Checked `business-specifications.md` (Sub-Issue C) and `test-cases.md` (C-1..C-9): the spec only
+defines "reject the whole file, leave IndexedDB untouched" for **fetch failures** — network
+error, 404, 401 (edge cases under Sub-Issue C, and C-8/C-9). It says nothing about what happens
+when the fetch succeeds but only one of the two fields in the JSON body is malformed. `stations`
+and `defaultFuel` are independent fields with no logical dependency on each other, so treating a
+malformed `defaultFuel` as invalidating an otherwise-valid `stations` array (or vice versa) isn't
+something the spec asks for — and the resulting `REMOTE_FETCH_FAILED_MESSAGE` ("Merci de vous
+reconnecter") is actively misleading in that case, since nothing about authentication or the
+fetch itself failed.
+
+Please clarify Sub-Issue C to state explicitly whether a partially-malformed remote file should:
+(a) still reject the whole sync (current behavior, made explicit and intentional rather than
+incidental), or (b) apply whichever field parsed successfully and leave the other untouched
+locally, with a distinct "remote file partially malformed" message instead of the re-auth one.
+
+status: review specs
