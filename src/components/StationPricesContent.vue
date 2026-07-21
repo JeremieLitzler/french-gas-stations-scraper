@@ -92,7 +92,11 @@ import {
 import { useStationPrices } from '@/composables/useStationPrices'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
+import { useGitHubAuth } from '@/composables/useGitHubAuth'
+import { useRepoConfig } from '@/composables/useRepoConfig'
+import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
 import { buildPriceRows, deriveFuelTypes, orderFuelTypes } from '@/utils/fuelTypeUtils'
+import { buildPreferencesFile } from '@/utils/preferencesExport'
 import type { PriceRow } from '@/types/price-row'
 import type { Station } from '@/types/station'
 
@@ -113,6 +117,9 @@ const {
 } = useStationPrices()
 const { defaultFuelType, saveDefaultFuelType, updateDefaultFuelType, clearDefaultFuelType } =
   useDefaultFuelType()
+const { isAuthenticated, handleUnauthorized } = useGitHubAuth()
+const { repoConfig } = useRepoConfig()
+const { pushPreferences } = useRemotePreferencesWrite()
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
@@ -183,18 +190,32 @@ watch(derivedFuelTypes, (fuelTypes: string[]) => {
   selectedFuelType.value = resolveInitialSelection(fuelTypes)
 })
 
+// Sub-Issue D, issue #64: pushes the just-saved default fuel type to the
+// user's GitHub repo, reusing the same PreferencesFile shape the
+// export/import feature (issue #63) already builds. pushPreferences itself
+// no-ops when the user isn't authenticated or repo config is incomplete, and
+// never throws (business-specifications.md Sub-Issue D rule 4: write
+// failures are non-blocking), so callers can await it unconditionally.
+async function pushFuelTypeChange(): Promise<void> {
+  const preferences = buildPreferencesFile(stations.value, defaultFuelType.value)
+  await pushPreferences(isAuthenticated.value, repoConfig.value, preferences, handleUnauthorized)
+}
+
 async function onSaveDefault(): Promise<void> {
   if (selectedFuelType.value === '') return
   await saveDefaultFuelType(selectedFuelType.value)
+  await pushFuelTypeChange()
 }
 
 async function onUpdateDefault(): Promise<void> {
   if (selectedFuelType.value === '') return
   await updateDefaultFuelType(selectedFuelType.value)
+  await pushFuelTypeChange()
 }
 
 async function onClearDefault(): Promise<void> {
   await clearDefaultFuelType()
+  await pushFuelTypeChange()
 }
 
 function clearDismissTimer(): void {
