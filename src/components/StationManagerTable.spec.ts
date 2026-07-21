@@ -47,6 +47,35 @@ function mountComponent() {
 }
 
 // ---------------------------------------------------------------------------
+// C-16: No stations anywhere shows an empty-state invitation, not example stations
+// ---------------------------------------------------------------------------
+
+describe('C-16: no stations shows the empty-state invitation, with no error banner', () => {
+  it('renders the "Aucune station" message when stations is empty', async () => {
+    mockStations.value = []
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const emptyMessage = wrapper.find('[role="status"]')
+    expect(emptyMessage.exists()).toBe(true)
+    expect(emptyMessage.text()).toContain('Aucune station pour le moment')
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('does not render the empty-state message once stations are present', async () => {
+    mockStations.value = [
+      { name: 'Station A', url: 'https://www.prix-carburants.gouv.fr/station/11111' },
+    ]
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-SCROLL-01: Scroll container is rendered
 // ---------------------------------------------------------------------------
 

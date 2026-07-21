@@ -205,6 +205,37 @@ afterEach(() => {
 })
 
 // ---------------------------------------------------------------------------
+// C-16: No stations anywhere shows an empty-state invitation, not example stations
+// ---------------------------------------------------------------------------
+
+describe('C-16: no stations shows the empty-state invitation, with no error banner', () => {
+  it('renders the "Aucune station" message and no fuel-type selector when stations is empty', async () => {
+    mockStations.value = []
+    mockResults.value = []
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const emptyMessage = activeWrapper.find('[role="status"]')
+    expect(emptyMessage.exists()).toBe(true)
+    expect(emptyMessage.text()).toContain('Aucune station pour le moment')
+
+    expect(activeWrapper.find('.fuel-type-selector').exists()).toBe(false)
+    expect(activeWrapper.find('[role="alert"]').exists()).toBe(false)
+  })
+
+  it('does not render the empty-state message once stations are present', async () => {
+    mockStations.value = [{ name: 'Station A', url: 'https://example.com/station/a' }]
+
+    activeWrapper = mountComponent()
+    await flushPromises()
+
+    const emptyMessage = activeWrapper.find('[role="status"]')
+    expect(emptyMessage.exists()).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // TC-01: Station removal dispatches removeStationPrice for the removed URL
 // ---------------------------------------------------------------------------
 
