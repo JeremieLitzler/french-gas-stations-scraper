@@ -312,4 +312,29 @@ responsibility. Field-visibility scenarios formerly listed here now live under S
 - **Action:** Call the logout Netlify function (e.g. via the Settings page "Logout" control).
 - **Expected:** The response clears the `gh_token` cookie (e.g. `Set-Cookie` with `Max-Age=0` or an expired date). No error occurs even if the cookie was already absent.
 
+### F-8: github-auth-callback rejects a missing or mismatched state parameter
+- **Precondition:** `github-auth-start` was called and issued a `state` value. The callback request carries a `state` that is absent or does not match the issued value (`code` may otherwise be valid).
+- **Action:** GET `/.netlify/functions/github-auth-callback?code=...&state=...` with the mismatched/missing `state`.
+- **Expected:** The function does not exchange the code for a token. Response is a 302 to `/settings?auth=error`. No `gh_token` cookie is set.
+
+### F-9: gh_token cookie carries Secure only when the request is over HTTPS
+- **Precondition:** A successful OAuth callback (as in F-2) is completed once over HTTPS and once over local HTTP.
+- **Action:** Inspect the `Set-Cookie` header for `gh_token` in each case.
+- **Expected:** Over HTTPS, the header includes `Secure`. Over local HTTP, the header omits `Secure` (all other attributes — `HttpOnly`, `SameSite=Strict`, `Max-Age=28800` — are present in both cases).
+
+### F-10: github-api-proxy rejects a call with no valid gh_token cookie
+- **Precondition:** No `gh_token` cookie is present (or it is malformed/expired) on the request.
+- **Action:** Call the proxy (e.g. to read the remote file).
+- **Expected:** The function returns an error response without issuing any request to the GitHub Contents API.
+
+### F-11: github-api-proxy clears the gh_token cookie server-side on an upstream 401
+- **Precondition:** User has a `gh_token` cookie that GitHub now considers invalid (e.g. revoked). The composable's UI-side re-authentication prompt is covered separately by A-10.
+- **Action:** Call the proxy; the GitHub Contents API responds 401.
+- **Expected:** The proxy's response clears the `gh_token` cookie (e.g. `Set-Cookie` with `Max-Age=0` or an expired date) rather than retrying the same token.
+
+### F-12: github-api-proxy calls never log the access token or Client Secret
+- **Precondition:** App is running with valid environment variables and an authenticated user.
+- **Action:** Trigger a proxied GitHub API call (e.g. read or write the remote file); inspect the function's log output.
+- **Expected:** No log line contains the raw `gh_token` value or `GITHUB_CLIENT_SECRET`.
+
 status: ready
