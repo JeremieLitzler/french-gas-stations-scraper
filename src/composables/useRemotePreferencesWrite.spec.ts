@@ -109,7 +109,7 @@ function githubNotFoundResponse() {
 }
 
 function githubWriteResponse(status = 200) {
-  return { status, json: () => Promise.resolve({}) }
+  return { status, ok: status >= 200 && status < 300, json: () => Promise.resolve({}) }
 }
 
 /**
