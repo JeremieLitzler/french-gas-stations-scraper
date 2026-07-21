@@ -79,15 +79,15 @@ function mountComponent() {
 }
 
 // ---------------------------------------------------------------------------
-// Bug fix: loadStations is called on mount
+// Load orchestration: StationManager no longer loads stations itself
 // ---------------------------------------------------------------------------
 
-describe('loadStations is called on mount to seed defaults from IndexedDB', () => {
-  it('calls loadStations once when the component mounts', async () => {
+describe('stations are loaded by HomePageContent.vue, not by StationManager', () => {
+  it('does not call loadStations when the component mounts', async () => {
     mountComponent()
     await flushPromises()
 
-    expect(mockLoadStations).toHaveBeenCalledOnce()
+    expect(mockLoadStations).not.toHaveBeenCalled()
   })
 })
 
