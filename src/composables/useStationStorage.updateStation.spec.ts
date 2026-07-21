@@ -4,8 +4,9 @@
  * The composable is a singleton, so vi.resetModules() + dynamic import()
  * is used to get a fresh module (and therefore a fresh stations ref) for each test.
  *
- * Note: loadStations always merges the five README defaults. Tests that seed
- * non-default stations will see 5 + N entries after loadStations.
+ * Note: loadStations only reads and validates IndexedDB (business-specifications.md
+ * Sub-Issue C, rule 7, issue #64) — there is no default seed list, so tests that
+ * seed N stations see exactly N entries after loadStations.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -40,7 +41,6 @@ async function freshComposable() {
   return mod.useStationStorage()
 }
 
-// Use unique URLs that don't overlap with DEFAULT_STATIONS
 const stationA: Station = {
   name: 'Station A',
   url: 'https://www.prix-carburants.gouv.fr/station/11111',
