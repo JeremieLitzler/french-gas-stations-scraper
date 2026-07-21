@@ -135,6 +135,36 @@ responsibility. Field-visibility scenarios formerly listed here now live under S
 - **Action:** App loads with a stale IndexedDB timestamp and the proxy returns 401.
 - **Expected:** The app prompts re-authentication. If the user refuses, the `gh_token` cookie is cleared and a warning banner states that GitHub access was revoked, noting that IndexedDB data is being used.
 
+### C-10: Remote file with a null or empty-string default fuel type is accepted
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The remote file has `favoriteStations` with at least one valid station and `fuelTypeDefault` set to `null` or `""`.
+- **Action:** Load the application.
+- **Expected:** IndexedDB's default fuel type is cleared/empty and its station list is replaced with the remote stations. No error is shown. The timestamp resets to now.
+
+### C-11: Remote file with an empty station list is accepted
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The remote file has `favoriteStations: []` and a valid string `fuelTypeDefault`.
+- **Action:** Load the application.
+- **Expected:** IndexedDB's station list is replaced with an empty list and its default fuel type is updated to the remote value. No error is shown. The timestamp resets to now.
+
+### C-12: Remote file missing a required key is rejected as invalid content
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The remote file has only one of `fuelTypeDefault` / `favoriteStations` — the other key is entirely absent.
+- **Action:** Load the application.
+- **Expected:** IndexedDB is left unchanged. A message distinct from the re-authentication prompt (C-8/C-9) states the remote file's content is invalid. The timestamp is not reset.
+
+### C-13: Remote file with a wrong-type default fuel value is rejected as invalid content
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The remote file's `fuelTypeDefault` is present but is neither `null` nor a string (e.g. a number).
+- **Action:** Load the application.
+- **Expected:** Same as C-12 — IndexedDB is left unchanged, the invalid-content message is shown, the timestamp is not reset.
+
+### C-14: Remote file with one malformed station entry is rejected as invalid content
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The remote file's `favoriteStations` array contains one entry failing station validation (e.g. missing `name`, or a `url` outside the allowed domain), alongside otherwise-valid entries.
+- **Action:** Load the application.
+- **Expected:** The whole file is rejected, not just the malformed entry (partial acceptance is out of scope — tracked in issue #105). IndexedDB is left unchanged, the invalid-content message is shown, the timestamp is not reset.
+
+### C-15: The invalid-content message is distinct from the re-authentication prompt
+- **Precondition:** One scenario from C-12/C-13/C-14 (malformed remote content) and one scenario from C-8/C-9 (fetch failure) have both been observed.
+- **Action:** Compare the message shown in each case.
+- **Expected:** The messages differ. The malformed-content message does not ask the user to reconnect or re-authenticate.
+
 ---
 
 ## Sub-Issue D — Write Preferences to Remote Repo on Update
