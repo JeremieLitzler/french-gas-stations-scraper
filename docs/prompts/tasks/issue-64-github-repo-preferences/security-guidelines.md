@@ -26,4 +26,8 @@
    - Where: all Netlify functions (`github-auth-callback`, `github-api-proxy`).
    - Why: Any value readable by JavaScript is readable by XSS payloads; the token must remain opaque to the browser and flow only through the `HttpOnly` cookie.
 
+7. **Bound the wait for the remote sync fetch to complete before falling back to the local/empty state — do not let the request hang indefinitely.**
+   - Where: the composable that calls `github-api-proxy` on application load (`useRemotePreferencesSync`).
+   - Why: business-specifications.md Sub-Issue C rule 8 (added in this pass) requires every view to hold off rendering the station list until the sync outcome is known; without a bound on the wait, a slow or unresponsive proxy/upstream GitHub response turns that requirement into an availability issue — the user is locked out of viewing or managing their own already-synced local data for as long as the request hangs.
+
 status: ready
