@@ -4,12 +4,11 @@
     <h2 class="text-xl font-bold mb-4 text-center">
       Comparez les prix des carburants dans vos stations préférées.
     </h2>
-    <StationPrices />
-    <StationManager />
+    <Suspense>
+      <HomePageContent />
+      <template #fallback>
+        <AppLoader />
+      </template>
+    </Suspense>
   </div>
 </template>
-
-<script setup lang="ts">
-import StationManager from '@/components/StationManager.vue'
-import StationPrices from '@/components/StationPrices.vue'
-</script>

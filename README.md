@@ -29,13 +29,9 @@ The HTML of each link should be parsed on load, with a loader until all links ar
 
 When parsing the HTML of the link provided, if you cannot find any element matching the CSS selector provided, detail a warning message under textarea with the link not working.
 
-Starting list of stations:
-
-- name: "à INTERMARCHE AOSTE" ; link: https://www.prix-carburants.gouv.fr/station/38490005
-- name: "à INTERMARCHE APPRIEU" ; link: https://www.prix-carburants.gouv.fr/station/38140005
-- name: "à SUPER U APPRIEU" ; link: https://www.prix-carburants.gouv.fr/station/38690006
-- name: "à INTERMARCHE TAIN L'HERMITAGE" ; link: https://www.prix-carburants.gouv.fr/station/26600007
-- name: "à SUPER U SAINT-DONAT" ; link: https://www.prix-carburants.gouv.fr/station/26260001
+The app no longer seeds a fixed example station list. On first use, with no stations saved yet
+(locally or via GitHub sync — see issue #64), the UI shows "Aucune station pour le moment" and
+invites the user to add their first station through the Station Manager.
 
 ## Development
 

@@ -1,8 +1,12 @@
 <template>
   <div>
-    <p v-if="syncError" role="alert" class="text-sm text-amber-700 mb-2">{{ syncError }}</p>
+    <EmptyStationsMessage v-if="stations.length === 0" />
     <p v-if="showFetchSuccess" class="fetch-success" role="status">Récupération terminée.</p>
-    <ul v-if="warnings.length > 0" class="station-warnings" aria-label="Avertissements de récupération des stations">
+    <ul
+      v-if="warnings.length > 0"
+      class="station-warnings"
+      aria-label="Avertissements de récupération des stations"
+    >
       <li v-for="warning in warnings" :key="warning.url" class="station-warning-item">
         Impossible de charger les prix pour <strong>{{ warning.stationName }}</strong> (<a
           :href="warning.url"
@@ -13,6 +17,7 @@
       </li>
     </ul>
     <template v-if="availableFuelTypes.length > 0">
+      <p class="mb-4">Choisissez le type de carburant selon vos besoins</p>
       <div class="fuel-type-selector" role="group" aria-label="Sélecteur de type de carburant">
         <button
           v-for="fuelType in availableFuelTypes"
@@ -25,7 +30,12 @@
         </button>
       </div>
       <div class="default-fuel-actions">
-        <span v-if="isCurrentDefault" class="default-indicator" aria-label="Ceci est votre carburant par défaut">Par défaut</span>
+        <span
+          v-if="isCurrentDefault"
+          class="default-indicator"
+          aria-label="Ceci est votre carburant par défaut"
+          >Par défaut</span
+        >
         <button
           v-if="showSaveDefault"
           type="button"
@@ -82,72 +92,27 @@ import {
 import { useStationPrices } from '@/composables/useStationPrices'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
-import { useGitHubAuth } from '@/composables/useGitHubAuth'
-import { useRepoConfig } from '@/composables/useRepoConfig'
-import { useRemotePreferencesSync } from '@/composables/useRemotePreferencesSync'
 import { buildPriceRows, deriveFuelTypes, orderFuelTypes } from '@/utils/fuelTypeUtils'
-import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
 import type { PriceRow } from '@/types/price-row'
 import type { Station } from '@/types/station'
-import type { PreferencesFile } from '@/types/preferences'
 
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
-const { stations, loadStations, replaceStations } = useStationStorage()
-const { results, warnings, fetchCompleted, loadAllStationPrices, removeStationPrice, addStationPrice, renameStation } = useStationPrices()
-const { defaultFuelType, loadDefaultFuelType, saveDefaultFuelType, updateDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
-const { isAuthenticated, initializeAuthState, handleUnauthorized } = useGitHubAuth()
-const { repoConfig, loadRepoConfig } = useRepoConfig()
-const { syncError, syncOnLoad } = useRemotePreferencesSync()
-
-// Applies a merged remote read (Sub-Issue C, issue #64) through
-// useStationStorage/useDefaultFuelType's own setters, per the
-// composable-caller-responsibility convention — useRemotePreferencesSync
-// never calls those composables itself.
-//
-// The two setters below are independent IndexedDB writes, so a failure of
-// the second (default fuel) after the first (stations) already succeeded
-// would otherwise leave the station list replaced from remote while the
-// default fuel stays stale — contradicting useRemotePreferencesSync's
-// syncError message, which implies nothing changed (review-results.md,
-// sub-issue-85). Rolling the station list back to its pre-merge value on
-// that failure restores the "local data unchanged" guarantee the caller
-// already relies on.
-async function applyRemotePreferences(data: PreferencesFile): Promise<void> {
-  const previousStations = stations.value
-  const previousSyncedAt = await getPreferencesSyncedAt()
-  await replaceStations(data.favoriteStations)
-  await applyDefaultFuelOrRollback(data.fuelTypeDefault, previousStations, previousSyncedAt)
-}
-
-// Every setter called during the merge (replaceStations, saveDefaultFuelType,
-// clearDefaultFuelType) marks the sync timestamp fresh as a side effect of its
-// own contract for direct user edits (Sub-Issue C rule 5). A rolled-back merge
-// is neither that nor a successful remote read (rule 4), so the rollback must
-// also restore the pre-merge timestamp — otherwise the failed merge leaves
-// IndexedDB looking freshly synced and the next load skips retrying the fetch
-// that just failed (review-results.md, sub-issue-85, second pass).
-async function applyDefaultFuelOrRollback(
-  fuelTypeDefault: string | null,
-  previousStations: Station[],
-  previousSyncedAt: number | undefined,
-): Promise<void> {
-  try {
-    await applyDefaultFuel(fuelTypeDefault)
-  } catch (error) {
-    await replaceStations(previousStations)
-    await restorePreferencesSyncedAt(previousSyncedAt)
-    throw error
-  }
-}
-
-async function applyDefaultFuel(fuelTypeDefault: string | null): Promise<void> {
-  if (fuelTypeDefault === null) {
-    await clearDefaultFuelType()
-    return
-  }
-  await saveDefaultFuelType(fuelTypeDefault)
-}
+// stations/defaultFuelType are already loaded and synced by HomePageContent.vue
+// before this component mounts (Sub-Issue C rule 8, issue #64) — this component
+// only reads the shared singleton state (ADR-002), it does not load or sync it.
+const { stations } = useStationStorage()
+const {
+  results,
+  warnings,
+  fetchCompleted,
+  loadAllStationPrices,
+  removeStationPrice,
+  addStationPrice,
+  renameStation,
+} = useStationPrices()
+const { defaultFuelType, saveDefaultFuelType, updateDefaultFuelType, clearDefaultFuelType } =
+  useDefaultFuelType()
 
 const showFetchSuccess = ref(false)
 const selectedFuelType = ref('')
@@ -179,7 +144,9 @@ const priceRows = computed<PriceRow[]>(() => {
 })
 
 const isCurrentDefault = computed<boolean>(
-  () => validatedDefaultFuelType.value !== null && selectedFuelType.value === validatedDefaultFuelType.value,
+  () =>
+    validatedDefaultFuelType.value !== null &&
+    selectedFuelType.value === validatedDefaultFuelType.value,
 )
 
 /**
@@ -296,19 +263,6 @@ watch(stations, (newStations: Station[], oldStations: Station[]) => {
   applyStationListChange(newStations, oldStations)
 })
 
-// The auth flag, repo config, station list, and default fuel type live under
-// separate IndexedDB keys with no data dependency between them, so loading
-// them in parallel is safe (see GitHubSyncSettings.vue for the same pattern).
-await Promise.all([
-  initializeAuthState(),
-  loadRepoConfig(),
-  loadStations(),
-  loadDefaultFuelType(),
-])
-// Must run after the loads above (needs isAuthenticated/repoConfig) and
-// before loadAllStationPrices below, so a fresh remote station list is what
-// gets priced rather than the stale local one it may just have replaced.
-await syncOnLoad(isAuthenticated.value, repoConfig.value, applyRemotePreferences, handleUnauthorized)
 await loadAllStationPrices(stations.value)
 isInitialized = true
 

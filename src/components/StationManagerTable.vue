@@ -1,4 +1,5 @@
 <template>
+  <EmptyStationsMessage v-if="stations.length === 0" />
   <Table class="table-auto">
     <TableHeader>
       <TableRow :disable-hover="true">
@@ -66,7 +67,7 @@
   </Table>
 </template>
 
-<script async setup lang="ts">
+<script setup lang="ts">
 import { reactive, ref, watch } from 'vue'
 import type { Ref } from 'vue'
 import {
@@ -93,9 +94,10 @@ interface RowDraft {
   rowError: string
 }
 
-const { stations, loadStations, addStation, removeStation, updateStation } = useStationStorage()
-
-await loadStations()
+// stations is already loaded and synced by HomePageContent.vue before this
+// component mounts (Sub-Issue C rule 8, issue #64) — this component only
+// reads the shared singleton state (ADR-002), it does not load it itself.
+const { stations, addStation, removeStation, updateStation } = useStationStorage()
 
 const rowDrafts: Ref<RowDraft[]> = ref([])
 
