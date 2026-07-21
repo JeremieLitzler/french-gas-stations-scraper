@@ -1,170 +1,116 @@
 # Technical Specifications — Sub-Issue C (#85): Read Preferences from Remote Repo on Load
 
+*(Third pass — field-name fix + error-signaling rework, per updated business-specifications.md
+and the human direction on `console.error` usage in `useRemotePreferencesSync.ts`.)*
+
+## What changed and why
+
+business-specifications.md (commit `48503b0`) fixed the remote JSON field names from
+`stations`/`defaultFuel` to `favoriteStations`/`fuelTypeDefault` — the shape the static
+export/import feature (issue #63) already uses — and made the "malformed remote content gets a
+distinct message, not the re-authentication prompt" edge case explicit and intentional, resolving
+the ambiguity previously flagged under "Specifications Need Review" in this file. Separately, the
+working tree carried an uncommitted debug pass on `useRemotePreferencesSync.ts` (extra
+`console.log`/`console.error` calls) with the direction that every `console.error` there signals
+a condition that should instead throw an `Error`. This pass addresses both.
+
 ## Summary of files created/changed
 
-- `src/types/remote-preferences.ts` — new. `RemotePreferencesFile` (`{ stations, defaultFuel }`),
-  the exact shape of the JSON file synced to the user's GitHub repo, shared by this sub-issue and
-  the future Sub-Issue D write path.
-- `src/utils/preferencesSyncTimestamp.ts` — new, changed in review pass 2. Pure IndexedDB-backed
-  helpers: `markPreferencesSynced()` (writes `Date.now()` under `preferencesLastSyncedAt`),
-  `isPreferencesStale(revalidateCacheDays)` (compares the stored timestamp's age against the
-  threshold; treats an absent timestamp as stale), `getPreferencesSyncedAt()` (reads the raw
-  stored value), and `restorePreferencesSyncedAt(timestamp)` (writes back a captured value, or
-  deletes the key when it was previously absent) — the latter two added in review pass 2 to let
-  a rolled-back remote merge undo the timestamp resets it triggered along the way.
-- `src/composables/useRemotePreferencesSync.ts` — new. Singleton composable exposing
-  `syncError` and `syncOnLoad(isAuthenticated, repoConfig, applyRemotePreferences, onUnauthorized)`.
-  Skips entirely when unauthenticated, repo config is incomplete, or local data is still fresh;
-  otherwise fetches the remote file via `github-api-proxy`, decodes/validates it, and delegates
-  applying it to the caller-supplied `applyRemotePreferences` callback.
-- `src/composables/useStationStorage.ts` — changed. Added `replaceStations(newStations)` (bulk
-  replace for the remote merge, filtering out entries that fail the same URL/name validation
-  `addStation` enforces). `addStation`/`removeStation`/`updateStation`/`replaceStations` now all
-  call `markPreferencesSynced()` after a successful write (business-specifications.md Sub-Issue C
-  rules 4–5: both a successful remote read and a user-triggered update reset the timestamp).
-- `src/composables/useDefaultFuelType.ts` — changed. `saveDefaultFuelType`/`updateDefaultFuelType`/
-  `clearDefaultFuelType` now also call `markPreferencesSynced()`, same rationale as above.
-- `src/components/StationPricesContent.vue` — changed. Wires `useGitHubAuth`, `useRepoConfig`, and
-  `useRemotePreferencesSync` alongside the existing `useStationStorage`/`useDefaultFuelType` calls,
-  per the composable-caller-responsibility convention. Loads auth state, repo config, stations, and
-  default fuel type in parallel, then runs `syncOnLoad` (which may replace both) before the existing
-  `loadAllStationPrices` call, then renders `syncError` as a non-blocking banner.
+- `src/types/preferences.ts` — unchanged. Already declares `PreferencesFile { fuelTypeDefault:
+  string | null; favoriteStations: Station[] }`, the shape business-specifications.md now points
+  to directly for the remote file.
+- `src/types/remote-preferences.ts` — **deleted**. `RemotePreferencesFile` duplicated
+  `PreferencesFile` under the old, incorrect field names. business-specifications.md is explicit
+  that the remote file "is the same `PreferencesFile` shape" issue #63 already uses, so the
+  duplicate type is removed in favor of importing `PreferencesFile` directly.
+- `src/composables/useRemotePreferencesSync.ts` — rewritten. Field names fixed
+  (`favoriteStations`/`fuelTypeDefault`); shape validation now reuses
+  `@/utils/preferencesImport`'s `parseJsonFile` instead of a duplicated
+  `parseStations`/`parseDefaultFuel`/`parseRemoteJson` trio; all `console.log`/`console.error`
+  calls removed in favor of thrown, typed errors caught once at the `refreshFromRemote` boundary;
+  a new `RemoteContentInvalidError` path produces a message distinct from the re-authentication
+  one, per the now-explicit spec edge case.
+- `src/components/StationPricesContent.vue` — changed. Imports `PreferencesFile` instead of the
+  deleted `RemotePreferencesFile`; `applyRemotePreferences`/`applyDefaultFuelOrRollback`/
+  `applyDefaultFuel` read `data.favoriteStations`/`data.fuelTypeDefault` (and the local parameter
+  is renamed `fuelTypeDefault` to match) instead of `data.stations`/`data.defaultFuel`. No
+  behavioral change to the rollback/timestamp logic itself (fixes #4/#5 from the prior pass) —
+  only the field names it reads.
 
 ## Non-trivial decisions
 
-- **Where the sync runs: `StationPricesContent.vue`, not a new top-level wrapper.** "On application
-  load" (rule 1) has no single existing entry point — `index.vue` is a thin static shell, and both
-  `StationPricesContent.vue` and `StationManagerTable.vue` already independently call `loadStations()`
-  in their own `<script async setup>`. `StationPricesContent.vue` is the one already wrapped in
-  `<Suspense>` (via `StationPrices.vue`) and already the first place `stations`/`defaultFuelType` are
-  loaded, so it's the natural place to also settle the remote sync before those singletons are read
-  by `loadAllStationPrices`. `StationManagerTable.vue` needs no changes: `stations` is a shared
-  singleton ref (ADR-002), so its own `watch(stations, ..., { immediate: true })` picks up a remote
-  replace regardless of which component mounted first.
-- **`syncOnLoad` runs after `loadStations()`/`loadDefaultFuelType()` but before `loadAllStationPrices`.**
-  Ordering matters only for the last step: if remote data replaces the station list, the price fetch
-  must use the fresh list, not the stale local one it just replaced. The auth/repo-config/stations/
-  default-fuel loads themselves have no data dependency on each other, so they run via `Promise.all`.
-- **`markPreferencesSynced()` lives inside each setter (`replaceStations`, `addStation`, `removeStation`,
-  `updateStation`, `saveDefaultFuelType`, `updateDefaultFuelType`, `clearDefaultFuelType`), not called
-  once by `useRemotePreferencesSync` after the merge.** Rule 4 (reset after a successful remote read)
-  and rule 5 (reset after a user-triggered update) both want the same outcome — timestamp = now. Since
-  applying a remote merge calls the same setters a user edit would call, reusing their existing
-  timestamp reset avoids a second, redundant explicit call and keeps one setter change instead of two
-  call sites needing to remember to mark synced.
-- **`useRemotePreferencesSync` never calls `useGitHubAuth`, `useRepoConfig`, `useStationStorage`, or
-  `useDefaultFuelType` itself** — per this command's composable-caller-responsibility rule. The
-  caller (`StationPricesContent.vue`) passes `isAuthenticated`/`repoConfig` as values and an
-  `applyRemotePreferences` callback built from `replaceStations`/`saveDefaultFuelType`/
-  `clearDefaultFuelType`, mirroring the `onUnauthorized` callback pattern `useRepoConfig.ts`
-  already established for the same reason.
-- **A malformed/missing `stations` field in the remote JSON is treated as a parse failure (`syncError`
-  set, IndexedDB untouched), not as an empty list.** `parseStations` returns `null` (not `[]`) when
-  the field isn't an array, so `parseRemoteJson` rejects the whole payload — otherwise a corrupted
-  remote file could silently wipe the local station list via `replaceStations`. Individual malformed
-  *entries* inside an otherwise-valid array are still dropped (shape-checked here, fully re-validated
-  by `replaceStations`), consistent with `loadStations`' existing forgiving treatment of bad entries
-  in already-stored local data.
-- **401 handling reuses `useRepoConfig.ts`'s established pattern**: `notifyUnauthorized` always
-  resolves (try/catch around the optional `onUnauthorized` callback) and `syncError` is always set to
-  a fixed message, rather than gating on whether the callback succeeds. The `github-api-proxy`
-  function already clears the `gh_token` cookie unconditionally on any 401 (security-guidelines.md
-  rule 5) before the SPA ever sees the response, so business-specifications.md's edge case ("if he
-  refuses, the cookie is cleared...") is resolved the same way Sub-Issue B already resolved it: the
-  cookie clear is unconditional and server-side, not gated on a user prompt the SPA would need to
-  build. `syncError` doubles as the "warning banner" the edge case calls for.
-- **404/network/other fetch failures collapse into one generic `syncError` message.**
-  business-specifications.md's edge cases list network error, 404, and 401 together as "the app asks
-  the user to reauthenticate," with 401 singled out only for the extra cookie/banner detail already
-  covered above. A single `REMOTE_FETCH_FAILED_MESSAGE` for the non-401 cases matches that literal
-  grouping without inventing a wrong-file-path-specific message the spec doesn't ask for.
+- **Reuse `parseJsonFile` (issue #63's validator) instead of re-fixing the duplicated
+  `parseStations`/`parseDefaultFuel` functions in place.** business-specifications.md's edge case
+  now says explicitly: "any entry in `favoriteStations` failing **the same station validation the
+  static import feature (issue #63) already enforces**". A literal reuse of `parseJsonFile`
+  guarantees that by construction — a renamed-in-place duplicate would only guarantee it today,
+  with no mechanism to keep the two validators in sync if either changes later. The precedent this
+  codebase set for duplicating *small* validators (`isValidUrl`/`isValidName`) across
+  `useStationStorage.ts`/`preferencesImport.ts` doesn't extend well to duplicating an entire
+  shape-validation function the spec now explicitly ties to a single other implementation.
+- **Deleted `RemotePreferencesFile` rather than renaming its fields in place.**
+  business-specifications.md's "Remote JSON File Structure" section states the remote file "is the
+  same `PreferencesFile` shape" — keeping a second, structurally identical interface around after
+  that statement would be a maintenance trap (the two could silently drift again, which is exactly
+  how the original `stations`/`defaultFuel` mistake happened: the spec always claimed the same
+  shape as #63 but the implementation never actually matched it).
+- **`console.error`/`console.log` replaced with two typed errors caught once, not just deleted.**
+  The human direction was literal: every `console.error` in this file marks a condition that
+  should throw. Rather than threading a discriminated-union outcome type through every helper (the
+  prior design) with a `console.error` at each failure site, each helper now throws
+  (`RemoteUnauthorizedError`, `RemoteContentInvalidError`, or a plain `Error` for everything else)
+  and `resolveRemotePreferences` is the single place that catches and maps to a `syncError`
+  message. This keeps the existing safety guarantee from the prior pass's self-review (no
+  exception may escape into `StationPricesContent.vue`'s top-level `<Suspense>` await) while
+  removing the parallel "return null/an outcome kind" bookkeeping the `console.error` calls were
+  compensating for.
+- **`RemoteContentInvalidError` is reserved for the decoded file's content, not the proxy
+  response wrapper.** A missing/malformed `content` field in the `github-api-proxy` JSON body
+  means the proxy call itself misbehaved (bad body, unexpected shape) — that is a fetch-layer
+  problem, not a statement about the user's remote preferences file, so it throws a plain `Error`
+  and falls into the generic re-authentication-style message instead of the "your file is
+  invalid" one. Only a failure to base64-decode or shape-validate the *decoded* text throws
+  `RemoteContentInvalidError`. Caught and fixed during self-review — see below.
 
 ## Object Calisthenics exceptions
 
 - `useRemotePreferencesSync()`'s returned function body groups reactive state and one operation in
-  one composable — same documented framework exception used throughout this codebase
-  (`useGitHubAuth.ts`, `useRepoConfig.ts`, `useStationStorage.ts`).
-- `splitOwnerRepo` is duplicated (not extracted to a shared util) between `useRepoConfig.ts` and this
-  new composable, matching this codebase's existing precedent of small validator duplication across
-  files (e.g. `isValidUrl`/`isValidName`/`stripHtmlTags` are already duplicated between
-  `useStationStorage.ts` and `preferencesImport.ts`) rather than introducing a new shared-utils module
-  for a four-line function.
+  one composable — same documented framework exception used throughout this codebase.
+- `splitOwnerRepo` remains duplicated with `useRepoConfig.ts`, unchanged from the prior pass.
 
-## Self-code review fixes applied
+## Self-code review
 
-1. **Uncaught-exception crash risk in base64/JSON decoding.** `atob()` throws a `DOMException` on
-   invalid base64 (a corrupted or unexpected `content` field from GitHub); this was unguarded and
-   would have propagated out of `syncOnLoad` into `StationPricesContent.vue`'s top-level `<Suspense>`
-   `await`, breaking the whole page's initial render instead of degrading to a sync-error banner.
-   Wrapped the decode+parse call in `fetchRemotePreferences` in a `try/catch` that resolves to the
-   `'error'` outcome.
-2. **Uncaught-exception crash risk when applying the merge.** `applyRemotePreferences` (which writes
-   through `useStationStorage`/`useDefaultFuelType`) can reject on an IndexedDB failure; this was
-   unguarded in `refreshFromRemote`; for the same reason as above, an unhandled rejection here would
-   have crashed the page instead of leaving the still-valid local data in place. Wrapped the call in
-   `try/catch`, falling back to `REMOTE_FETCH_FAILED_MESSAGE` on failure.
-3. **Malformed remote file could silently wipe local data.** `parseStations` originally defaulted a
-   missing/wrong-type `stations` field to `[]` rather than rejecting the payload, so a corrupted
-   remote file (valid JSON, but `stations` renamed/omitted) would have replaced the local station
-   list with an empty one via `replaceStations` instead of failing safely. Changed `parseStations` to
-   return `null` for a missing/wrong-type field, which `parseRemoteJson` now propagates as a full
-   parse failure (IndexedDB left untouched, `syncError` shown) — matching C-8's "IndexedDB data is
-   not modified" requirement for corrupt data too, not just HTTP failures.
+1. **`extractResponseContent` mis-attributed a broken proxy response wrapper to "the remote file
+   is invalid."** Initially thrown as `RemoteContentInvalidError` when the GitHub proxy's JSON
+   body was missing/malformed `content`. That message would tell the user their *preferences
+   file* is broken when the actual fault is the proxy call itself (bad body, wrong shape) —
+   misleading, since re-checking their file wouldn't help. Fixed by throwing a plain `Error`
+   there instead, so it falls into the same re-authentication-style message as a network error or
+   unexpected HTTP status; `RemoteContentInvalidError` is now reserved for base64-decode and
+   shape-validation failures on the already-successfully-fetched content.
+2. **Uncaught-exception crash risk preserved from the prior pass, re-verified under the new
+   control flow.** `decodeBase64Utf8` can throw a `DOMException` on invalid base64, and
+   `applyRemotePreferences` can reject on an IndexedDB failure. Both remain wrapped in `try/catch`
+   (`decodeAndParseRemoteFile`, and the dedicated `try/catch` around `applyRemotePreferences` in
+   `refreshFromRemote`) so neither can propagate into `StationPricesContent.vue`'s top-level
+   `<Suspense>` await — the guarantee the prior pass's self-review established still holds after
+   the rewrite to thrown errors.
+3. **Reusing `parseJsonFile` closes a prototype-pollution gap the duplicated validator didn't
+   have.** The old `parseStations`/`parseDefaultFuel` pair (now removed) never checked for
+   `__proto__`/`constructor`/`prototype` keys in the parsed JSON before consuming it.
+   `parseJsonFile` already guards against this (`hasDangerousKey`) for the local-import path;
+   reusing it means the remote-sync path inherits the same protection instead of carrying a
+   second, weaker validator.
 
-## Review fixes applied (review-results.md, sub-issue-85)
+## Known gap — not fixed here (out of scope for this command)
 
-4. **`applyRemotePreferences` was not atomic.** It called `replaceStations(data.stations)` and then
-   `saveDefaultFuelType`/`clearDefaultFuelType` as two independent IndexedDB writes inside one
-   `try/catch` in `refreshFromRemote`. If the first succeeded and the second threw, the station list
-   was already replaced from remote while the default fuel stayed stale — yet `syncError` showed a
-   generic "please reconnect" message that implied nothing had changed, contradicting Sub-Issue C
-   rule 3 ("merges ... into IndexedDB" as one operation) and this file's own item 2 above (which
-   assumed the fallback left "local data in place"). Fixed in `StationPricesContent.vue`: capture
-   `stations.value` before the merge, and if the default-fuel write throws after the station write
-   succeeded, roll the station list back to its pre-merge value via `replaceStations` before
-   re-throwing, so the existing `syncError` message is accurate again. A true single-transaction
-   write across both IndexedDB keys would require a new multi-key primitive in `indexedDb.ts`; a
-   compensating rollback of the one setter that can succeed-then-be-followed-by-a-failure is the
-   minimal fix that restores the stated guarantee without that broader change.
+`src/composables/useRemotePreferencesSync.spec.ts` still constructs `RemotePreferencesFile`
+literals with the old `stations`/`defaultFuel` field names and imports the now-deleted
+`@/types/remote-preferences` module. Per this command's scope, test files are owned by
+`/jli-writes-tests-spec`/`/jli-writes-tests`, not `/jli-codes` — this spec file needs updating to
+`favoriteStations`/`fuelTypeDefault` and `PreferencesFile`, plus new cases for C-10 through C-15
+(null/empty-valid content, and the three "invalid content" rejection scenarios with their distinct
+message), before the suite will build/pass again. `npm run type-check` confirms this is the only
+remaining error in the tree — every non-test file type-checks cleanly.
 
-## Review fixes applied (review-results.md, sub-issue-85, second pass)
-
-5. **The rollback from fix #4 left the sync timestamp marked fresh despite the merge failing.**
-   `replaceStations` (called both for the initial station write and for the rollback itself) and
-   `saveDefaultFuelType`/`clearDefaultFuelType` all call `markPreferencesSynced()` unconditionally
-   as part of their contract for direct user edits (Sub-Issue C rule 5). During a failed merge,
-   this meant the rollback's own `replaceStations(previousStations)` call re-stamped the timestamp
-   to "now" a second time, even though neither call was a successful remote read (rule 4) nor a
-   real user edit — so a failed merge left IndexedDB looking freshly synced, and the next page
-   load's `isPreferencesStale` check would skip retrying the fetch that had just failed, for a
-   full `revalidateCacheDays` period, with no further error shown. Fixed by capturing the
-   timestamp via a new `getPreferencesSyncedAt()` before the merge starts and restoring it via a
-   new `restorePreferencesSyncedAt(timestamp)` after the rollback's `replaceStations` call, so a
-   failed merge leaves both the station data and the staleness state exactly as they were before
-   the sync attempt.
-
-### Specifications Need Review
-
-`parseRemoteJson` currently rejects the *entire* remote file (returns `null`, IndexedDB
-untouched, generic `REMOTE_FETCH_FAILED_MESSAGE` shown) when **either** `stations` **or**
-`defaultFuel` fails to parse — even if the other field is perfectly valid. This coupling was an
-implementation choice made by analogy to the `stations`-corruption rationale already documented
-above ("Non-trivial decisions", item on malformed `stations`); it was never derived from
-`business-specifications.md`.
-
-Checked `business-specifications.md` (Sub-Issue C) and `test-cases.md` (C-1..C-9): the spec only
-defines "reject the whole file, leave IndexedDB untouched" for **fetch failures** — network
-error, 404, 401 (edge cases under Sub-Issue C, and C-8/C-9). It says nothing about what happens
-when the fetch succeeds but only one of the two fields in the JSON body is malformed. `stations`
-and `defaultFuel` are independent fields with no logical dependency on each other, so treating a
-malformed `defaultFuel` as invalidating an otherwise-valid `stations` array (or vice versa) isn't
-something the spec asks for — and the resulting `REMOTE_FETCH_FAILED_MESSAGE` ("Merci de vous
-reconnecter") is actively misleading in that case, since nothing about authentication or the
-fetch itself failed.
-
-Please clarify Sub-Issue C to state explicitly whether a partially-malformed remote file should:
-(a) still reject the whole sync (current behavior, made explicit and intentional rather than
-incidental), or (b) apply whichever field parsed successfully and leave the other untouched
-locally, with a distinct "remote file partially malformed" message instead of the re-auth one.
-
-status: review specs
+status: ready

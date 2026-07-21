@@ -89,7 +89,7 @@ import { buildPriceRows, deriveFuelTypes, orderFuelTypes } from '@/utils/fuelTyp
 import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
 import type { PriceRow } from '@/types/price-row'
 import type { Station } from '@/types/station'
-import type { RemotePreferencesFile } from '@/types/remote-preferences'
+import type { PreferencesFile } from '@/types/preferences'
 
 const SUCCESS_DISMISS_DELAY_MS = 3000
 
@@ -113,11 +113,11 @@ const { syncError, syncOnLoad } = useRemotePreferencesSync()
 // sub-issue-85). Rolling the station list back to its pre-merge value on
 // that failure restores the "local data unchanged" guarantee the caller
 // already relies on.
-async function applyRemotePreferences(data: RemotePreferencesFile): Promise<void> {
+async function applyRemotePreferences(data: PreferencesFile): Promise<void> {
   const previousStations = stations.value
   const previousSyncedAt = await getPreferencesSyncedAt()
-  await replaceStations(data.stations)
-  await applyDefaultFuelOrRollback(data.defaultFuel, previousStations, previousSyncedAt)
+  await replaceStations(data.favoriteStations)
+  await applyDefaultFuelOrRollback(data.fuelTypeDefault, previousStations, previousSyncedAt)
 }
 
 // Every setter called during the merge (replaceStations, saveDefaultFuelType,
@@ -128,12 +128,12 @@ async function applyRemotePreferences(data: RemotePreferencesFile): Promise<void
 // IndexedDB looking freshly synced and the next load skips retrying the fetch
 // that just failed (review-results.md, sub-issue-85, second pass).
 async function applyDefaultFuelOrRollback(
-  defaultFuel: string | null,
+  fuelTypeDefault: string | null,
   previousStations: Station[],
   previousSyncedAt: number | undefined,
 ): Promise<void> {
   try {
-    await applyDefaultFuel(defaultFuel)
+    await applyDefaultFuel(fuelTypeDefault)
   } catch (error) {
     await replaceStations(previousStations)
     await restorePreferencesSyncedAt(previousSyncedAt)
@@ -141,12 +141,12 @@ async function applyDefaultFuelOrRollback(
   }
 }
 
-async function applyDefaultFuel(defaultFuel: string | null): Promise<void> {
-  if (defaultFuel === null) {
+async function applyDefaultFuel(fuelTypeDefault: string | null): Promise<void> {
+  if (fuelTypeDefault === null) {
     await clearDefaultFuelType()
     return
   }
-  await saveDefaultFuelType(defaultFuel)
+  await saveDefaultFuelType(fuelTypeDefault)
 }
 
 const showFetchSuccess = ref(false)

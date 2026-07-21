@@ -4,6 +4,15 @@
  * against `revalidate-cache-days` and, when stale, fetches the remote JSON
  * file via the `github-api-proxy` Netlify function and merges it in.
  *
+ * The remote file is the same `PreferencesFile` shape (`favoriteStations`/
+ * `fuelTypeDefault`) the static export/import feature (issue #63) already
+ * reads and writes — see business-specifications.md, "Remote JSON File
+ * Structure". Shape validation is reused verbatim from
+ * `@/utils/preferencesImport`'s `parseJsonFile` rather than duplicated, so
+ * this composable enforces exactly "the same station validation the static
+ * import feature already enforces" (business-specifications.md, Sub-Issue C
+ * edge cases) by construction.
+ *
  * Per the composable-caller-responsibility convention, this composable never
  * calls `useGitHubAuth()`, `useStationStorage()`, or `useDefaultFuelType()`
  * itself. The caller passes the current `isAuthenticated`/`repoConfig`
@@ -14,11 +23,17 @@
  * edits (Sub-Issue C rule 5), instead of this composable marking it a
  * second time itself.
  *
- * A 401 from the proxy always resolves `syncError` to a re-authentication
- * message (security-guidelines.md rule 5) regardless of wiring; the optional
- * `onUnauthorized` callback is an additional notification the caller can
- * wire to `useGitHubAuth().handleUnauthorized`, matching the pattern already
- * established by `useRepoConfig.ts`.
+ * Failure signaling uses thrown errors, caught once at the `refreshFromRemote`
+ * boundary and translated into a `syncError` message — not `console.error` —
+ * so every failure path is a single, typed, testable branch instead of
+ * scattered logging alongside a parallel "return null/an outcome object"
+ * convention. `RemoteUnauthorizedError` maps to the re-authentication
+ * message (security-guidelines.md rule 5); `RemoteContentInvalidError` maps
+ * to a distinct "remote file is invalid" message (business-specifications.md
+ * Sub-Issue C edge cases) since re-authenticating would not fix a malformed
+ * file; any other error (network failure, unexpected HTTP status, a failed
+ * `applyRemotePreferences` write) falls back to the generic re-auth-style
+ * fetch-failed message the spec groups network/404/401 failures under.
  *
  * Object Calisthenics exception: the composable function body exceeds five
  * lines because Vue composable conventions require grouping all returned
@@ -29,28 +44,27 @@
 import { ref } from 'vue'
 import type { Ref } from 'vue'
 import type { RepoConfigDraft } from '@/types/repo-config'
-import type { RemotePreferencesFile } from '@/types/remote-preferences'
-import type { Station } from '@/types/station'
+import type { PreferencesFile } from '@/types/preferences'
 import { isPreferencesStale } from '@/utils/preferencesSyncTimestamp'
+import { parseJsonFile } from '@/utils/preferencesImport'
 
 const PROXY_PATH = '/.netlify/functions/github-api-proxy'
-const ACCESS_REVOKED_MESSAGE =
-  "L'accès à GitHub a été révoqué. Vos données locales sont utilisées."
+const ACCESS_REVOKED_MESSAGE = "L'accès à GitHub a été révoqué. Vos données locales sont utilisées."
 const REMOTE_FETCH_FAILED_MESSAGE =
   'Impossible de récupérer vos préférences depuis GitHub. Merci de vous reconnecter.'
+const INVALID_REMOTE_CONTENT_MESSAGE =
+  'Le fichier de préférences distant est invalide. Vos données locales sont conservées.'
 
 type UnauthorizedCallback = (() => void | Promise<void>) | undefined
-type ApplyRemotePreferences = (data: RemotePreferencesFile) => Promise<void>
-
-type FetchOutcome =
-  | { kind: 'ok'; data: RemotePreferencesFile }
-  | { kind: 'unauthorized' }
-  | { kind: 'error' }
+type ApplyRemotePreferences = (data: PreferencesFile) => Promise<void>
 
 interface OwnerRepo {
   owner: string
   repo: string
 }
+
+class RemoteUnauthorizedError extends Error {}
+class RemoteContentInvalidError extends Error {}
 
 // Module-level state — all consumers share the same reference (ADR-002).
 const syncError: Ref<string | null> = ref(null)
@@ -77,45 +91,42 @@ function buildProxyUrl(ownerRepo: OwnerRepo, path: string): string {
   return `${PROXY_PATH}?${params.toString()}`
 }
 
-function isStationShape(value: unknown): value is Station {
-  if (typeof value !== 'object' || value === null) return false
-  const record = value as Record<string, unknown>
-  return typeof record.name === 'string' && typeof record.url === 'string'
-}
-
-// A missing/wrong-type `stations` field means the remote file is corrupt or
-// unexpected — treated as null (parse failure) rather than defaulting to an
-// empty array, so a malformed remote file cannot silently wipe the local
-// station list via replaceStations. Individual malformed entries within an
-// otherwise-valid array are still dropped rather than failing the whole sync.
-function parseStations(value: unknown): Station[] | null {
-  if (!Array.isArray(value)) return null
-  return value.filter(isStationShape)
-}
-
-function parseDefaultFuel(value: unknown): string | null | undefined {
-  if (value === null) return null
-  if (typeof value === 'string') return value
-  return undefined
-}
-
-// Shape-checks only (does an object with the right keys exist) — full URL/name
-// validation is `replaceStations`' responsibility (single source of truth for
-// what counts as a valid station, shared with `addStation`).
-function parseRemoteJson(text: string): RemotePreferencesFile | null {
-  let parsed: unknown
+async function requestRemoteFile(ownerRepo: OwnerRepo, path: string): Promise<Response> {
+  let response: Response
   try {
-    parsed = JSON.parse(text)
+    response = await fetch(buildProxyUrl(ownerRepo, path))
   } catch {
-    return null
+    throw new Error('Network error while fetching remote preferences from GitHub.')
   }
-  if (typeof parsed !== 'object' || parsed === null) return null
-  const record = parsed as Record<string, unknown>
-  const defaultFuel = parseDefaultFuel(record.defaultFuel)
-  if (defaultFuel === undefined) return null
-  const stations = parseStations(record.stations)
-  if (stations === null) return null
-  return { stations, defaultFuel }
+  if (response.status === 401) {
+    throw new RemoteUnauthorizedError('GitHub access is unauthorized.')
+  }
+  if (response.status !== 200) {
+    throw new Error(`GitHub proxy returned unexpected status ${response.status}.`)
+  }
+  return response
+}
+
+function extractBase64Content(body: unknown): string | null {
+  if (typeof body !== 'object' || body === null) return null
+  const record = body as Record<string, unknown>
+  return typeof record.content === 'string' ? record.content : null
+}
+
+// A missing/malformed `content` field means the GitHub proxy's own response
+// wrapper is broken (bad JSON body, unexpected shape) — a fetch-layer
+// problem, not a judgment about the user's remote preferences file. Thrown
+// as a generic Error so it falls into the same re-authentication-style
+// fetch-failed message as a network error or unexpected HTTP status,
+// leaving RemoteContentInvalidError reserved for cases where the proxy
+// response itself is well-formed but the decoded file content is not.
+async function extractResponseContent(response: Response): Promise<string> {
+  const body = await response.json().catch(() => null)
+  const content = extractBase64Content(body)
+  if (content === null) {
+    throw new Error('Missing base64 content in GitHub proxy response.')
+  }
+  return content
 }
 
 // GitHub's Contents API returns base64 content wrapped at 60 characters with
@@ -127,38 +138,32 @@ function decodeBase64Utf8(base64: string): string {
   return new TextDecoder().decode(bytes)
 }
 
-function extractBase64Content(body: unknown): string | null {
-  if (typeof body !== 'object' || body === null) return null
-  const record = body as Record<string, unknown>
-  return typeof record.content === 'string' ? record.content : null
+// atob() throws a DOMException on invalid base64 (a corrupted or unexpected
+// `content` field) — treated the same as a shape-validation failure, since
+// both mean the remote file's content is unusable rather than a fetch/auth
+// problem.
+function decodeAndParseRemoteFile(content: string): PreferencesFile {
+  let text: string
+  try {
+    text = decodeBase64Utf8(content)
+  } catch {
+    throw new RemoteContentInvalidError('Failed to decode remote file content as UTF-8.')
+  }
+  const data = parseJsonFile(text)
+  if (data === null) {
+    throw new RemoteContentInvalidError('Remote file does not match the expected preferences shape.')
+  }
+  return data
 }
 
-async function fetchRemotePreferences(config: RepoConfigDraft): Promise<FetchOutcome> {
+async function fetchRemotePreferences(config: RepoConfigDraft): Promise<PreferencesFile> {
   const ownerRepo = splitOwnerRepo(config.ownerRepo)
-  if (!ownerRepo) return { kind: 'error' }
-  let response: Response
-  try {
-    response = await fetch(buildProxyUrl(ownerRepo, config.filePath.trim()))
-  } catch {
-    return { kind: 'error' }
+  if (!ownerRepo) {
+    throw new Error(`Invalid owner/repo format in repoConfig: "${config.ownerRepo}".`)
   }
-  if (response.status === 401) return { kind: 'unauthorized' }
-  if (response.status !== 200) return { kind: 'error' }
-  const body = await response.json().catch(() => null)
-  const content = extractBase64Content(body)
-  if (content === null) return { kind: 'error' }
-  // atob() throws a DOMException on invalid base64 (a corrupted or
-  // unexpected `content` field) — caught here so it surfaces as a normal
-  // sync error instead of an uncaught rejection breaking the page's
-  // top-level <Suspense> await.
-  let data: RemotePreferencesFile | null
-  try {
-    data = parseRemoteJson(decodeBase64Utf8(content))
-  } catch {
-    return { kind: 'error' }
-  }
-  if (data === null) return { kind: 'error' }
-  return { kind: 'ok', data }
+  const response = await requestRemoteFile(ownerRepo, config.filePath.trim())
+  const content = await extractResponseContent(response)
+  return decodeAndParseRemoteFile(content)
 }
 
 // Always resolves — even without an onUnauthorized callback, or if that
@@ -173,28 +178,41 @@ async function notifyUnauthorized(onUnauthorized: UnauthorizedCallback): Promise
   }
 }
 
+async function resolveRemotePreferences(
+  repoConfig: RepoConfigDraft,
+  onUnauthorized: UnauthorizedCallback,
+): Promise<PreferencesFile | null> {
+  try {
+    return await fetchRemotePreferences(repoConfig)
+  } catch (error) {
+    if (error instanceof RemoteUnauthorizedError) {
+      await notifyUnauthorized(onUnauthorized)
+      syncError.value = ACCESS_REVOKED_MESSAGE
+      return null
+    }
+    if (error instanceof RemoteContentInvalidError) {
+      syncError.value = INVALID_REMOTE_CONTENT_MESSAGE
+      return null
+    }
+    syncError.value = REMOTE_FETCH_FAILED_MESSAGE
+    return null
+  }
+}
+
 async function refreshFromRemote(
   repoConfig: RepoConfigDraft,
   applyRemotePreferences: ApplyRemotePreferences,
   onUnauthorized: UnauthorizedCallback,
 ): Promise<void> {
-  const outcome = await fetchRemotePreferences(repoConfig)
-  if (outcome.kind === 'unauthorized') {
-    await notifyUnauthorized(onUnauthorized)
-    syncError.value = ACCESS_REVOKED_MESSAGE
-    return
-  }
-  if (outcome.kind === 'error') {
-    syncError.value = REMOTE_FETCH_FAILED_MESSAGE
-    return
-  }
+  const data = await resolveRemotePreferences(repoConfig, onUnauthorized)
+  if (data === null) return
   // applyRemotePreferences writes through useStationStorage/useDefaultFuelType,
   // which can reject on an IndexedDB failure. Left unguarded, that rejection
   // would propagate out of this component's top-level <Suspense> await and
   // break the whole page's initial render instead of just leaving local data
   // as the (already valid) fallback.
   try {
-    await applyRemotePreferences(outcome.data)
+    await applyRemotePreferences(data)
   } catch {
     syncError.value = REMOTE_FETCH_FAILED_MESSAGE
     return
