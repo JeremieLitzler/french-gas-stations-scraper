@@ -6,6 +6,8 @@ Allow a user to persist and synchronize their station list and fuel type default
 
 This issue is split into sub-issues. Each section below corresponds to one sub-issue.
 
+The app's former hardcoded starter station list is removed as part of Sub-Issue C below — this affects every user, not only those with GitHub sync configured (see Sub-Issue C, rule 7).
+
 ## Architecture decisions already resolved (do not re-ask)
 
 - OAuth type: GitHub OAuth App (not GitHub App)
@@ -94,12 +96,15 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 4. After a successful remote read, the IndexedDB timestamp is updated to the current date and time.
 5. Each user-triggered update (add/edit/delete station, change fuel default) also resets the timestamp.
 6. Both `fuelTypeDefault` and `favoriteStations` keys must be present in the remote JSON (matching the static import feature's existing requirement). Given both keys are present, a `null` or empty-string `fuelTypeDefault`, and an empty `favoriteStations` array, are valid — they mean "no default fuel type chosen yet" / "no stations saved yet", not an error. None of them block the merge.
+7. The app never seeds a fixed example station list. This applies to every user, regardless of whether GitHub sync is configured, and replaces the app's former hardcoded starter list entirely. If, once application load has resolved — including any remote sync attempt — the station list is empty, every view that displays the station list shows "Aucune station pour le moment" and invites the user to add one via the Station Manager, instead of showing any station data.
+8. Every view that displays the station list reflects the same outcome of application load, consistently: once a remote sync has completed and changed the list, no view keeps showing the data it held before the sync. A view must not render the station list before it is known whether a sync will change it — a stale intermediate state is not shown, even briefly.
 
 ### Edge cases integrated
 
 - If the remote fetch fails (network error, 404, 401), the app asks the user to reauthenticate.
 - If access is revoked (401 on any call), the app asks the user to reauthenticate. If he refuses, the cookie is cleared, the warning banner states that GitHub access was revoked and IndexedDB data is being used.
 - If the remote file's content does not match the expected shape — either key entirely absent, `fuelTypeDefault` present but neither `null` nor a string, or any entry in `favoriteStations` failing the same station validation the static import feature (issue #63) already enforces — the whole read is rejected: IndexedDB is left untouched and a distinct message tells the user the remote file's content is invalid (not the re-authentication prompt used for network/401 failures, since re-authenticating would not fix a malformed file). Accepting the valid parts of a malformed file while reporting what was rejected is tracked separately in issue #105 for both this sync and the local import feature — out of scope here.
+- An empty station list (no data anywhere, or an unauthenticated/unconfigured user with nothing local) is not an error: the "Aucune station pour le moment" message is shown with no accompanying error banner.
 
 ### How to test locally
 
@@ -112,6 +117,8 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 7. Push a remote file with `"fuelTypeDefault": null, "favoriteStations": []` and wait for the cache threshold; reload and confirm IndexedDB is replaced with empty/no-default data, with no error shown.
 8. Push a remote file with `"fuelTypeDefault": 42` (wrong type) and wait for the cache threshold; reload and confirm IndexedDB is left unchanged and a "remote file is invalid" message is shown — distinct from the re-authentication prompt from step 6.
 9. Push a remote file missing the `favoriteStations` key entirely (e.g. `{ "fuelTypeDefault": "SP95" }`) and wait for the cache threshold; reload and confirm IndexedDB is left unchanged and the same "remote file is invalid" message is shown.
+10. Clear IndexedDB and load the app fully unauthenticated, with no prior data; confirm every view that shows the station list (the price table area and the Station Manager) displays "Aucune station pour le moment" with no error banner, instead of any hardcoded example stations.
+11. With GitHub sync configured and authenticated, and a non-empty remote file, clear IndexedDB and reload; confirm every view showing the station list ends up displaying the remote stations, with no view left showing an empty or stale list after the sync has completed.
 
 #### Going live
 
@@ -129,7 +136,7 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 2. If the remote file already exists, its current content is fetched and a diff is presented to the user (reusing the diff UI implemented in issue #63); the user must confirm before the write is committed. If the remote file does not yet exist, it is created directly with no diff or confirmation step.
 3. The write uses the GitHub Contents API `PUT /repos/{owner}/{repo}/contents/{path}` with the file's current `sha` to avoid overwrite conflicts.
 4. If the remote write fails, IndexedDB retains the update and a non-blocking error is shown; the write is not retried automatically.
-5. The JSON written to the remote repo always contains only `stations` and `defaultFuel` — never `owner`, `repo`, or `revalidateCacheDays`.
+5. The JSON written to the remote repo always contains only `favoriteStations` and `fuelTypeDefault` — never `owner`, `repo`, or `revalidateCacheDays`.
 6. If the user cancels the diff dialog, no write is sent; a persistent notice states that local data differs from the remote file, shown until the next successful write.
 
 ### Edge cases integrated
