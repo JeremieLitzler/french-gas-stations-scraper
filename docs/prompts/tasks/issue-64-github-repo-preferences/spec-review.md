@@ -68,4 +68,47 @@ No inline comments. No changes requested. Confirmed coherent with the amended mo
 1. **Sub-Issue B dependency**: given config fields must be editable pre-authentication, should Sub-Issue B's "Depends on: Sub-Issue A" be changed to "Depends on: nothing" (config can be entered any time, independent of login state)? This also affects the dependency graph already encoded in child issues #82–#86 (`#83` currently depends on `#82`) — if the dependency is dropped, that child-issue link needs updating too.
 2. B-2/B-3 test preconditions currently say "User is authenticated" — should these become "User is unauthenticated (first-time setup) or has logged out to edit an existing config"?
 
+*(Both open questions above are resolved in current business-specifications.md: Sub-Issue B's dependency is "nothing", and B-2/B-3 already assume an unauthenticated/logged-out precondition. Superseded by later `/jli-writes-spec` passes; kept here for history.)*
+
+## Round 2 — Sub-Issue D coherence check (2026-07-21)
+
+**Source:** no PR — chat-requested coherence check for Sub-Issue D (#86), following sub-issue-85's implementation, comparing current `business-specifications.md`/`security-guidelines.md`/`test-cases.md`/ADR-012 against GitHub issue #86's current body.
+
+### Amendment requests
+
+#### business-specifications.md / security-guidelines.md / ADR-012 — field-name drift vs. issue tracker
+
+- The shipped `PreferencesFile` type (`src/types/preferences.ts`), `useRemotePreferencesSync.ts`, and the current `business-specifications.md` ("Remote JSON File Structure", Sub-Issue C rule 3, Sub-Issue D rule 5) all use **`favoriteStations`/`fuelTypeDefault`**.
+- GitHub issue **#86**'s current body (and #85's, for the record) still says the remote JSON contains only **`stations`/`defaultFuel`** — the pre-rename names. `ADR-012` line 8 and line 26 also still say `stations`/`defaultFuel`.
+- The spec files and the code are internally coherent with each other; issue #86's body is the stale one. Anyone implementing #86 from the issue body alone would write the wrong keys.
+- **Action needed:** update `ADR-012` lines 8 and 26 to `favoriteStations`/`fuelTypeDefault`, and update issue #86's body (`gh issue edit 86`) to match — same for #85 if it's still referenced later. This isn't a business-specifications.md change (it's already correct); it's an ADR fix plus an issue-tracker sync.
+
+#### business-specifications.md — Sub-Issue D, rule 2 (diff UI reuse is not literally reusable as specified)
+
+- Rule 2 and test cases D-1/D-2 say the write flow reuses "the diff UI implemented in issue #63" and describe it as showing "before (remote) and after (updated) JSON content" with a single confirm/cancel.
+- The actual issue #63 component, `PreferencesDiffDialog.vue`, is hard-coupled to `usePreferencesImport()` (no props/emits — it calls that singleton composable directly) and implements a **per-row merge-conflict resolution** UI: for each station, the user picks "Fichier" vs "Actuel" via radio buttons, or a checkbox to include a new station; same for the fuel-type diff. Its copy is import-specific ("Aperçu des changements à importer", "Confirmer l'import").
+- That's a different interaction model than what Sub-Issue D describes (a single "here's what will be written, confirm or cancel" preview — there's nothing to merge since IndexedDB is already the desired end state before the write). Reusing the component as-is would either misrepresent the write as a mergeable import, or require generalizing it to a second mode.
+- **This is an architecture decision the spec doesn't currently resolve** (CLAUDE.md: "never silently make a decision that affects architecture or data shape"). Needs one of: (a) generalize `PreferencesDiffDialog.vue` to support a "write-confirm" mode alongside its "import-merge" mode, or (b) build a separate, simpler preview dialog for Sub-Issue D and drop the "reuse" framing from rule 2. Flagging as an open question below rather than picking for the user.
+
+#### business-specifications.md — Sub-Issue F note (informational, not a rule change)
+
+- `netlify/functions/github-api-proxy/github-api-proxy.ts` already fully implements the write path (`PUT`, `sha`-based optimistic concurrency, 409 passthrough) — built ahead of schedule alongside earlier sub-issues. Sub-Issue D's implementer does not need to touch this function; it only needs a client-side caller.
+- `github-api-proxy.spec.ts` currently only covers F-4/F-5 (read-path forwarding, token non-exposure) — there's no test for the write/PUT forwarding or the 409 passthrough at the proxy layer, even though the code path exists.
+
+#### test-cases.md — Sub-Issue F, missing write-path coverage
+
+- Add a test case (or two) for `github-api-proxy`'s write path: PUT forwards `owner`/`repo`/`path`/`message`/`content`/`sha` unchanged, and a GitHub 409 response is passed through unchanged to the caller. This closes the gap above and gives Sub-Issue D's D-7 (stale sha) an underlying unit-level test to rely on, not just the UI-level scenario.
+
+### Coherence
+
+- **Confirmed coherent:** business-specifications.md, security-guidelines.md, and test-cases.md agree with each other and with the shipped code on the `favoriteStations`/`fuelTypeDefault` naming, the Sub-Issue D → A/B/C dependency chain, and the "no diff on first write" / "persistent divergence notice on cancel" rules already resolved in Round 1.
+- **Contradiction found:** GitHub issue #86's body (and ADR-012) vs. business-specifications.md / shipped code on remote JSON key names (`stations`/`defaultFuel` vs. `favoriteStations`/`fuelTypeDefault`) — see amendment above.
+- **Gap found:** business-specifications.md Sub-Issue D rule 2 assumes a reusable diff UI that, on inspection, isn't shaped for reuse without a decision on how — see amendment above.
+- **Soft gap, not blocking:** Sub-Issue D doesn't name which component triggers the remote write after a station add/edit. `StationManagerTable.vue` already owns `addStation`/`updateStation` (confirmed in code), so the composable-caller-responsibility convention naturally points there — but sub-issue-85's own spec-review (Finding 2) shows that leaving "which component" implicit for a similar on-load concern caused a real race-condition bug. Worth an explicit line in Sub-Issue D rule 1 naming the owning component, rather than leaving it to convention a second time.
+
+### Open questions
+
+1. For the diff-UI reuse gap: generalize `PreferencesDiffDialog.vue` to a second "write-confirm" mode, or build a separate simpler dialog for Sub-Issue D? This affects rule 2's wording and D-1/D-2's expected UI.
+2. Should issue #85's body also be edited for the field-name fix, or left as historical record now that it's closed/implemented?
+
 status: review specs
