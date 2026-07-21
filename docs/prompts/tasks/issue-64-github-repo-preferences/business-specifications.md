@@ -90,14 +90,16 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 
 1. On application load, if the user is authenticated and repo config is present, the app compares the age of the IndexedDB data against the configurable `revalidate-cache-days` parameter (default: 7 days, editable from Settings UI).
 2. If IndexedDB data is younger than the threshold, the remote repo is not consulted; IndexedDB is used as-is.
-3. If IndexedDB data is older than the threshold (or absent), the app fetches the JSON file from the remote repo via a Netlify proxy function and merges its `stations` and `defaultFuel` into IndexedDB, replacing the existing data. The remote file never carries `owner`, `repo`, or `revalidateCacheDays` — those stay exclusively in IndexedDB (Sub-Issue B).
+3. If IndexedDB data is older than the threshold (or absent), the app fetches the JSON file from the remote repo via a Netlify proxy function and merges its `favoriteStations` and `fuelTypeDefault` into IndexedDB, replacing the existing data. The remote file never carries `owner`, `repo`, or `revalidateCacheDays` — those stay exclusively in IndexedDB (Sub-Issue B). This is the same `{ fuelTypeDefault, favoriteStations }` shape the static export/import feature (issue #63) already reads and writes — see "Remote JSON File Structure" below.
 4. After a successful remote read, the IndexedDB timestamp is updated to the current date and time.
 5. Each user-triggered update (add/edit/delete station, change fuel default) also resets the timestamp.
+6. Both `fuelTypeDefault` and `favoriteStations` keys must be present in the remote JSON (matching the static import feature's existing requirement). Given both keys are present, a `null` or empty-string `fuelTypeDefault`, and an empty `favoriteStations` array, are valid — they mean "no default fuel type chosen yet" / "no stations saved yet", not an error. None of them block the merge.
 
 ### Edge cases integrated
 
 - If the remote fetch fails (network error, 404, 401), the app asks the user to reauthenticate.
 - If access is revoked (401 on any call), the app asks the user to reauthenticate. If he refuses, the cookie is cleared, the warning banner states that GitHub access was revoked and IndexedDB data is being used.
+- If the remote file's content does not match the expected shape — either key entirely absent, `fuelTypeDefault` present but neither `null` nor a string, or any entry in `favoriteStations` failing the same station validation the static import feature (issue #63) already enforces — the whole read is rejected: IndexedDB is left untouched and a distinct message tells the user the remote file's content is invalid (not the re-authentication prompt used for network/401 failures, since re-authenticating would not fix a malformed file). Accepting the valid parts of a malformed file while reporting what was rejected is tracked separately in issue #105 for both this sync and the local import feature — out of scope here.
 
 ### How to test locally
 
@@ -107,6 +109,9 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 4. Reload again immediately; confirm the remote repo is NOT fetched a second time (timestamp is fresh).
 5. Add a station via the UI; confirm the IndexedDB timestamp resets.
 6. Simulate a 404 by setting the file path to a non-existent file and waiting for the cache threshold; reload and confirm an error/re-auth prompt appears.
+7. Push a remote file with `"fuelTypeDefault": null, "favoriteStations": []` and wait for the cache threshold; reload and confirm IndexedDB is replaced with empty/no-default data, with no error shown.
+8. Push a remote file with `"fuelTypeDefault": 42` (wrong type) and wait for the cache threshold; reload and confirm IndexedDB is left unchanged and a "remote file is invalid" message is shown — distinct from the re-authentication prompt from step 6.
+9. Push a remote file missing the `favoriteStations` key entirely (e.g. `{ "fuelTypeDefault": "SP95" }`) and wait for the cache threshold; reload and confirm IndexedDB is left unchanged and the same "remote file is invalid" message is shown.
 
 #### Going live
 
@@ -235,18 +240,19 @@ The two new architectural patterns this feature introduces are documented in [AD
 
 ## Remote JSON File Structure
 
-The JSON file stored in the user's GitHub repository has the following shape — it never carries repo configuration, only station data:
+The JSON file stored in the user's GitHub repository is the same `PreferencesFile` shape the static export/import feature (issue #63) already uses — it never carries repo configuration, only station data:
 
 ```json
 {
-  "stations": [
+  "fuelTypeDefault": "SP95",
+  "favoriteStations": [
     { "name": "Station A", "url": "https://..." },
     { "name": "Station B", "url": "https://..." }
-  ],
-  "defaultFuel": "SP95"
+  ]
 }
 ```
 
 - `owner`, `repo`, and `revalidate-cache-days` live only in IndexedDB (Sub-Issue B); they are never written to or read from the remote file.
+- Both keys must be present. Given that, `fuelTypeDefault` may be `null` or an empty string (no default chosen yet); `favoriteStations` may be an empty array (no stations saved yet) — both are valid, not errors (Sub-Issue C, rule 6).
 
 status: ready
