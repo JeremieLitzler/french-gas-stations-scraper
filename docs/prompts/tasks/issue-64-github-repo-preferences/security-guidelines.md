@@ -30,4 +30,8 @@
    - Where: the composable that calls `github-api-proxy` on application load (`useRemotePreferencesSync`).
    - Why: business-specifications.md Sub-Issue C rule 8 (added in this pass) requires every view to hold off rendering the station list until the sync outcome is known; without a bound on the wait, a slow or unresponsive proxy/upstream GitHub response turns that requirement into an availability issue — the user is locked out of viewing or managing their own already-synced local data for as long as the request hangs.
 
+8. **Run the remote file's content through the same shape/type validation used on read (Sub-Issue C's edge cases) before it enters the write-confirm diff preview, and render every diffed value through Vue's default text interpolation — never `v-html`.**
+   - Where: the shared diff component (business-specifications.md Sub-Issue D rule 2) and whichever composable fetches the pre-write remote content for the diff.
+   - Why: Sub-Issue D's diff preview reads and displays the remote file's raw content before any write decision is made, a step Sub-Issue C's existing validation does not cover since that path only runs when merging into IndexedDB; a compromised repo or a malformed file could otherwise inject unexpected values or, if ever rendered unescaped, a script payload into the confirmation UI the user is about to trust and act on.
+
 status: ready
