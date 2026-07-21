@@ -276,7 +276,14 @@ export function useRemotePreferencesWrite() {
     // Guards against duplicate in-flight requests (e.g. two blur events firing
     // in quick succession): without it, two calls could race on the initial
     // GET and both resolve into a create/diff step for the same target file.
-    if (isWriting.value) return
+    // The change that loses the race is not dropped silently — it is already
+    // in IndexedDB (the caller awaits its own storage write first), so the
+    // same persistent notice cancelWrite uses tells the user it hasn't
+    // reached GitHub yet (review-results.md, sub-issue-86).
+    if (isWriting.value) {
+      divergedNotice.value = DIVERGED_MESSAGE
+      return
+    }
     isWriting.value = true
     resetWriteFeedback()
     try {
