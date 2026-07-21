@@ -98,7 +98,7 @@ responsibility. Field-visibility scenarios formerly listed here now live under S
 ### C-2: Remote repo fetched when IndexedDB data is stale
 - **Precondition:** User is authenticated and repo config is present. IndexedDB timestamp is older than `revalidate-cache-days`.
 - **Action:** Load the application.
-- **Expected:** The app fetches the remote JSON file via the Netlify proxy. IndexedDB is updated with the remote `stations` and `defaultFuel`. The timestamp is reset to the current date and time.
+- **Expected:** The app fetches the remote JSON file via the Netlify proxy. IndexedDB is updated with the remote `favoriteStations` and `fuelTypeDefault`. The timestamp is reset to the current date and time.
 
 ### C-3: Remote repo not fetched again after fresh load
 - **Precondition:** The remote repo was just fetched (timestamp is now current).
@@ -165,6 +165,26 @@ responsibility. Field-visibility scenarios formerly listed here now live under S
 - **Action:** Compare the message shown in each case.
 - **Expected:** The messages differ. The malformed-content message does not ask the user to reconnect or re-authenticate.
 
+### C-16: No stations anywhere shows an empty-state invitation, not example stations
+- **Precondition:** IndexedDB has no stations and no sync timestamp. The user is unauthenticated, or repo config is incomplete, or the remote file has an empty `favoriteStations` list.
+- **Action:** Load the application.
+- **Expected:** Every view that displays the station list (the price table area and the Station Manager) shows "Aucune station pour le moment" and invites the user to add one via the Station Manager. No hardcoded example stations appear anywhere. No error banner accompanies the message.
+
+### C-17: Every view reflects the same station list once a sync completes
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale or empty, and the remote file has one or more stations.
+- **Action:** Load the application and wait for the sync to complete.
+- **Expected:** Every view that displays the station list (the price table area and the Station Manager) shows the same, remote-sourced list. No view is left showing the empty state, or a different or stale list, once the sync has completed.
+
+### C-18: No view shows a stale list before the sync outcome is known
+- **Precondition:** User is authenticated, repo config is present, and IndexedDB holds a station list from a previous session that differs from what the remote file currently contains; IndexedDB is stale.
+- **Action:** Load the application, observing every view that displays the station list from first paint through sync completion.
+- **Expected:** No view displays the previous/local station list at any point before the sync outcome is known. Each such view shows either a neutral loading state or nothing until the final, synced list is ready, then shows that final list directly.
+
+### C-19: A hung remote sync fetch does not block the app indefinitely
+- **Precondition:** User is authenticated, repo config is present, IndexedDB is stale. The request to the GitHub API proxy never resolves (simulated hang).
+- **Action:** Load the application and wait.
+- **Expected:** After a bounded wait, the app stops waiting for the remote fetch and falls back to displaying the local IndexedDB state (or the empty state, per C-16, if none exists) instead of hanging indefinitely — the station list becomes visible and interactive.
+
 ---
 
 ## Sub-Issue D — Write Preferences to Remote Repo on Update
@@ -212,7 +232,7 @@ responsibility. Field-visibility scenarios formerly listed here now live under S
 ### D-9: Written JSON never includes repo configuration
 - **Precondition:** User confirms a write after adding a station.
 - **Action:** Inspect the JSON written to the remote repo.
-- **Expected:** The file contains only `stations` and `defaultFuel` keys. It never includes `owner`, `repo`, or `revalidateCacheDays`.
+- **Expected:** The file contains only `favoriteStations` and `fuelTypeDefault` keys. It never includes `owner`, `repo`, or `revalidateCacheDays`.
 
 ---
 
