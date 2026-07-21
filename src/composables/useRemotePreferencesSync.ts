@@ -49,6 +49,7 @@ import { isPreferencesStale } from '@/utils/preferencesSyncTimestamp'
 import { parseJsonFile } from '@/utils/preferencesImport'
 
 const PROXY_PATH = '/.netlify/functions/github-api-proxy'
+const REMOTE_FETCH_TIMEOUT_MS = 10_000
 const ACCESS_REVOKED_MESSAGE = "L'accès à GitHub a été révoqué. Vos données locales sont utilisées."
 const REMOTE_FETCH_FAILED_MESSAGE =
   'Impossible de récupérer vos préférences depuis GitHub. Merci de vous reconnecter.'
@@ -91,13 +92,24 @@ function buildProxyUrl(ownerRepo: OwnerRepo, path: string): string {
   return `${PROXY_PATH}?${params.toString()}`
 }
 
-async function requestRemoteFile(ownerRepo: OwnerRepo, path: string): Promise<Response> {
-  let response: Response
+// Bounds how long the app waits for the GitHub proxy (security-guidelines.md
+// rule 7): without this, a hung/unresponsive response would block every view
+// of the station list indefinitely, since no view renders before the sync
+// outcome is known (business-specifications.md Sub-Issue C rule 8).
+async function fetchWithTimeout(url: string): Promise<Response> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REMOTE_FETCH_TIMEOUT_MS)
   try {
-    response = await fetch(buildProxyUrl(ownerRepo, path))
+    return await fetch(url, { signal: controller.signal })
   } catch {
     throw new Error('Network error while fetching remote preferences from GitHub.')
+  } finally {
+    clearTimeout(timeoutId)
   }
+}
+
+async function requestRemoteFile(ownerRepo: OwnerRepo, path: string): Promise<Response> {
+  const response = await fetchWithTimeout(buildProxyUrl(ownerRepo, path))
   if (response.status === 401) {
     throw new RemoteUnauthorizedError('GitHub access is unauthorized.')
   }

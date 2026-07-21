@@ -23,17 +23,6 @@ const STATIONS_KEY = 'stations'
 const MAX_NAME_LENGTH = 200
 const ALLOWED_ORIGIN = 'https://www.prix-carburants.gouv.fr'
 
-const DEFAULT_STATIONS: readonly Station[] = [
-  { name: 'à INTERMARCHE AOSTE', url: 'https://www.prix-carburants.gouv.fr/station/38490005' },
-  { name: 'à INTERMARCHE APPRIEU', url: 'https://www.prix-carburants.gouv.fr/station/38140005' },
-  { name: 'à SUPER U APPRIEU', url: 'https://www.prix-carburants.gouv.fr/station/38690006' },
-  {
-    name: "à INTERMARCHE TAIN L'HERMITAGE",
-    url: 'https://www.prix-carburants.gouv.fr/station/26600007',
-  },
-  { name: 'à SUPER U SAINT-DONAT', url: 'https://www.prix-carburants.gouv.fr/station/26260001' },
-]
-
 // Module-level ref — all consumers share the same reactive state (ADR-002 singleton pattern).
 const stations: Ref<Station[]> = ref([])
 
@@ -78,21 +67,9 @@ export function useStationStorage() {
     return list.map((s) => ({ ...toRaw(s) }))
   }
 
-  const mergeWithDefaults = (stored: Station[]): Station[] => {
-    const storedUrls = new Set(stored.map((station) => station.url))
-    const missingDefaults = DEFAULT_STATIONS.filter((station) => !storedUrls.has(station.url))
-    return [...missingDefaults, ...stored]
-  }
-
   const loadStations = async (): Promise<void> => {
     const stored = await get<unknown>(STATIONS_KEY)
-    const validStations = filterValidStations(stored)
-    const merged = mergeWithDefaults(validStations)
-    const hasNewDefaults = merged.length > validStations.length
-    if (hasNewDefaults) {
-      await set(STATIONS_KEY, toPlainStations(merged))
-    }
-    stations.value = merged
+    stations.value = filterValidStations(stored)
   }
 
   const addStation = async (station: Station): Promise<void> => {

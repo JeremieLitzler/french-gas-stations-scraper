@@ -24,12 +24,7 @@ const { fuelTypeWarning, doOpenDialog } = usePreferencesImport()
     </p>
     <details>
       <summary class="cursor-pointer mb-2">Afficher / masquer la liste</summary>
-      <Suspense>
-        <StationManagerTable />
-        <template #fallback>
-          <AppLoader />
-        </template>
-      </Suspense>
+      <StationManagerTable />
     </details>
     <PreferencesDiffDialog />
   </div>
