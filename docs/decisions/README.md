@@ -24,6 +24,7 @@ Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 | [ADR-010](./ADR-010-markdown-runtime-parsing.md)                  | Static Content Rendering Strategy for the Mentions Légales Page | Accepted | 2026-03-20 |
 | [ADR-011](./ADR-011-github-oauth-app-auth.md)                     | GitHub OAuth App Authentication via Netlify Functions with HTTP-Only Cookie | Accepted | 2026-04-30 |
 | [ADR-012](./ADR-012-github-repo-as-sync-backend.md)               | User-Owned GitHub Repository as Remote Sync Backend             | Accepted | 2026-04-30 |
+| [ADR-013](./ADR-013-page-level-load-orchestrator.md)              | Page-Level Load Orchestrator for Shared Singleton State Under Async Mutation | Accepted | 2026-07-21 |
 
 ## How to Add a New ADR
 
