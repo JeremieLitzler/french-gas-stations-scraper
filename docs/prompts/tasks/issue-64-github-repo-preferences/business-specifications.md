@@ -133,7 +133,7 @@ page. Until then, verify the login-readiness check and auth state directly.)*
 ### Rules
 
 1. Whenever the user saves a change to their station list or fuel type default, the updated data is first written to IndexedDB, then a write request is sent to the remote repo via Netlify function.
-2. If the remote file already exists, its current content is fetched and a diff is presented to the user (reusing the diff UI implemented in issue #63); the user must confirm before the write is committed. If the remote file does not yet exist, it is created directly with no diff or confirmation step.
+2. If the remote file already exists, its current content is fetched and a diff is presented to the user; the user must confirm before the write is committed. If the remote file does not yet exist, it is created directly with no diff or confirmation step. Since this diff operates on the same station/fuel-type data shape as the import diff from issue #63, both are presented through a single shared diff component with two modes: issue #63's per-row merge (the user picks which value to keep per conflict, since import can combine file and local data) and this sub-issue's before/after preview (a single confirm/cancel, since the local state written to IndexedDB in rule 1 is already the value that will be pushed — there is nothing to merge).
 3. The write uses the GitHub Contents API `PUT /repos/{owner}/{repo}/contents/{path}` with the file's current `sha` to avoid overwrite conflicts.
 4. If the remote write fails, IndexedDB retains the update and a non-blocking error is shown; the write is not retried automatically.
 5. The JSON written to the remote repo always contains only `favoriteStations` and `fuelTypeDefault` — never `owner`, `repo`, or `revalidateCacheDays`.

@@ -5,7 +5,7 @@
 
 ## Context
 
-Issue #64 introduces preference sync: stations and default fuel type should persist beyond a single device and survive browser storage clearing. Repository configuration (`owner`, `repo`, `revalidateCacheDays`) is a local-only setting, not part of the synced data — it stays in IndexedDB and is never written to or read from the remote file.
+Issue #64 introduces preference sync: `favoriteStations` and `fuelTypeDefault` should persist beyond a single device and survive browser storage clearing. Repository configuration (`owner`, `repo`, `revalidateCacheDays`) is a local-only setting, not part of the synced data — it stays in IndexedDB and is never written to or read from the remote file.
 
 The app currently stores all data client-side only (ADR-008: IndexedDB). A remote persistence tier is needed for sync.
 
@@ -23,7 +23,7 @@ All GitHub API calls are routed through a Netlify function (`github-api-proxy`) 
 
 ### Remote JSON File Structure
 
-See business-specifications.md, "Remote JSON File Structure", for the exact schema — `stations` and `defaultFuel` only. Repo configuration (`owner`, `repo`, `revalidateCacheDays`) stays in IndexedDB and is never written to the remote file.
+See business-specifications.md, "Remote JSON File Structure", for the exact schema — `favoriteStations` and `fuelTypeDefault` only. Repo configuration (`owner`, `repo`, `revalidateCacheDays`) stays in IndexedDB and is never written to the remote file.
 
 ### Cache Invalidation Strategy
 
