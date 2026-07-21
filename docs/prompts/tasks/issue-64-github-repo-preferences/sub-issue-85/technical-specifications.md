@@ -2,7 +2,39 @@
 
 *(Sixth pass — implements business-specifications.md Sub-Issue C rules 7/8 (empty-state,
 cross-view consistency) and security-guidelines.md rule 7 (bounded remote-fetch wait), per
-`spec-review.md`.)*
+`spec-review.md`. Seventh pass — fixes the C-17 test failure recorded in `test-results.md` by
+adding an explicit import; see "Seventh pass" below.)*
+
+## Seventh pass — fix for test-results.md's C-17 failure
+
+`test-results.md` reported two failures. Diagnosis (root-caused with a temporary, reverted debug
+build of `HomePageContent.spec.ts`, never committed) found they have different causes:
+
+- **`HomePageContent.spec.ts` C-17 (fixed here):** `unplugin-vue-components` does not reliably
+  resolve `StationPrices` to a static import when referenced from `HomePageContent.vue`
+  specifically — `StationManager`, referenced the same way one line below it, resolves correctly.
+  Left to auto-import, Vue falls back to runtime component resolution for `StationPrices`, which
+  test-utils' name-based `stubs` cannot intercept the same way it intercepts a statically-bound
+  auto-import; the genuine `StationPrices` subtree renders instead of the test's stub, in
+  production this has no visible effect (the genuine component is the one that should render
+  there anyway) but it defeats the stub-based isolation `HomePageContent.spec.ts` relies on to
+  assert cross-view consistency (C-17) without depending on `StationPrices`' unrelated internals
+  (live fuel-price fetching). Fix: `HomePageContent.vue` now imports `StationPrices` explicitly
+  (see "Non-trivial decisions" below) — verified against the real, unmodified
+  `HomePageContent.spec.ts` (both C-17 and C-18 pass) and against the full suite (378/379 passing,
+  the one remaining failure being the pre-existing, unrelated gap below).
+- **`StationManager.spec.ts` "loadStations is called on mount" (not fixed here — test-file issue,
+  out of `/jli-codes` scope):** asserts that mounting `StationManager` calls `loadStations` once.
+  This was true before the sixth pass, when `StationManagerTable.vue` loaded its own data; the
+  sixth pass intentionally removed that call as part of centralizing all loading in
+  `HomePageContent.vue` (composable-caller-responsibility convention) — a change already reviewed
+  and approved in `review-results.md` ("`StationManagerTable.vue` no longer calls any of
+  these [loaders] themselves ... matches C-17/C-18"). The test still asserts the pre-refactor
+  behavior and was missed when `StationManagerTable.updateStation.spec.ts` /
+  `useStationStorage.spec.ts` were flagged as needing updates in the sixth pass's "Known gaps"
+  below — `StationManager.spec.ts` needs the same treatment. `/jli-codes` does not author or edit
+  `.spec.ts` files, so this is left for `/jli-writes-tests` to update (delete or rewrite that one
+  `it()` block to reflect that `HomePageContent.vue`, not `StationManager.vue`, now owns the load).
 
 ## Summary of files created/changed
 
@@ -35,6 +67,9 @@ cross-view consistency) and security-guidelines.md rule 7 (bounded remote-fetch 
 - `README.md` (project root) — changed. Replaced the now-inaccurate "Starting list of stations"
   section with a note that the app shows an empty-state invitation instead of seeding example
   stations.
+- `src/components/HomePageContent.vue` — changed (seventh pass). Added an explicit
+  `import StationPrices from './StationPrices.vue'` in place of relying on auto-import, to fix
+  the C-17 test failure — see "Seventh pass" above.
 
 ## Non-trivial decisions
 
@@ -70,6 +105,17 @@ cross-view consistency) and security-guidelines.md rule 7 (bounded remote-fetch 
   a new user-facing setting the spec never asked for; `revalidate-cache-days` already covers the
   user-configurable timing concern (how *often* to sync), which is a different axis from *how
   long a single attempt may hang*.
+
+- **`StationPrices` is imported explicitly in `HomePageContent.vue`, deviating from this
+  codebase's auto-import convention (CLAUDE.md), rather than pursued as an auto-import
+  configuration fix.** The observed failure is scoped to one specific auto-import resolution in
+  one specific file; a one-line explicit import fixes it with certainty and no risk to any other
+  component's auto-import behavior. Chasing the resolver-level root cause (why
+  `unplugin-vue-components` treats `StationPrices` differently from the identically-declared
+  `StationManager` one line below it) would mean debugging third-party plugin internals for a
+  benefit — a cleaner import statement — that doesn't change runtime behavior, which is out of
+  scope for a bug-fix pass. `StationManager` is left auto-imported since it does not exhibit the
+  problem.
 
 ## Object Calisthenics exceptions
 
@@ -110,6 +156,9 @@ cross-view consistency) and security-guidelines.md rule 7 (bounded remote-fetch 
 - `StationManagerTable.updateStation.spec.ts` / `useStationStorage.spec.ts` likely still assert
   against the removed default-seeding behavior in `loadStations()` — expected to need updating
   alongside the above.
+- `StationManager.spec.ts`'s "loadStations is called on mount to seed defaults from IndexedDB"
+  test asserts the same removed behavior (see "Seventh pass" above) — confirmed failing, not just
+  "likely."
 
 ### ADR Required
 
