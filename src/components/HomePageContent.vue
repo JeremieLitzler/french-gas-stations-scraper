@@ -22,6 +22,15 @@
  * (see useGitHubAuth.ts, useRepoConfig.ts, useStationStorage.ts).
  */
 
+// StationPrices is imported explicitly, unlike every other auto-imported
+// component in this codebase (CLAUDE.md), because unplugin-vue-components
+// does not reliably resolve it as a static binding when referenced from
+// this file specifically — leaving it to auto-import causes Vue to fall
+// back to runtime component resolution here, which real-world testing
+// (HomePageContent.spec.ts, C-17) showed renders the genuine StationPrices
+// subtree (with its own network-calling children) instead of the intended
+// component. StationManager does not exhibit this and is left auto-imported.
+import StationPrices from './StationPrices.vue'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
 import { useGitHubAuth } from '@/composables/useGitHubAuth'
