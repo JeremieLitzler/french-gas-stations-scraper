@@ -11,33 +11,19 @@ All those mentioned in [technical specs](technical-specifications.md), plus the 
 
 ## Results
 
-### Failures
+All tests passed. No failures.
 
-**`src/components/StationManager.spec.ts`**
-Test: `loadStations is called on mount to seed defaults from IndexedDB > calls loadStations once when the component mounts`
-
-```
-AssertionError: expected "vi.fn()" to be called once, but got 0 times
-    at E:/Git/GitHub/french-gas-stations-scraper_feat-load-remote-preferences/src/components/StationManager.spec.ts:90:30
-```
-
-Known, pre-existing gap — not introduced by this pass. This test asserts pre-refactor behavior
-(`StationManagerTable.vue` calling `loadStations()` on mount); the sixth pass intentionally moved
-that responsibility to `HomePageContent.vue` and this change was already reviewed and approved
-(`review-results.md`). See `technical-specifications.md`'s "Seventh pass" and "Known gaps"
-sections — this is a stale `.spec.ts` file that `/jli-writes-tests` needs to update, out of
-`/jli-codes`'s scope.
-
-`src/components/HomePageContent.spec.ts`'s previously-failing `C-17` test now passes: the seventh
-pass's explicit `StationPrices` import in `HomePageContent.vue` fixed the auto-import resolution
-bug that caused it.
+The previous run's failure (`StationManager.spec.ts`'s "loadStations is called on mount"
+test, asserting pre-refactor behavior) was fixed by `/jli-writes-tests`: the test now asserts
+that `loadStations` is **not** called by `StationManager`, matching the load orchestration
+moved to `HomePageContent.vue`.
 
 ### Test Summary
 
-323 test files, 379 tests total — 1 failed.
+323 test files, 379 tests total — all passed.
 
-- Test files: 321 passed, 2 failed
-- Tests: 378 passed (1 failed)
-- Duration: ~8 seconds
+- Test files: 323 passed
+- Tests: 379 passed (0 failed)
+- Duration: ~9 seconds
 
-status: failed
+status: passed
