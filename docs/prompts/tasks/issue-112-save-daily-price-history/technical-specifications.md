@@ -91,6 +91,24 @@ the Settings UI).
    `slice(0, -1)` truncation, so a malformed existing CSV line is preserved as-is rather than
    silently corrupted.
 
+## Review-Loop Fixes (post `/jli-reviews-code`)
+
+4. **`scheduled-price-history.ts` now imports `jsonResponse` from `../lib/http-responses` instead
+   of defining its own copy.** `review-results.md` flagged the local duplicate — the shared helper
+   already lives in the same `netlify/functions/lib/` directory this file already imports five
+   other modules from (no project-reference boundary excuse applies here, unlike the `src/`-mirrored
+   files), and all four existing Netlify functions already use it.
+5. **`readExistingHistory(config)` now runs concurrently with `readFavoriteStations(config)`** via
+   `Promise.all`, instead of after the favorites read and the scrape pass. The existing-history read
+   has no data dependency on either — it only needed to happen before the CSV is assembled — so
+   running it in parallel shortens the run's wall-clock time by roughly its own latency, found during
+   self-review as a performance bottleneck.
+6. **`runDailySnapshot` now skips the GitHub write when `csvContent === existing.content`.** Found
+   during self-review: without this check, a day with zero favorite stations, or a day where every
+   station fails to scrape, still produced an identical PUT — a no-op GitHub commit and a spent write
+   call for zero effect. The `null`-vs-string comparison still lets the true first-run case (file
+   doesn't exist yet) through, since `existing.content` is `null` and `csvContent` is never `null`.
+
 No new ADR is required — every decision above elaborates on ADR-014's already-approved scope
 (fixed PAT, fixed env vars, DST-aware double-fire) rather than introducing a new architectural
 pattern.

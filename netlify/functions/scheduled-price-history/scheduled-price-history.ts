@@ -7,6 +7,7 @@
 // cron-triggered function.
 import { schedule } from '@netlify/functions'
 import type { HandlerEvent, HandlerResponse } from '@netlify/functions'
+import { jsonResponse } from '../lib/http-responses'
 import { readHistoryConfig } from '../lib/environment'
 import type { HistoryConfig } from '../lib/environment'
 import { isScheduledInvocation, isTargetLocalHour } from '../lib/scheduleGuards'
@@ -27,10 +28,6 @@ const APP_NAME = 'Coup de pompe'
 const STATION_FETCH_TIMEOUT_MS = 10_000
 
 type FoundFuelPrice = ScrapedFuelPrice & { price: number }
-
-function jsonResponse(statusCode: number, body: unknown): HandlerResponse {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }
-}
 
 function toIsoDate(now: Date): string {
   return now.toISOString().slice(0, 10)
@@ -139,16 +136,26 @@ async function writeHistory(
 // call below — a scrape or read failure earlier in this function throws (or
 // short-circuits via the guard clauses above it) before that PUT is ever
 // reached, so a failed run never leaves a partial file
-// (business-specifications.md).
+// (business-specifications.md). Reading the existing history file has no
+// dependency on the favorite-stations list or the scrape results, so it runs
+// concurrently with them instead of after, shortening the run's wall-clock
+// time by roughly that read's own latency.
 async function runDailySnapshot(now: Date): Promise<HandlerResponse> {
   const config = readHistoryConfig()
   if (config === null) return jsonResponse(500, { error: 'Missing history configuration.' })
   const date = toIsoDate(now)
-  const stations = await readFavoriteStations(config)
+  const [stations, existing] = await Promise.all([
+    readFavoriteStations(config),
+    readExistingHistory(config),
+  ])
   if (stations === null) return jsonResponse(500, { error: 'Unable to read favorite stations.' })
   const todaysRows = await scrapeAllStations(stations, date)
-  const existing = await readExistingHistory(config)
   const csvContent = updateHistoryCsv(existing.content, date, todaysRows)
+  // Skip the write when nothing actually changed (e.g. no favorites, or every
+  // station failed to scrape on a day already free of rows for today) — an
+  // identical PUT would still create a no-op GitHub commit and spend a write
+  // call for zero effect.
+  if (csvContent === existing.content) return jsonResponse(200, { rowsWritten: todaysRows.length })
   await writeHistory(config, csvContent, existing.sha, date)
   return jsonResponse(200, { rowsWritten: todaysRows.length })
 }
