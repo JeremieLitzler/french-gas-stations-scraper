@@ -6,7 +6,6 @@
 // (ADR-012) instead of IndexedDB, since neither is reachable from a
 // cron-triggered function.
 import { schedule } from '@netlify/functions'
-import { log } from "console";
 import type { HandlerEvent, HandlerResponse } from '@netlify/functions'
 import { jsonResponse } from '../lib/http-responses'
 import { readHistoryConfig } from '../lib/environment'
@@ -20,6 +19,8 @@ import type { FavoriteStation } from '../lib/favoriteStationsParser'
 import { readRemoteFile, writeRemoteFile, encodeBase64, decodeBase64 } from '../lib/githubContentsClient'
 import { updateHistoryCsv } from '../lib/priceHistoryCsv'
 import type { PriceHistoryRow } from '../lib/priceHistoryCsv'
+
+console.log("scheduled-price-history>Starting registering scheduled-price-history function...");
 
 const CRON_EXPRESSION = '0 19,20 * * *'
 const HISTORY_FILE_PATH = 'history.csv'
@@ -171,7 +172,7 @@ async function handleScheduledRun(event: HandlerEvent): Promise<HandlerResponse>
   try {
     return await runDailySnapshot(new Date())
   } catch (error) {
-    log('Daily price history run failed:', error)
+    console.error('Daily price history run failed:', error)
     return jsonResponse(500, { error: 'Daily price history run failed.' })
   }
 }
