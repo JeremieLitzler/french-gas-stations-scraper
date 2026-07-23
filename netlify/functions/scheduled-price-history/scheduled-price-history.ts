@@ -163,12 +163,17 @@ async function runDailySnapshot(now: Date): Promise<HandlerResponse> {
 }
 
 async function handleScheduledRun(event: HandlerEvent): Promise<HandlerResponse> {
-  //if (!isScheduledInvocation(event.body)) {
-  //  return jsonResponse(403, { error: 'Not a scheduled invocation.' })
-  //}
-  //if (!isTargetLocalHour(new Date())) {
-  //  return jsonResponse(200, { skipped: true })
-  //}
+  let outcome = ""
+  if (!isScheduledInvocation(event.body)) {
+    outcome = "Not a scheduled invocation."
+    console.error(outcome)
+    return jsonResponse(403, { error: outcome })
+  }
+  if (!isTargetLocalHour(new Date())) {
+    outcome = "Is not target local hour."
+    console.warn(outcome)
+    return jsonResponse(200, { skipped: true })
+  }
   try {
     return await runDailySnapshot(new Date())
   } catch (error) {
