@@ -1,90 +1,63 @@
-# Technical Specifications — Issue #115: Randomize the Scheduled Run's Trigger Time
+# Technical Specifications — Issue #115: Fix the Scheduled Run's Trigger Time
 
 ## Files Changed
 
-- `netlify/functions/scheduled-price-history/scheduled-price-history.ts` — replaced the fixed
-  `CRON_EXPRESSION` constant with `CronExpression`, resolved once at module load by picking a
-  random Paris-local time in [20:00, 22:59] and converting it to the UTC cron string `schedule()`
-  registers with. Dropped the `isTargetLocalHour` guard call from `handleScheduledRun`.
-- `netlify/functions/lib/scheduleGuards.ts` — removed `TARGET_LOCAL_HOUR`, `isTargetLocalHour`,
-  and `parisHour`. `isScheduledInvocation` and its private helpers are untouched.
-- `netlify/functions/lib/scheduleGuards.spec.ts` — removed scenarios 1–4 (the `isTargetLocalHour`
-  coverage for issue #112); scenario 18 (`isScheduledInvocation`) kept as-is.
+- `netlify/functions/scheduled-price-history/scheduled-price-history.ts` — reverted the earlier
+  per-deploy random-time-resolution logic (`pickRandomParisLocalTime`, `numericPart`,
+  `datePartsInParis`, `parisTimeReadAsUtc`, `parisUtcOffsetMinutes`, `toUtcClockTime`,
+  `toCronExpression`, `resolveTriggerCronExpression`, the `ClockTime` interface, and all their
+  supporting constants) back to a single static `CRON_EXPRESSION = '0 19 * * *'` literal passed
+  directly to `schedule(...)`. `handleScheduledRun`'s only guard remains `isScheduledInvocation`.
+- `netlify/functions/scheduled-price-history/scheduled-price-history.spec.ts` — deleted. It only
+  covered the random-time-resolution logic being removed (window bounds, minute spread, CET/CEST
+  conversion, concrete-value-at-registration, once-per-module-load reuse), per test-cases.md.
+- `docs/decisions/ADR-014-scheduled-function-pat-auth.md` — "Scheduling Mechanism (DST handling)"
+  renamed to "Scheduling Mechanism" and rewritten to describe the single fixed 19:00 UTC trigger,
+  replacing the twice-daily-plus-guard mechanism it previously documented. The Consequences
+  section's positive "DST-correct scheduling" bullet and negative "twice-daily no-op invocation"
+  bullet were removed/replaced, since both described the mechanism this issue supersedes; a new
+  negative bullet documents the accepted DST drift instead.
+- `netlify/functions/lib/scheduleGuards.ts` / `scheduleGuards.spec.ts` — already in their target
+  state from earlier in this issue (no `TARGET_LOCAL_HOUR`/`isTargetLocalHour`); unchanged here.
 
 ## Non-Trivial Decisions
 
-**Trigger-time resolution logic lives inline in `scheduled-price-history.ts`, not in a new lib
-file.** The business spec's "Files to Create or Modify" section lists only the three files above
-— no new helper module. Since this logic has no other caller, adding a fourth file would be an
-unrequested abstraction.
+**The cron value is a plain string literal assigned to a module-level `const`, not inlined
+directly into the `schedule()` call.** Either satisfies the "static literal" requirement
+equally; the named constant is kept because it is referenced from the doc comment above it and
+makes the 19:00 UTC / 21:00-French-local relationship easier to find on a future edit than an
+anonymous string would.
 
-**The resolution is split into four small pure functions** (`pickRandomParisLocalTime`,
-`toUtcClockTime`, `toCronExpression`, `resolveTriggerCronExpression`) instead of one function that
-does everything. Each is independently testable against the test-cases.md scenarios: scenarios
-1–4 only need `pickRandomParisLocalTime`'s output range/distribution; scenarios 5–6 need
-`toUtcClockTime` given a fixed Paris local time and a fixed `now` (to control CET vs CEST) without
-randomness in the way. All four are exported for that reason.
+**ADR-014's Consequences bullets describing the removed twice-daily mechanism were edited, not
+left as-is, even though business-specifications.md's "Files to Create or Modify" section only
+named the "Scheduling Mechanism" section explicitly.** Leaving them would have made the ADR
+assert, in its own Consequences list, benefits and costs of a mechanism the Decision section no
+longer describes (DST-correctness, twice-daily invocation overhead) — an internal contradiction
+in the same document, not a scope expansion. The Alternatives Considered section was left
+untouched: it evaluates rejected paths against the design at the time and remains historically
+accurate without needing a rewrite.
 
-**The Paris→UTC offset is computed by reformatting `now` into Paris wall-clock digits and reading
-those same digits back as if they were UTC, then diffing against `now`** (`parisUtcOffsetMinutes`),
-rather than parsing a `timeZoneName: 'longOffset'` string. `longOffset` is a newer Intl option with
-less consistent runtime support; the digits-diff technique only depends on `formatToParts` with
-plain numeric fields, which is universally supported, and matches the technique the original
-`scheduleGuards.ts` file already relied on (via `Intl.DateTimeFormat` + `Europe/Paris`) — this
-function bundles a repo-write PAT (ADR-014), so minimizing what the module load path depends on
-matters (security-guidelines.md rule 3).
-
-**`toUtcClockTime` wraps the minute-of-day math with a defensive `+ MINUTES_PER_DAY) % MINUTES_PER_DAY`**
-even though the current trigger window (20:00–22:59 Paris, offset always +60 or +120) never
-actually goes negative. It costs nothing and makes the function correct for any `ClockTime` input,
-not just the current window's numbers — cheaper to keep than to have to reason about which window
-values are "safe" if the window ever changes.
-
-**No new npm dependency was added** — the whole resolution uses only `Math.random`, `Date`, and
-built-in `Intl`, per security-guidelines.md rule 2.
+**No new npm dependency, no lib file added.** The reverted logic is a single literal; there is
+nothing left to factor into a helper.
 
 ## Self-Review
 
-Three things were checked deliberately before finishing, given this code runs on every deploy with
-no test coverage of its own from this command:
+Three things checked before finishing:
 
-1. **Node/V8's known `Intl.DateTimeFormat` quirk of formatting midnight as hour "24" instead of
-   "00"** (historically triggered by `hour12: false`) is avoided by using `hourCycle: 'h23'`
-   explicitly rather than `hour12`. Even if it did occur, `Date.UTC` normalizes an out-of-range
-   hour into the next calendar day automatically, and the later `% MINUTES_PER_DAY` in
-   `toUtcClockTime` absorbs the resulting whole-day offset — so the failure mode is doubly guarded.
-2. **`Math.random()`'s exclusive upper bound** was verified against the window math:
-   `Math.floor(Math.random() * 3)` can only yield 0, 1, or 2 (never 3), so the picked hour never
-   exceeds 22; `Math.floor(Math.random() * 60)` never exceeds 59. The 22:59 upper bound from
-   business-specifications.md is structurally guaranteed, not just probable.
-3. **Fixed**: `handleScheduledRun`'s `let outcome = ""` declared outside the guard was a leftover
-   from when the function had two guard branches (`isScheduledInvocation` and `isTargetLocalHour`)
-   sharing one variable. With the second branch removed, the variable only has one assignment site
-   left — changed to a `const` scoped inside the `if` block instead of a mutable outer variable.
+1. **Confirmed no other file references the removed exports** (`pickRandomParisLocalTime`,
+   `toUtcClockTime`, `toCronExpression`, `resolveTriggerCronExpression`, `ClockTime`,
+   `CronExpression`) — a repo-wide search turned up only the task-folder docs describing the
+   prior attempt, none in `netlify/` or `src/`.
+2. **Verified `scheduleGuards.ts` and `scheduleGuards.spec.ts` already matched this issue's target
+   state** (no `TARGET_LOCAL_HOUR`/`isTargetLocalHour`, only scenario 18 for
+   `isScheduledInvocation`) from earlier work in this issue — no further edit needed there.
+3. **Checked `netlify.toml` for any cron/schedule configuration that might duplicate or conflict
+   with the in-code `schedule(...)` call** — none found; the trigger is registered solely via the
+   `schedule()` wrapper in `scheduled-price-history.ts`.
 
 ## Manual Verification
 
-`npm run type-check` and `npm run lint` both pass on the changed files (lint reports 9 pre-existing
-errors in unrelated `usePreferencesExport.spec.ts` / `usePreferencesImport.spec.ts` files, untouched
-by this change).
-
-## Review Follow-Up
-
-`review-results.md` flagged `parisUtcOffsetMinutes` for exceeding the 5-line method limit (Object
-Calisthenics rule 7): an inline 8-key `Intl.DateTimeFormat` options object plus a 6-argument
-`Date.UTC(...)` call in one ~20-line body. Fixed by:
-
-- Hoisting the formatter to a module-level `PARIS_DATE_TIME_FORMATTER` constant — it has no
-  per-call inputs, so rebuilding it on every invocation was also wasted work, not just a length
-  problem.
-- Extracting the `formatToParts` + numeric-extraction step into `datePartsInParis(now)`, returning
-  `[year, month, day, hour, minute, second]` via a `PARIS_DATE_PART_TYPES` array mapped through the
-  existing `numericPart` helper, rather than six repeated `numericPart(parts, '...')` calls.
-- Extracting the `Date.UTC(...)` diff setup into `parisTimeReadAsUtc(now)`, which destructures
-  `datePartsInParis`'s array directly into `Date.UTC`'s arguments.
-
-`parisUtcOffsetMinutes` itself is now a single-line return: the diff-and-round against
-`parisTimeReadAsUtc(now)`. Behavior is unchanged — same digits-diff technique, same inputs/outputs
-— this is a pure decomposition, not a logic change.
+Not run in this command per `/jli-codes` scope (`npm run type-check` / `npm run lint` /
+`npm run test` belong to `/jli-runs-tests` and `/jli-reviews-code`).
 
 status: ready
