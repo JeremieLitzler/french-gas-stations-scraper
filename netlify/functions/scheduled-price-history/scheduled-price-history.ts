@@ -10,7 +10,7 @@ import type { HandlerEvent, HandlerResponse } from '@netlify/functions'
 import { jsonResponse } from '../lib/http-responses'
 import { readHistoryConfig } from '../lib/environment'
 import type { HistoryConfig } from '../lib/environment'
-import { isScheduledInvocation, isTargetLocalHour } from '../lib/scheduleGuards'
+import { isScheduledInvocation } from '../lib/scheduleGuards'
 import { isAllowedStationUrl } from '../lib/stationUrlAllowlist'
 import { parseStationHtml } from '../lib/stationHtmlParser'
 import type { ScrapedFuelPrice } from '../lib/stationHtmlParser'
@@ -22,14 +22,92 @@ import type { PriceHistoryRow } from '../lib/priceHistoryCsv'
 
 console.log("scheduled-price-history>Starting registering scheduled-price-history function...");
 
-const CRON_EXPRESSION = '0 19,20 * * *'
 const HISTORY_FILE_PATH = 'history.csv'
 const USER_AGENT = 'french-gas-stations-scraper/1.0'
 const COMMIT_MESSAGE_PREFIX = 'Historique des prix du'
 const APP_NAME = 'Coup de pompe'
 const STATION_FETCH_TIMEOUT_MS = 10_000
 
+const PARIS_TIME_ZONE = 'Europe/Paris'
+const TRIGGER_WINDOW_START_HOUR = 20
+const TRIGGER_WINDOW_END_HOUR = 22
+const MINUTES_PER_HOUR = 60
+const HOURS_PER_DAY = 24
+const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR
+
 type FoundFuelPrice = ScrapedFuelPrice & { price: number }
+
+export interface ClockTime {
+  hour: number
+  minute: number
+}
+
+// Picks the daily trigger's Paris-local hour/minute, once per deploy
+// (business-specifications.md). 20:00-22:59 inclusive, so the window spans
+// three whole hours.
+export function pickRandomParisLocalTime(): ClockTime {
+  const windowHourCount = TRIGGER_WINDOW_END_HOUR - TRIGGER_WINDOW_START_HOUR + 1
+  const hour = TRIGGER_WINDOW_START_HOUR + Math.floor(Math.random() * windowHourCount)
+  const minute = Math.floor(Math.random() * MINUTES_PER_HOUR)
+  return { hour, minute }
+}
+
+function numericPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): number {
+  return Number(parts.find((part) => part.type === type)?.value ?? '0')
+}
+
+// Reads `now`'s wall-clock date/time as it appears in Paris, then treats
+// those same digits as UTC to measure Paris's current offset from UTC — the
+// standard offset-free way to ask "what is this zone's offset right now"
+// without needing IANA-aware date arithmetic (security-guidelines.md rule
+// 3: local computation only, no network or external calls).
+function parisUtcOffsetMinutes(now: Date): number {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: PARIS_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hourCycle: 'h23',
+  })
+  const parts = formatter.formatToParts(now)
+  const parisReadAsUtc = Date.UTC(
+    numericPart(parts, 'year'),
+    numericPart(parts, 'month') - 1,
+    numericPart(parts, 'day'),
+    numericPart(parts, 'hour'),
+    numericPart(parts, 'minute'),
+    numericPart(parts, 'second'),
+  )
+  return Math.round((parisReadAsUtc - now.getTime()) / (MINUTES_PER_HOUR * 1000))
+}
+
+// Converts a Paris-local clock time into the UTC clock time cron must fire
+// at, using the offset in effect at `now` (CET or CEST). A deploy near a DST
+// transition may drift by up to an hour until the next deploy re-resolves it
+// — an accepted trade-off (business-specifications.md).
+export function toUtcClockTime(parisLocal: ClockTime, now: Date): ClockTime {
+  const offsetMinutes = parisUtcOffsetMinutes(now)
+  const parisMinuteOfDay = parisLocal.hour * MINUTES_PER_HOUR + parisLocal.minute
+  const utcMinuteOfDay = ((parisMinuteOfDay - offsetMinutes) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY
+  return { hour: Math.floor(utcMinuteOfDay / MINUTES_PER_HOUR), minute: utcMinuteOfDay % MINUTES_PER_HOUR }
+}
+
+export function toCronExpression(utcTime: ClockTime): string {
+  return `${utcTime.minute} ${utcTime.hour} * * *`
+}
+
+// Resolved once, synchronously, at module load — schedule() below needs a
+// concrete string the instant it runs (business-specifications.md).
+export function resolveTriggerCronExpression(now: Date): string {
+  const parisLocal = pickRandomParisLocalTime()
+  const utcTime = toUtcClockTime(parisLocal, now)
+  return toCronExpression(utcTime)
+}
+
+const CronExpression = resolveTriggerCronExpression(new Date())
 
 function toIsoDate(now: Date): string {
   return now.toISOString().slice(0, 10)
@@ -163,16 +241,10 @@ async function runDailySnapshot(now: Date): Promise<HandlerResponse> {
 }
 
 async function handleScheduledRun(event: HandlerEvent): Promise<HandlerResponse> {
-  let outcome = ""
   if (!isScheduledInvocation(event.body)) {
-    outcome = "Not a scheduled invocation."
+    const outcome = "Not a scheduled invocation."
     console.error(outcome)
     return jsonResponse(403, { error: outcome })
-  }
-  if (!isTargetLocalHour(new Date())) {
-    outcome = "Is not target local hour."
-    console.warn(outcome)
-    return jsonResponse(200, { skipped: true })
   }
   try {
     return await runDailySnapshot(new Date())
@@ -182,4 +254,4 @@ async function handleScheduledRun(event: HandlerEvent): Promise<HandlerResponse>
   }
 }
 
-export const handler = schedule(CRON_EXPRESSION, handleScheduledRun)
+export const handler = schedule(CronExpression, handleScheduledRun)
