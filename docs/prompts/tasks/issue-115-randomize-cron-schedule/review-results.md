@@ -6,18 +6,24 @@ type-check: clean
 
 ## Findings
 
-- **Object Calisthenics rule 7 (methods ≤5 lines)** —
-  `netlify/functions/scheduled-price-history/scheduled-price-history.ts:64-85`
-  (`parisUtcOffsetMinutes`). The body spans ~20 lines: an 8-key `Intl.DateTimeFormat` options
-  object (static — doesn't depend on `now` or any other parameter) is rebuilt inline every call,
-  followed by a 6-argument `Date.UTC(...)` call. Extract the formatter to a module-level constant
-  (it has no per-call inputs) and/or pull the `formatToParts` + numeric-extraction step into a
-  small `datePartsInParis(now)` helper so `parisUtcOffsetMinutes` itself reads as offset-from-diff
-  in ≤5 lines.
+None. The previous finding (Object Calisthenics rule 7 — `parisUtcOffsetMinutes` spanning
+~20 lines) is resolved: the formatter is now a module-level `PARIS_DATE_TIME_FORMATTER`
+constant, `datePartsInParis(now)` isolates the `formatToParts` + numeric-extraction step, and
+`parisTimeReadAsUtc(now)` isolates the `Date.UTC(...)` diff setup. `parisUtcOffsetMinutes`
+itself is now a single-line return. Every function in
+`scheduled-price-history/scheduled-price-history.ts`'s trigger-resolution chain
+(`pickRandomParisLocalTime`, `numericPart`, `datePartsInParis`, `parisTimeReadAsUtc`,
+`parisUtcOffsetMinutes`, `toUtcClockTime`, `toCronExpression`, `resolveTriggerCronExpression`)
+is now ≤5 lines of body.
 
-All other checklist items ✓ (security-guidelines.md rules 1–3 all verifiably met; business spec
-matched with no scope creep; no dead code or unused imports; naming has no abbreviations; no
-Vue-specific concerns apply to these plain Netlify function files; no `any`/`unknown`/non-null `!`
-introduced; all exported functions have explicit return types).
+All other checklist items ✓ (security-guidelines.md rules 1–3 all verifiably met:
+`isScheduledInvocation` remains the sole invocation guard at `scheduled-price-history.ts:249`
+and is unchanged; no new npm dependency, only `Math.random`/`Date`/`Intl`; the whole resolution
+chain is synchronous local computation with no network calls before `schedule(...)` at line 262.
+Business spec matched with no scope creep — `TARGET_LOCAL_HOUR`/`isTargetLocalHour` are gone
+from `scheduleGuards.ts`, `isScheduledInvocation` untouched, `scheduleGuards.spec.ts` keeps only
+scenario 18. No dead code or unused imports. Naming has no abbreviations. No Vue-specific
+concerns apply to these plain Netlify function files. No `any`/`unknown`/non-null `!`
+introduced. All exported functions have explicit return types.)
 
-status: changes requested
+status: approved
