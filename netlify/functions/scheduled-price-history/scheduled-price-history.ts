@@ -52,36 +52,41 @@ export function pickRandomParisLocalTime(): ClockTime {
   return { hour, minute }
 }
 
+const PARIS_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: PARIS_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hourCycle: 'h23',
+})
+
+const PARIS_DATE_PART_TYPES: Intl.DateTimeFormatPartTypes[] = ['year', 'month', 'day', 'hour', 'minute', 'second']
+
 function numericPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): number {
   return Number(parts.find((part) => part.type === type)?.value ?? '0')
 }
 
-// Reads `now`'s wall-clock date/time as it appears in Paris, then treats
-// those same digits as UTC to measure Paris's current offset from UTC — the
-// standard offset-free way to ask "what is this zone's offset right now"
-// without needing IANA-aware date arithmetic (security-guidelines.md rule
-// 3: local computation only, no network or external calls).
+// `now`'s wall-clock date/time as it appears in Paris, in
+// [year, month, day, hour, minute, second] order.
+function datePartsInParis(now: Date): number[] {
+  const parts = PARIS_DATE_TIME_FORMATTER.formatToParts(now)
+  return PARIS_DATE_PART_TYPES.map((type) => numericPart(parts, type))
+}
+
+// Treats Paris's wall-clock digits as if they were UTC digits — the
+// standard offset-free way to measure a zone's current UTC offset without
+// needing IANA-aware date arithmetic (security-guidelines.md rule 3: local
+// computation only, no network or external calls).
+function parisTimeReadAsUtc(now: Date): number {
+  const [year, month, day, hour, minute, second] = datePartsInParis(now)
+  return Date.UTC(year, month - 1, day, hour, minute, second)
+}
+
 function parisUtcOffsetMinutes(now: Date): number {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: PARIS_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hourCycle: 'h23',
-  })
-  const parts = formatter.formatToParts(now)
-  const parisReadAsUtc = Date.UTC(
-    numericPart(parts, 'year'),
-    numericPart(parts, 'month') - 1,
-    numericPart(parts, 'day'),
-    numericPart(parts, 'hour'),
-    numericPart(parts, 'minute'),
-    numericPart(parts, 'second'),
-  )
-  return Math.round((parisReadAsUtc - now.getTime()) / (MINUTES_PER_HOUR * 1000))
+  return Math.round((parisTimeReadAsUtc(now) - now.getTime()) / (MINUTES_PER_HOUR * 1000))
 }
 
 // Converts a Paris-local clock time into the UTC clock time cron must fire

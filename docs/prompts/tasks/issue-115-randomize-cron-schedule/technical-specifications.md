@@ -68,4 +68,23 @@ no test coverage of its own from this command:
 errors in unrelated `usePreferencesExport.spec.ts` / `usePreferencesImport.spec.ts` files, untouched
 by this change).
 
+## Review Follow-Up
+
+`review-results.md` flagged `parisUtcOffsetMinutes` for exceeding the 5-line method limit (Object
+Calisthenics rule 7): an inline 8-key `Intl.DateTimeFormat` options object plus a 6-argument
+`Date.UTC(...)` call in one ~20-line body. Fixed by:
+
+- Hoisting the formatter to a module-level `PARIS_DATE_TIME_FORMATTER` constant — it has no
+  per-call inputs, so rebuilding it on every invocation was also wasted work, not just a length
+  problem.
+- Extracting the `formatToParts` + numeric-extraction step into `datePartsInParis(now)`, returning
+  `[year, month, day, hour, minute, second]` via a `PARIS_DATE_PART_TYPES` array mapped through the
+  existing `numericPart` helper, rather than six repeated `numericPart(parts, '...')` calls.
+- Extracting the `Date.UTC(...)` diff setup into `parisTimeReadAsUtc(now)`, which destructures
+  `datePartsInParis`'s array directly into `Date.UTC`'s arguments.
+
+`parisUtcOffsetMinutes` itself is now a single-line return: the diff-and-round against
+`parisTimeReadAsUtc(now)`. Behavior is unchanged — same digits-diff technique, same inputs/outputs
+— this is a pure decomposition, not a logic change.
+
 status: ready
