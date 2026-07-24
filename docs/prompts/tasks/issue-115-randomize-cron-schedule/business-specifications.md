@@ -1,58 +1,47 @@
-# Business Specifications — Issue #115: Randomize the Scheduled Run's Trigger Time
+# Business Specifications — Issue #115: Fix the Scheduled Run's Trigger Time
 
 ## Goal and Scope
 
-Replace the daily price-history job's current trigger logic — a cron fired at two fixed UTC
-hours (to compensate for daylight saving) plus a guard that only allows the run through if the
-invocation lands on an exact target local hour — with a single trigger time, randomly chosen
-within a broader French-local-time window. This removes the class of bug where a legitimate
-invocation lands outside the one hour the guard accepts and is silently skipped, without
-reintroducing the DST-offset bug the original fixed-hour design tried to work around.
+Supersede this issue's earlier attempt (a per-deploy, randomly-computed cron expression):
+Netlify's scheduled-function build step reads the `schedule()` call's cron argument directly
+from source text, without executing the file — only a literal string works, never a value
+resolved by running code. Replace it with a single fixed daily trigger time, and keep this
+issue's other fix: removing the `isTargetLocalHour` guard, whose original bug was that a
+legitimate invocation landing outside the one accepted local hour was silently skipped.
 
-Scope is limited to how and when `netlify/functions/scheduled-price-history/scheduled-price-history.ts`
-is triggered. The work the job performs once triggered (issue #112, ADR-014) does not change.
+Scope is limited to how and when `scheduled-price-history.ts` is triggered. The work the job
+performs once triggered (issue #112, ADR-014) does not change.
 
 ## Files to Create or Modify
 
-- `netlify/functions/scheduled-price-history/scheduled-price-history.ts` — no longer registers
-  a fixed cron expression; registers a cron expression whose time was randomly chosen within the
-  target window, fully resolved before the schedule registration happens.
-- `netlify/functions/lib/scheduleGuards.ts` — drops the fixed-target-hour concept
-  (`TARGET_LOCAL_HOUR`, `isTargetLocalHour`) entirely, since there is no longer one fixed hour to
-  compare an invocation against. `isScheduledInvocation` (the defense-in-depth check that the
-  call actually came from Netlify's scheduler) is unaffected and stays as-is.
-- `netlify/functions/lib/scheduleGuards.spec.ts` — test coverage follows the guard changes: the
-  target-hour tests are removed; `isScheduledInvocation` tests are unaffected.
+- `netlify/functions/scheduled-price-history/scheduled-price-history.ts` — reverts to a fixed,
+  literal cron expression; all per-deploy trigger-time-resolution logic from the earlier attempt
+  (random Paris-local pick, UTC conversion, offset computation) is removed, since nothing is
+  computed anymore.
+- `netlify/functions/scheduled-price-history/scheduled-price-history.spec.ts` — deleted; it only
+  exercised the random-time-resolution logic being removed.
+- `docs/decisions/ADR-014-scheduled-function-pat-auth.md` — "Scheduling Mechanism" section
+  amended to describe the single fixed cron trigger, replacing the twice-daily-plus-guard
+  mechanism it currently documents (which this issue also removes).
+- `netlify/functions/lib/scheduleGuards.ts` and `scheduleGuards.spec.ts` — already dropped
+  `isTargetLocalHour`/`TARGET_LOCAL_HOUR` earlier in this issue; unaffected by this revision.
 
 ## Rules
 
-**The job fires exactly once per day, at a single random time between 20:00 and 22:59 French
-local time (Europe/Paris), inclusive of the minute.** Example: on a given deploy, the resolved
-time might be 21:37 Paris local time; every day until the next deploy, the job fires at 21:37
-Paris local time (adjusted for whichever of CET/CEST is in effect that day).
+**The job fires once a day, at a single fixed time: 19:00 UTC.** That's 21:00 French local time
+during CEST (summer) and 20:00 during CET (winter). This value is a literal in the cron
+expression, not computed — the earlier attempt failed to deploy because Netlify's build step
+cannot execute code to resolve a value at build time.
 
-**The random time is chosen once, when the function's code is loaded (i.e., once per deploy), not
-recomputed per invocation or per day.** The same resolved time is reused for every daily firing
-until the next deploy triggers a new pick. This is a deliberate trade-off: true day-to-day
-randomization is not achievable with a single static cron registration, so redeploy frequency is
-what varies the trigger time over the long run.
+**No guard rejects a valid scheduled invocation for landing at the "wrong" hour.**
+`isTargetLocalHour` and `TARGET_LOCAL_HOUR` stay removed. `isScheduledInvocation` — confirming the
+call actually came from Netlify's scheduler — remains the only check before a run is attempted.
 
-**The random time must be fully resolved to a concrete value before the schedule registration is
-reached.** The function's registration with Netlify's scheduler happens once, synchronously, as
-the module loads — if the random time were still being computed asynchronously at that point, the
-registration would not have a usable value to register with, and the job would not be scheduled
-correctly for that deploy.
+**The French local trigger time is not DST-corrected.** Because the cron expression is a fixed
+UTC value, the actual local fire time drifts by an hour between CEST and CET across the year — an
+accepted trade-off of using one static cron entry, not treated as a bug.
 
-**No guard rejects a valid scheduled invocation for landing at the "wrong" hour anymore.** Because
-the registered trigger time is itself already the target, there is nothing left to double-check
-against a fixed target hour. `isScheduledInvocation` still rejects any call that doesn't carry the
-shape of a genuine Netlify scheduler invocation, but a genuine invocation is never skipped for
-timing reasons.
-
-**A deploy that happens close to a DST transition (late March / late October) may leave the
-resolved trigger time offset by up to an hour in French local time until the next deploy**, since
-the local-to-UTC conversion is fixed at pick time and the cron registration itself cannot shift
-automatically when the clocks change. This is an accepted consequence of resolving the time once
-per deploy rather than once per day, and is not treated as a bug to guard against in this change.
+**Changing the trigger time in the future means editing the literal cron expression in source and
+redeploying.** There is no runtime or automatic mechanism to vary it.
 
 status: ready
