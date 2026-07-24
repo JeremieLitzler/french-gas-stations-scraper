@@ -43,13 +43,21 @@ normally supplies:
 `history.csv` itself is written at a fixed path (repo root) — not user-configurable — per the
 issue's literal request for a file named `history.csv`.
 
-### Scheduling Mechanism (DST handling)
+### Scheduling Mechanism
 
-The Netlify Scheduled Function's cron trigger fires **twice** a day, at 19:00 and 20:00 UTC —
-covering both possible UTC offsets of 21:00 French local time. On each invocation, the function
-computes the current wall-clock hour in the `Europe/Paris` time zone and exits immediately,
-without touching `history.csv`, unless that hour is 21. This guarantees exactly one effective run
-per day at true French local 21:00 year-round, with no manual cron edit needed at DST changeovers.
+The Netlify Scheduled Function's cron trigger fires **once** a day, at a single fixed
+`19:00 UTC` — a plain string literal in the `schedule()` call, since Netlify's build step reads
+that argument directly from source text without executing the file (only a literal works, never
+a value resolved by running code). That is 21:00 French local time in CEST (summer) and 20:00 in
+CET (winter): the local fire time is **not DST-corrected**, and drifts by an hour across the year
+— an accepted trade-off (issue #115), not a bug. Changing the trigger time means editing the
+literal and redeploying; there is no runtime or automatic mechanism to vary it.
+
+An earlier revision of this ADR described a twice-daily (19:00 and 20:00 UTC) trigger paired with
+a wall-clock-hour guard that skipped every invocation except the one landing on French local
+21:00, to stay DST-correct without manual edits. Issue #115 removed that guard after it silently
+skipped a legitimate invocation that landed outside the one accepted hour, and replaced the
+mechanism with the single fixed entry described above.
 
 ## Consequences
 
@@ -59,7 +67,6 @@ per day at true French local 21:00 year-round, with no manual cron edit needed a
   login state, cookie expiry, or whether anyone opens the app that day.
 - ✅ Least-privilege credential: fine-grained PAT scoped to one repo, one permission, unlike the
   broader `repo`/`public_repo` OAuth scope already granted to browser sessions.
-- ✅ DST-correct scheduling without recurring maintenance (no biannual cron edit).
 - ✅ No new proxy function needed — the scheduled function calls the GitHub Contents API
   directly, since there's no browser request to shield the token from.
 
@@ -73,8 +80,8 @@ per day at true French local 21:00 year-round, with no manual cron edit needed a
 - ⚠️ Two extra environment variables (`HISTORY_GITHUB_OWNER`, `HISTORY_PREFS_FILE_PATH`) must be
   kept manually in sync with whatever the user has configured in the Settings UI — they will
   silently drift if the user changes the Settings UI values without updating Netlify.
-- ⚠️ Firing the scheduled trigger twice daily (to cover both DST offsets) means one invocation
-  per day does no useful work beyond checking the clock and exiting — a minor, accepted overhead.
+- ⚠️ The fixed 19:00 UTC trigger is not DST-corrected — the true French local fire time drifts by
+  an hour between CEST and CET across the year (issue #115, accepted trade-off, not a bug).
 - ⚠️ This design is explicitly single-user/single-repo. Generalizing to multiple app users would
   require a fundamentally different config/credential storage approach (out of scope here).
 

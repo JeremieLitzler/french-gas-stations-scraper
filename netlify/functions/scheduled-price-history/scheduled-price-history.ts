@@ -28,91 +28,13 @@ const COMMIT_MESSAGE_PREFIX = 'Historique des prix du'
 const APP_NAME = 'Coup de pompe'
 const STATION_FETCH_TIMEOUT_MS = 10_000
 
-const PARIS_TIME_ZONE = 'Europe/Paris'
-const TRIGGER_WINDOW_START_HOUR = 20
-const TRIGGER_WINDOW_END_HOUR = 22
-const MINUTES_PER_HOUR = 60
-const HOURS_PER_DAY = 24
-const MINUTES_PER_DAY = HOURS_PER_DAY * MINUTES_PER_HOUR
+// Fixed daily trigger at 19:00 UTC — 21:00 French local time in CEST, 20:00
+// in CET (business-specifications.md). Must stay a plain string literal:
+// Netlify's build step reads schedule()'s argument from source text without
+// executing the file, so no computed value can ever appear here.
+const CRON_EXPRESSION = '0 19 * * *'
 
 type FoundFuelPrice = ScrapedFuelPrice & { price: number }
-
-export interface ClockTime {
-  hour: number
-  minute: number
-}
-
-// Picks the daily trigger's Paris-local hour/minute, once per deploy
-// (business-specifications.md). 20:00-22:59 inclusive, so the window spans
-// three whole hours.
-export function pickRandomParisLocalTime(): ClockTime {
-  const windowHourCount = TRIGGER_WINDOW_END_HOUR - TRIGGER_WINDOW_START_HOUR + 1
-  const hour = TRIGGER_WINDOW_START_HOUR + Math.floor(Math.random() * windowHourCount)
-  const minute = Math.floor(Math.random() * MINUTES_PER_HOUR)
-  return { hour, minute }
-}
-
-const PARIS_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
-  timeZone: PARIS_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  second: '2-digit',
-  hourCycle: 'h23',
-})
-
-const PARIS_DATE_PART_TYPES: Intl.DateTimeFormatPartTypes[] = ['year', 'month', 'day', 'hour', 'minute', 'second']
-
-function numericPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatPartTypes): number {
-  return Number(parts.find((part) => part.type === type)?.value ?? '0')
-}
-
-// `now`'s wall-clock date/time as it appears in Paris, in
-// [year, month, day, hour, minute, second] order.
-function datePartsInParis(now: Date): number[] {
-  const parts = PARIS_DATE_TIME_FORMATTER.formatToParts(now)
-  return PARIS_DATE_PART_TYPES.map((type) => numericPart(parts, type))
-}
-
-// Treats Paris's wall-clock digits as if they were UTC digits — the
-// standard offset-free way to measure a zone's current UTC offset without
-// needing IANA-aware date arithmetic (security-guidelines.md rule 3: local
-// computation only, no network or external calls).
-function parisTimeReadAsUtc(now: Date): number {
-  const [year, month, day, hour, minute, second] = datePartsInParis(now)
-  return Date.UTC(year, month - 1, day, hour, minute, second)
-}
-
-function parisUtcOffsetMinutes(now: Date): number {
-  return Math.round((parisTimeReadAsUtc(now) - now.getTime()) / (MINUTES_PER_HOUR * 1000))
-}
-
-// Converts a Paris-local clock time into the UTC clock time cron must fire
-// at, using the offset in effect at `now` (CET or CEST). A deploy near a DST
-// transition may drift by up to an hour until the next deploy re-resolves it
-// — an accepted trade-off (business-specifications.md).
-export function toUtcClockTime(parisLocal: ClockTime, now: Date): ClockTime {
-  const offsetMinutes = parisUtcOffsetMinutes(now)
-  const parisMinuteOfDay = parisLocal.hour * MINUTES_PER_HOUR + parisLocal.minute
-  const utcMinuteOfDay = ((parisMinuteOfDay - offsetMinutes) % MINUTES_PER_DAY + MINUTES_PER_DAY) % MINUTES_PER_DAY
-  return { hour: Math.floor(utcMinuteOfDay / MINUTES_PER_HOUR), minute: utcMinuteOfDay % MINUTES_PER_HOUR }
-}
-
-export function toCronExpression(utcTime: ClockTime): string {
-  return `${utcTime.minute} ${utcTime.hour} * * *`
-}
-
-// Resolved once, synchronously, at module load — schedule() below needs a
-// concrete string the instant it runs (business-specifications.md).
-export function resolveTriggerCronExpression(now: Date): string {
-  const parisLocal = pickRandomParisLocalTime()
-  const utcTime = toUtcClockTime(parisLocal, now)
-  return toCronExpression(utcTime)
-}
-
-const CronExpression = resolveTriggerCronExpression(new Date())
 
 function toIsoDate(now: Date): string {
   return now.toISOString().slice(0, 10)
@@ -259,4 +181,4 @@ async function handleScheduledRun(event: HandlerEvent): Promise<HandlerResponse>
   }
 }
 
-export const handler = schedule(CronExpression, handleScheduledRun)
+export const handler = schedule(CRON_EXPRESSION, handleScheduledRun)
