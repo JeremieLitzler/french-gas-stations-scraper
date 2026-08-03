@@ -73,6 +73,71 @@ On any preference change, the app writes optimistically to IndexedDB, then to th
 - The GitHub Contents API has a file size limit of 100 MB (well above any realistic preferences JSON).
 - If the user's repository is private, the `repo` OAuth scope is required. If public, `public_repo` suffices. Scope selection should be documented in the Settings UI setup guide.
 
+## Addendum (2026-08-03): Batched Write Trigger for Station List Edits (Issue #110)
+
+**Status:** Accepted
+
+### Context
+
+The original Write Flow pushes to GitHub on every single preference change — each station
+add/edit/delete in `StationManagerTable.vue` triggered its own immediate `PUT` and, when a
+remote file already existed, its own diff-confirmation dialog. Editing several stations in a
+row (e.g. renaming three stations one after another) produced three separate GitHub commits
+and three separate confirmation dialogs, and the dialog itself showed the full before/after
+JSON of the file rather than what had actually changed — both work against this ADR's
+"auditable" rationale (point 3) once a user makes more than one edit at a time.
+
+### Decision
+
+For station-list edits made in `StationManager`/`StationManagerTable.vue` only, the write flow
+changes from immediate-on-every-change to **batched and explicitly triggered**:
+
+- Adding, editing, or deleting a station still writes to IndexedDB immediately, unchanged.
+- The GitHub push is deferred: the app tracks that a push is pending since the last successful
+  write, without pushing yet.
+- A new "Enregistrer les modifications" button in `StationManager` is visible only while a push
+  is pending. Clicking it bundles every station-list change made since the last successful push
+  into a single diff/`PUT`, reusing the same `sha`-based optimistic concurrency (an absent `sha`
+  creates, a stale `sha` still 409s) and the same proxy/auth path this ADR already established.
+- The diff-confirmation dialog (`PreferencesDiffDialog.vue`) changes to render only the fields
+  that changed — added/removed stations by name, and per-station old → new values for edited
+  fields — instead of the full before/after JSON text. `RemoteWritePreview`
+  (`src/types/preferences.ts`) changes shape accordingly, from `{ beforeJson, afterJson }` to a
+  field-level diff representation.
+
+This ADR's core decision — the GitHub Contents API as the write mechanism, the Netlify proxy,
+and the `sha`-based concurrency model — is unchanged. Only the trigger point and
+confirmation-dialog content for `StationManager` edits change.
+
+**Out of scope:** the default fuel type save flow (`StationPricesContent.vue`) keeps pushing to
+GitHub immediately on every change, unaffected by this addendum.
+
+### Consequences
+
+#### Positive
+
+- ✅ Fewer GitHub commits and API calls for a burst of edits — one commit per logical batch of
+  changes instead of one per field.
+- ✅ The confirmation dialog stays readable and reviewable even when several stations are
+  edited before saving.
+- ✅ The audit trail becomes more meaningful — one commit per user-initiated save, not one per
+  blur event.
+
+#### Negative
+
+- ⚠️ Adds local "pending changes" state that must stay correct across page reloads/navigation —
+  a user who edits and then closes the tab without clicking "Enregistrer les modifications" has
+  a local/remote divergence until they return and save. Local edits are never lost (they are
+  already in IndexedDB); only the remote push is delayed.
+- ⚠️ Two different write-trigger behaviors now exist in the same app (immediate for default
+  fuel type, batched for the station list), which future contributors need to know when
+  extending either flow.
+
+### Notes
+
+- Reuses this ADR's existing `sha`-based conflict handling unchanged — a concurrent remote edit
+  during the batching window still surfaces as a 409 / `DIVERGED_MESSAGE`.
+
 ## References
 
 - [GitHub Contents API documentation](https://docs.github.com/en/rest/repos/contents)
