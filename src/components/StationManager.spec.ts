@@ -181,8 +181,8 @@ function mountComponent() {
         TableRow: { template: '<tr><slot /></tr>' },
         TableHead: { template: '<th><slot /></th>' },
         TableCell: { template: '<td><slot /></td>' },
-        PreferencesExport: { template: '<div />' },
-        PreferencesImport: { template: '<div />' },
+        PreferencesExport: { template: '<div class="preferences-export-stub" />' },
+        PreferencesImport: { template: '<div class="preferences-import-stub" />' },
         PreferencesDiffDialog: { template: '<div />' },
         // Stubbed with a marker element (not `true`) so tests can assert its
         // presence/absence while GitHubSyncSettings itself is left unstubbed
@@ -1089,8 +1089,8 @@ describe('test-cases.md (issue #120) scenario 2: the rest of Station Manager is 
     expect(wrapper.find('#ownerRepo').exists()).toBe(false)
 
     // The rest of Station Manager is already interactive.
-    expect(wrapper.findComponent({ name: 'PreferencesExport' }).exists()).toBe(true)
-    expect(wrapper.findComponent({ name: 'PreferencesImport' }).exists()).toBe(true)
+    expect(wrapper.find('.preferences-export-stub').exists()).toBe(true)
+    expect(wrapper.find('.preferences-import-stub').exists()).toBe(true)
     const firstRowNameInput = wrapper.findAll('input')[2]
     await firstRowNameInput.setValue('Station A Updated')
     await firstRowNameInput.trigger('blur')
