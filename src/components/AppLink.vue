@@ -4,7 +4,7 @@
     v-if="isExternal"
     :href="isExternal ? to.toString() : ''"
     target="_blank"
-    rel="noopener"
+    rel="noopener noreferrer"
     class="external-link link"
   >
     <slot></slot>

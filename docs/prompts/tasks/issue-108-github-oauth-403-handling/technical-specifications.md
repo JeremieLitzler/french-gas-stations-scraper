@@ -10,8 +10,12 @@
   (security-guidelines.md rule 3).
 - `src/components/OrgRestrictionNotice.vue` (new) — renders the fixed French sentence
   (business-specifications.md rule 2) with the "lien" word as a real link, reusing the existing
-  `AppLink` component for the `target="_blank" rel="noopener"` new-tab behavior
+  `AppLink` component for the `target="_blank" rel="noopener noreferrer"` new-tab behavior
   (security-guidelines.md rule 4) instead of a one-off anchor.
+- `src/components/AppLink.vue` — `rel="noopener"` changed to `rel="noopener noreferrer"` on its
+  external-link branch (review-results.md finding), to literally satisfy security-guidelines.md
+  rule 4's stated requirement; this also tightens every other external link already using
+  `AppLink` (`AppFooter.vue`, `StationManager.vue`).
 - `src/composables/useRepoConfig.ts` — `classifyProxyResponse`/`checkProxyReachable` detect the
   org-restriction 403 as a boolean (`isOrgRestrictedResponse`, replacing the old
   message-extracting/sanitizing `extractOrgRestrictionMessage`); `resolveValidationError`
@@ -54,15 +58,15 @@
   by construction instead of by discipline. This follows the same small,
   single-purpose-message-component precedent already in the codebase (`EmptyStationsMessage.vue`).
 
-- **The link is rendered via the existing `AppLink` component, not a new one-off `<a>`.**
-  `AppLink` already implements exactly the required external-link behavior
-  (`target="_blank" rel="noopener"`, used elsewhere in `AppFooter.vue`/`StationManager.vue`), so
-  reusing it satisfies security-guidelines.md rule 4 by construction and avoids a second,
-  slightly different implementation of the same security-sensitive attribute pair. `AppLink`
-  uses `rel="noopener"` (not `noopener noreferrer`); `noopener` alone already fully closes the
-  `window.opener` reverse-tabnabbing vector security-guidelines.md rule 4 is about, so matching
-  this project's one established convention was chosen over introducing a second, inconsistent
-  external-link pattern for `noreferrer`'s purely-cosmetic (referrer-header) difference.
+- **The link is rendered via the existing `AppLink` component, not a new one-off `<a>`, and
+  `AppLink` itself was updated to add `noreferrer`.** review-results.md's first pass flagged
+  that `AppLink` only set `rel="noopener"`, while security-guidelines.md rule 4 explicitly
+  requires `rel="noopener noreferrer"` — `noopener` alone does close the `window.opener`
+  reverse-tabnabbing vector the rule's "Why" describes, but the rule's "What" is a literal,
+  specific requirement, not just "prevent reverse-tabnabbing by some means." Fixing `AppLink`
+  itself (rather than adding a one-off anchor just for this feature) satisfies the rule and
+  tightens every other external link already using it, instead of leaving the codebase with two
+  different external-link `rel` conventions.
 
 - **Each composable's error ref stays `string | OrgRestrictionNotice | null`, split into two
   typed computed refs inside the consuming component rather than in the composable.** This
@@ -98,5 +102,11 @@ Three issues were found and fixed while reviewing the new code:
    the established convention in this codebase (`splitOwnerRepo`, `buildProxyUrl`,
    `hasCompleteRepoConfig`) is already to duplicate such small per-file helpers rather than
    share them across these three composables — consistent, not a new pattern.
+
+Additionally, after the review's `rel` finding, checked whether `AppLink.vue`'s change to
+`noopener noreferrer` could regress anything: no `.spec.ts` file exists for `AppLink.vue`
+itself, and `src/pages/mentions-legales.spec.ts` (TC-05) already asserts external links
+elsewhere in this app carry `rel="noopener noreferrer"` — confirming `AppLink`'s prior
+`noopener`-only was the inconsistent outlier, not an established convention this change breaks.
 
 status: ready
