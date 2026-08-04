@@ -1,9 +1,10 @@
 <script async setup lang="ts">
 /**
- * Settings-page section for GitHub sync (Sub-Issue E, issue #64): renders the
- * login/logout control and the `owner/repo`, file path, and
- * `revalidate-cache-days` fields, wiring Sub-Issue A's `useGitHubAuth` and
- * Sub-Issue B's `useRepoConfig` composables together.
+ * Station Manager's GitHub sync section (Sub-Issue E, issue #64; relocated
+ * into `StationManager.vue` per issue #120): renders the login/logout control
+ * and the `owner/repo`, file path, and `revalidate-cache-days` fields, wiring
+ * Sub-Issue A's `useGitHubAuth` and Sub-Issue B's `useRepoConfig` composables
+ * together.
  *
  * Per the composable-caller-responsibility convention, both composables are
  * called only here, at the top level of `setup()`; `handleUnauthorized` is
