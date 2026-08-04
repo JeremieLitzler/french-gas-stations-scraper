@@ -87,11 +87,14 @@ describe('AppFooter', () => {
     })
   })
 
-  it('all links have rel="noopener"', () => {
+  // AppLink.vue now sets rel="noopener noreferrer" (issue #108,
+  // security-guidelines.md rule 4) — matches mentions-legales.spec.ts TC-05's
+  // existing external-link convention.
+  it('all links have rel="noopener noreferrer"', () => {
     const wrapper = mount(AppFooter, globalConfig)
     const links = wrapper.findAll('a.external-link')
     links.forEach((link) => {
-      expect(link.attributes('rel')).toBe('noopener')
+      expect(link.attributes('rel')).toBe('noopener noreferrer')
     })
   })
 

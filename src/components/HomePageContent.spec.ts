@@ -20,12 +20,17 @@
  * Scenarios covered (test-cases.md, Sub-Issue C):
  *   C-17 — every view reflects the same station list once a sync completes
  *   C-18 — no view shows a stale list before the sync outcome is known
+ *
+ * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
+ *   8 (rendering)  — an org-restriction syncError renders OrgRestrictionNotice, not raw text
+ *   12 (rendering) — an org-restriction writeError renders OrgRestrictionNotice, not raw text
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import type { Station } from '@/types/station'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 import HomePageContent from './HomePageContent.vue'
 
 // ---------------------------------------------------------------------------
@@ -125,10 +130,28 @@ const mockSyncOnLoad = vi.fn((_isAuthenticated: boolean, _repoConfig: unknown, a
   })
 })
 
+const mockSyncError = ref<string | OrgRestrictionNotice | null>(null)
+
 vi.mock('@/composables/useRemotePreferencesSync', () => ({
   useRemotePreferencesSync: () => ({
-    syncError: ref(null),
+    syncError: mockSyncError,
     syncOnLoad: mockSyncOnLoad,
+  }),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock useRemotePreferencesWrite — HomePageContent reads only writeError,
+// writeSuccess, and divergedNotice; pushPreferences/confirmWrite/etc. are not
+// called from this component, so the mock exposes only what it consumes.
+// ---------------------------------------------------------------------------
+
+const mockWriteError = ref<string | OrgRestrictionNotice | null>(null)
+
+vi.mock('@/composables/useRemotePreferencesWrite', () => ({
+  useRemotePreferencesWrite: () => ({
+    writeError: mockWriteError,
+    writeSuccess: ref(false),
+    divergedNotice: ref(null),
   }),
 }))
 
@@ -182,6 +205,8 @@ beforeEach(() => {
   mockClearDefaultFuelType.mockClear()
   mockSyncOnLoad.mockClear()
   resolveSync = null
+  mockSyncError.value = null
+  mockWriteError.value = null
 })
 
 // ---------------------------------------------------------------------------
@@ -231,5 +256,51 @@ describe('C-17: every view reflects the same station list once a sync completes'
     expect(mockReplaceStations).toHaveBeenCalledWith([
       { name: 'Remote Station', url: 'https://www.prix-carburants.gouv.fr/station/99999999' },
     ])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 8 (rendering): an org-restriction syncError renders OrgRestrictionNotice
+// ---------------------------------------------------------------------------
+
+describe('Scenario 8 (rendering): an org-restriction syncError renders OrgRestrictionNotice, not raw text', () => {
+  it('renders the fixed sentence with a link to the configured owner\'s settings page', async () => {
+    const wrapper = mountHomePage()
+    await flushPromises()
+    resolveSync?.()
+    await flushPromises()
+
+    mockSyncError.value = { owner: 'acme-corp' }
+    await flushPromises()
+
+    const alert = wrapper.find('.text-amber-700[role="alert"]')
+    expect(alert.text()).not.toContain('[object Object]')
+    const link = alert.find('a')
+    expect(link.attributes('href')).toBe(
+      'https://github.com/organizations/acme-corp/settings/oauth_application_policy',
+    )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 12 (rendering): an org-restriction writeError renders OrgRestrictionNotice
+// ---------------------------------------------------------------------------
+
+describe('Scenario 12 (rendering): an org-restriction writeError renders OrgRestrictionNotice, not raw text', () => {
+  it('renders the fixed sentence with a link to the configured owner\'s settings page', async () => {
+    const wrapper = mountHomePage()
+    await flushPromises()
+    resolveSync?.()
+    await flushPromises()
+
+    mockWriteError.value = { owner: 'acme-corp' }
+    await flushPromises()
+
+    const alert = wrapper.find('.text-red-700[role="alert"]')
+    expect(alert.text()).not.toContain('[object Object]')
+    const link = alert.find('a')
+    expect(link.attributes('href')).toBe(
+      'https://github.com/organizations/acme-corp/settings/oauth_application_policy',
+    )
   })
 })

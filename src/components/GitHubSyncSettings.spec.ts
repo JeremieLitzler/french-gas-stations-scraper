@@ -22,6 +22,9 @@
  *   E-6 — owner/repo and file path fields re-enabled after logout
  *   E-7 — login button reflects the login-readiness check
  *
+ * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
+ *   1 (rendering) — an org-restriction validationError renders OrgRestrictionNotice, not raw text
+ *
  * Scenarios covered (test-cases.md, issue #110 — settings page mobile layout):
  *   TC-01 — save/connect buttons stack vertically, full width, while unauthenticated
  *   TC-02 — save/disconnect buttons stack vertically, full width, while authenticated
@@ -44,6 +47,7 @@ import { defineComponent, ref } from 'vue'
 import type { Ref } from 'vue'
 import GitHubSyncSettings from './GitHubSyncSettings.vue'
 import type { RepoConfigDraft } from '@/types/repo-config'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 
 // ---------------------------------------------------------------------------
 // Mock useGitHubAuth
@@ -86,7 +90,7 @@ const mockRepoConfig: Ref<RepoConfigDraft> = ref({
   filePath: '',
   revalidateCacheDays: 7,
 })
-const mockValidationError: Ref<string | null> = ref(null)
+const mockValidationError: Ref<string | OrgRestrictionNotice | null> = ref(null)
 const mockLoadRepoConfig = vi.fn().mockResolvedValue(undefined)
 const mockSaveRepoConfig = vi.fn().mockResolvedValue(undefined)
 
@@ -291,6 +295,26 @@ describe('E-7: login button reflects the login-readiness check', () => {
     await wrapper.find('#revalidateCacheDays').setValue('7')
 
     expect(findButtonByText(wrapper, 'Se connecter avec GitHub').attributes('disabled')).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 1 (rendering): an org-restriction validationError renders OrgRestrictionNotice
+// ---------------------------------------------------------------------------
+
+describe('Scenario 1 (rendering): an org-restriction validationError renders OrgRestrictionNotice, not raw text', () => {
+  it('renders the fixed sentence with a link to the configured owner\'s settings page', async () => {
+    mockValidationError.value = { owner: 'acme-corp' }
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const alert = wrapper.find('[role="alert"]')
+    expect(alert.text()).toContain("Veuillez visiter ce")
+    expect(alert.text()).not.toContain('[object Object]')
+    const link = alert.find('a')
+    expect(link.attributes('href')).toBe(
+      'https://github.com/organizations/acme-corp/settings/oauth_application_policy',
+    )
   })
 })
 

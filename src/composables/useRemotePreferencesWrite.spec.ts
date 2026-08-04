@@ -48,6 +48,13 @@
  *   TC-15 — no remote file: creates directly, no dialog, clears pending on success
  *   TC-16 — after a successful push, a new markStationChange makes hasPendingChanges true again
  *   TC-21 — includeStationChanges: false never bundles or clears pendingStationChanges
+ *
+ * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
+ *   12 — existing-file check org-restricted 403 sets writeError to {owner}, no generic/re-auth message
+ *   13 — existing-file check non-org 403 falls back to the generic write-failed message
+ *   14 — final PUT org-restricted 403 sets writeError to the same {owner} notice
+ *   15 — final PUT 401 is unchanged (regression guard)
+ *   16 — final PUT 409 is unchanged (regression guard)
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -61,6 +68,8 @@ import type { PreferencesFile, StationChange } from '@/types/preferences'
 const UNAUTHORIZED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
 const CONFLICT_MESSAGE =
   'Le fichier distant a été modifié entre-temps. Merci de rafraîchir la page et réessayer.'
+const WRITE_FAILED_MESSAGE =
+  "Impossible d'enregistrer vos préférences sur GitHub. Vos données locales sont conservées."
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -134,6 +143,30 @@ function githubReadResponse(data: PreferencesFile, sha: string) {
 
 function githubNotFoundResponse() {
   return { status: 404, json: () => Promise.resolve({}) }
+}
+
+// ---------------------------------------------------------------------------
+// Org-OAuth-restriction 403 helpers (issue #108)
+// ---------------------------------------------------------------------------
+
+function orgRestrictedResponse() {
+  return {
+    status: 403,
+    json: () =>
+      Promise.resolve({
+        message:
+          "Although you appear to have the correct authorization credentials, the `alice` organization has enabled OAuth App access restrictions, meaning that data access to third-parties is limited. For more information on these restrictions, including how to enable this app, visit https://docs.github.com/articles/restricting-access-to-your-organization-s-data/",
+        documentation_url: 'https://docs.github.com/rest/repos/contents#create-or-update-file-contents',
+        status: '403',
+      }),
+  }
+}
+
+function rateLimited403Response() {
+  return {
+    status: 403,
+    json: () => Promise.resolve({ message: 'API rate limit exceeded for user ID.' }),
+  }
 }
 
 function githubWriteResponse(status = 200) {
@@ -635,5 +668,107 @@ describe('TC-21: a fuel-type-only push (includeStationChanges: false) is unaffec
 
     // The station edit was never bundled into this push, so it is still pending.
     expect(hasPendingChanges.value).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 12: existing-file check org-restricted 403 sets writeError to {owner}
+// ---------------------------------------------------------------------------
+
+describe('Scenario 12: existing-file check org-restricted 403 sets writeError to {owner}', () => {
+  it('sets writeError to {owner}, never sends a PUT, distinct from the generic and re-auth messages', async () => {
+    const fetchMock = buildFetchMock(orgRestrictedResponse(), githubWriteResponse())
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { writeError, markStationChange, pushPreferences } = await freshComposable()
+    markStationChange(ADDED_STATION_CHANGE)
+    await pushPreferences(true, REPO_CONFIG, UPDATED_PREFERENCES_ADD, true)
+
+    expect(writeError.value).toEqual({ owner: 'alice' })
+    expect(writeError.value).not.toBe(WRITE_FAILED_MESSAGE)
+    expect(writeError.value).not.toBe(UNAUTHORIZED_MESSAGE)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 13: existing-file check non-org 403 falls back to the generic write-failed message
+// ---------------------------------------------------------------------------
+
+describe('Scenario 13: existing-file check non-org 403 falls back to the generic write-failed message', () => {
+  it('sets writeError to WRITE_FAILED_MESSAGE, unchanged from today', async () => {
+    const fetchMock = buildFetchMock(rateLimited403Response(), githubWriteResponse())
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { writeError, markStationChange, pushPreferences } = await freshComposable()
+    markStationChange(ADDED_STATION_CHANGE)
+    await pushPreferences(true, REPO_CONFIG, UPDATED_PREFERENCES_ADD, true)
+
+    expect(writeError.value).toBe(WRITE_FAILED_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 14: final PUT org-restricted 403 sets writeError to the same {owner} notice
+// ---------------------------------------------------------------------------
+
+describe('Scenario 14: final PUT org-restricted 403 sets writeError to the same {owner} notice', () => {
+  it('sets writeError to {owner} after a confirmed write is rejected by an org-restricted 403', async () => {
+    const fetchMock = buildFetchMock(
+      githubReadResponse(EXISTING_PREFERENCES, EXISTING_SHA),
+      orgRestrictedResponse(),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { writeError, writeSuccess, markStationChange, pushPreferences, confirmWrite } =
+      await freshComposable()
+    markStationChange(ADDED_STATION_CHANGE)
+    await pushPreferences(true, REPO_CONFIG, UPDATED_PREFERENCES_ADD, true)
+    await confirmWrite()
+
+    expect(writeError.value).toEqual({ owner: 'alice' })
+    expect(writeSuccess.value).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 15: final PUT 401 is unchanged (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 15: final PUT 401 is unchanged (regression guard)', () => {
+  it('sets writeError to the existing re-authentication message', async () => {
+    const fetchMock = buildFetchMock(githubReadResponse(EXISTING_PREFERENCES, EXISTING_SHA), {
+      status: 401,
+      json: () => Promise.resolve({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { writeError, markStationChange, pushPreferences, confirmWrite } = await freshComposable()
+    markStationChange(ADDED_STATION_CHANGE)
+    await pushPreferences(true, REPO_CONFIG, UPDATED_PREFERENCES_ADD, true)
+    await confirmWrite()
+
+    expect(writeError.value).toBe(UNAUTHORIZED_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 16: final PUT 409 is unchanged (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 16: final PUT 409 is unchanged (regression guard)', () => {
+  it('sets writeError to the existing conflict message', async () => {
+    const fetchMock = buildFetchMock(githubReadResponse(EXISTING_PREFERENCES, EXISTING_SHA), {
+      status: 409,
+      json: () => Promise.resolve({}),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    const { writeError, markStationChange, pushPreferences, confirmWrite } = await freshComposable()
+    markStationChange(ADDED_STATION_CHANGE)
+    await pushPreferences(true, REPO_CONFIG, UPDATED_PREFERENCES_ADD, true)
+    await confirmWrite()
+
+    expect(writeError.value).toBe(CONFLICT_MESSAGE)
   })
 })
