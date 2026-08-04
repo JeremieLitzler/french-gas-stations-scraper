@@ -140,6 +140,56 @@ the `mentions-legales.spec.ts` TC-05 precedent).
 was already failing against this branch's `AppLink.vue` change before this pass and is
 unaffected by today's fixes — it is not part of this task's `test-cases.md` and this command
 does not touch test files, so it is called out here rather than silently left for
-`/jli-runs-tests` to discover cold.
+`/jli-runs-tests` to discover cold. (Resolved by `/jli-writes-tests` in a later pass, which
+updated the assertion to `'noopener noreferrer'`.)
+
+## Loop-back fix: `test-results.md` Scenario 17 failure
+
+### Files changed
+
+- `src/components/OrgRestrictionNotice.vue` — the `ce`/`<AppLink>lien</AppLink>`/`pour` text
+  and link, previously each on their own template line, are joined onto one line
+  (`ce <AppLink ...>lien</AppLink> pour`).
+
+### Root cause
+
+Vue's compiler (default `whitespace: 'condense'`) fully removes a text node's boundary
+whitespace when that whitespace run contains a newline and sits directly against an element
+tag — it does not condense it to a single space the way it does for whitespace runs that
+stay within plain text. With `ce` and `pour` each on their own line around `<AppLink>`, the
+newline-adjacent-to-tag boundaries on both sides were stripped entirely, rendering
+`...visiter celienpour autoriser...` with no separating spaces — the bug
+`OrgRestrictionNotice.spec.ts`'s Scenario 17 (test-results.md) caught, since it asserts the
+exact fixed sentence from business-specifications.md rule 2.
+
+### Fix and why it's correct
+
+Putting `ce <AppLink ...>lien</AppLink> pour` on a single line means the whitespace on each
+side of the tag is a single space with no newline in it — condense mode preserves that as-is
+(only newline-containing boundary whitespace is dropped; a same-line space next to a tag is
+kept). The surrounding prose (`avec votre\n  compte`, `pour\n  autoriser`) is left wrapped
+across lines exactly as before, since interior newlines *within* a text run (not touching a
+tag boundary) already condensed correctly to a single space — that part of the rendering was
+never broken, and test-results.md's diff confirms the sentence up to `ce` and after `pour`
+was already correct.
+
+### Self-code review
+
+1. **Checked for a resulting double space.** `AppLink.vue` renders its slot content
+   (`<slot></slot>`) with no surrounding whitespace of its own, so joining `ce <AppLink>` and
+   `</AppLink> pour` on one line contributes exactly one space on each side of the link text
+   — not two. No change needed.
+2. **Checked the fix doesn't reintroduce the newline-adjacent-to-tag bug elsewhere in the
+   same file.** The template now has exactly one inline element (`AppLink`); both of its
+   surrounding boundaries were moved onto its own line, and no other tag boundary exists to
+   re-check.
+3. **Checked whether this fix could regress the "no GitHub response text" and "no `v-html`"
+   security guarantees (security-guidelines.md rule 2).** The change is purely whitespace
+   placement in static template text — no interpolation, binding, or `v-html` was touched. No
+   change needed.
+
+Same-pattern multi-line-around-inline-element templates elsewhere in the codebase (if any)
+are out of this task's scope (business-specifications.md lists no other files) and are not
+touched here.
 
 status: ready
