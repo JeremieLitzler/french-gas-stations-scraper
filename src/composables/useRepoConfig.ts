@@ -38,8 +38,44 @@ const REPO_NOT_REACHABLE_MESSAGE =
 const VALIDATION_UNAVAILABLE_MESSAGE =
   'Impossible de vérifier le dépôt GitHub pour le moment. Réessayez plus tard.'
 const SESSION_EXPIRED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
+const ORG_RESTRICTION_INDICATOR = 'OAuth App access restrictions'
+// Hardcoded literal (security-guidelines.md rule 2) — never built from the
+// proxy response body's own `documentation_url`.
+const ORG_RESTRICTION_DOCS_URL =
+  'https://docs.github.com/articles/restricting-access-to-your-organization-s-data/'
+const ORG_RESTRICTION_MESSAGE_PREFIX =
+  "Votre organisation GitHub restreint l'accès aux applications OAuth tierces : "
+const ORG_RESTRICTION_MESSAGE_SUFFIX = " Plus d'informations : "
+// Ranges of Unicode control / bidi-override / invisible characters to strip
+// from GitHub's echoed message text (security-guidelines.md rule 3). Built
+// from numeric code points rather than typed literally, so this source file
+// never itself contains the invisible/bidi characters it defends against.
+const CONTROL_CHAR_CODE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x0000, 0x0008],
+  [0x000b, 0x000c],
+  [0x000e, 0x001f],
+  [0x007f, 0x009f],
+  [0x200b, 0x200f],
+  [0x202a, 0x202e],
+  [0x2060, 0x2069],
+  [0xfeff, 0xfeff],
+]
 
-type ProxyCheckResult = 'ok' | 'notFound' | 'unauthorized' | 'error'
+function buildControlCharsPattern(): RegExp {
+  const classBody = CONTROL_CHAR_CODE_RANGES.map(
+    ([start, end]) => String.fromCharCode(start) + '-' + String.fromCharCode(end),
+  ).join('')
+  return new RegExp('[' + classBody + ']', 'g')
+}
+
+const CONTROL_CHARS_PATTERN = buildControlCharsPattern()
+
+type ProxyCheckResult =
+  | { kind: 'ok' }
+  | { kind: 'notFound' }
+  | { kind: 'unauthorized' }
+  | { kind: 'orgRestricted'; message: string }
+  | { kind: 'error' }
 type UnauthorizedCallback = (() => void | Promise<void>) | undefined
 
 interface OwnerRepo {
@@ -82,19 +118,49 @@ function buildProxyUrl(ownerRepo: OwnerRepo, path?: string): string {
   return `${PROXY_PATH}?${params.toString()}`
 }
 
-function classifyProxyResponse(status: number): ProxyCheckResult {
-  if (status === 200) return 'ok'
-  if (status === 401) return 'unauthorized'
-  if (status === 404) return 'notFound'
-  return 'error'
+function sanitizeGitHubText(text: string): string {
+  const withoutControlChars = text.replace(CONTROL_CHARS_PATTERN, '')
+  return withoutControlChars.trim()
+}
+
+// Wrapped in try/catch (security-guidelines.md rule 1): the 403 body's exact
+// shape is GitHub's, not a contract this project controls, so any parse
+// failure or unexpected shape resolves to null (the generic-failure path)
+// instead of throwing.
+async function extractOrgRestrictionMessage(response: Response): Promise<string | null> {
+  try {
+    const body: unknown = await response.json()
+    if (typeof body !== 'object' || body === null) return null
+    const record = body as Record<string, unknown>
+    if (typeof record.message !== 'string') return null
+    if (!record.message.includes(ORG_RESTRICTION_INDICATOR)) return null
+    return sanitizeGitHubText(record.message)
+  } catch {
+    return null
+  }
+}
+
+function buildOrgRestrictionMessage(githubMessage: string): string {
+  return ORG_RESTRICTION_MESSAGE_PREFIX + githubMessage + ORG_RESTRICTION_MESSAGE_SUFFIX + ORG_RESTRICTION_DOCS_URL
+}
+
+async function classifyProxyResponse(response: Response): Promise<ProxyCheckResult> {
+  if (response.status === 200) return { kind: 'ok' }
+  if (response.status === 401) return { kind: 'unauthorized' }
+  if (response.status === 404) return { kind: 'notFound' }
+  if (response.status === 403) {
+    const message = await extractOrgRestrictionMessage(response)
+    if (message !== null) return { kind: 'orgRestricted', message }
+  }
+  return { kind: 'error' }
 }
 
 async function checkProxyReachable(ownerRepo: OwnerRepo, path?: string): Promise<ProxyCheckResult> {
   try {
     const response = await fetch(buildProxyUrl(ownerRepo, path))
-    return classifyProxyResponse(response.status)
+    return await classifyProxyResponse(response)
   } catch {
-    return 'error'
+    return { kind: 'error' }
   }
 }
 
@@ -127,13 +193,18 @@ async function resolveValidationError(
   const filePath = draft.filePath.trim()
   if (!filePath) return MISSING_FILE_PATH_MESSAGE
   const fileCheck = await checkProxyReachable(ownerRepo, filePath)
-  if (fileCheck === 'ok') return null
-  if (fileCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
-  if (fileCheck === 'error') return VALIDATION_UNAVAILABLE_MESSAGE
+  if (fileCheck.kind === 'ok') return null
+  if (fileCheck.kind === 'unauthorized') return notifyUnauthorized(onUnauthorized)
+  // Short-circuits like a 401 (business-specifications.md rule 5): an
+  // org-OAuth-restriction 403 would 403 again for the same organization-wide
+  // reason, so the repo-level fallback below is skipped.
+  if (fileCheck.kind === 'orgRestricted') return buildOrgRestrictionMessage(fileCheck.message)
+  if (fileCheck.kind === 'error') return VALIDATION_UNAVAILABLE_MESSAGE
   const repoCheck = await checkProxyReachable(ownerRepo)
-  if (repoCheck === 'ok') return null
-  if (repoCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
-  if (repoCheck === 'notFound') return REPO_NOT_REACHABLE_MESSAGE
+  if (repoCheck.kind === 'ok') return null
+  if (repoCheck.kind === 'unauthorized') return notifyUnauthorized(onUnauthorized)
+  if (repoCheck.kind === 'orgRestricted') return buildOrgRestrictionMessage(repoCheck.message)
+  if (repoCheck.kind === 'notFound') return REPO_NOT_REACHABLE_MESSAGE
   return VALIDATION_UNAVAILABLE_MESSAGE
 }
 
