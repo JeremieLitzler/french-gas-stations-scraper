@@ -1,83 +1,99 @@
 # Technical Specifications: Handle GitHub org OAuth restriction (403)
 
-## Files changed
+## Why this file stops at "review specs" instead of code
 
-- `src/composables/useRepoConfig.ts` — `classifyProxyResponse`/`checkProxyReachable` now read the
-  403 response body to detect GitHub's org-OAuth-restriction case; `resolveValidationError` resolves
-  it to a distinct message and skips the repo-level fallback, mirroring the existing 401 short-circuit.
-- `src/composables/useRemotePreferencesSync.ts` — `requestRemoteFile` throws a new
-  `RemoteOrgRestrictedError` on an org-restricted 403; `handleFetchFailure` maps it to a distinct
-  `syncError` message.
-- `src/composables/useRemotePreferencesWrite.ts` — `fetchExistingFile` and `handlePutResponse` both
-  throw a new `RemoteWriteOrgRestrictedError` on an org-restricted 403; `handleWriteFailure` maps it
-  to a distinct `writeError` message with the same "your local data is kept" reassurance this
-  composable's other failure messages already use.
+Mid-implementation, the user redirected the message design (see conversation): instead of
+echoing GitHub's own 403 message text with a fixed generic docs link, the app should show one
+fixed French sentence with a link built from the user's own configured repo owner, opening in a
+new tab. This contradicts several rules already written into `business-specifications.md` and
+`security-guidelines.md`, and several scenarios in `test-cases.md` no longer describe the
+intended behavior. Rather than have `/jli-codes` silently rewrite those three files (owned by
+`/jli-writes-spec`, `/jli-verifies-security`, `/jli-writes-tests-spec`), this file records the
+fully-resolved design below so the spec-revision commands can transcribe it directly without
+re-asking the user anything.
 
-No new files were created and `netlify/functions/github-api-proxy.ts` is unchanged, per the task's
-scope.
+## Resolved design (confirmed with the user)
 
-## Non-trivial decisions
+1. **Message text is fixed and identical at all three call sites** (no more per-composable tone
+   variation, no more "your local data is kept" reassurance tied to this message):
 
-- **`ProxyCheckResult` becomes a discriminated union, not a string enum.** Detecting the
-  org-restriction case requires reading the 403 response body, so the org-restricted branch must
-  carry the extracted message alongside its outcome. A plain string union (`'orgRestricted'`) would
-  have nowhere to put that payload, so each variant became `{ kind: '...' }`, with `orgRestricted`
-  adding a `message` field. This changed `classifyProxyResponse` from a sync `(status: number)`
-  function into an async `(response: Response)` function, since detecting the reason now requires
-  awaiting `response.json()`.
+   > Le dépôt choisi se trouve sous une organisation n'autorisant pas l'authentification avec
+   > votre compte et le dépôt choisi. Veuillez visiter ce **lien** pour autoriser l'accès.
 
-- **Detection, sanitization, and the docs-link constant are duplicated per composable, not
-  extracted to a shared util.** The task's scope explicitly lists these three files with "no new
-  files." The existing code in all three files already duplicates small helpers this way
-  (`splitOwnerRepo`, `buildProxyUrl`, `hasCompleteRepoConfig`), so this follows the file's own
-  established convention rather than introducing a new one.
+   (Typo fixed from the user's literal wording: "choisit" → "choisi" — the earlier occurrence
+   is the past participle modifying "dépôt", matching the second, already-correct occurrence in
+   the same sentence. Flagging this fix explicitly rather than silently carrying a typo into
+   product copy; revert in `/jli-writes-spec` if the exact literal string is wanted instead.)
 
-- **The org-restriction 403 body is read via a small `extractOrgRestrictionMessage(response)`
-  helper, wrapped in try/catch (security-guidelines.md rule 1).** Any parse failure or unexpected
-  shape resolves to `null`, which every call site treats as "not the org-restriction case" and
-  falls through to that call site's existing generic-failure message — never an uncaught throw.
+2. **GitHub's own 403 `message` body text is no longer displayed anywhere.** It is still read,
+   but only to *detect* the org-restriction case (does it contain `"OAuth App access
+   restrictions"`) — the extracted text itself is discarded, never interpolated into the
+   user-visible message. Consequence: the bidi/control-character stripping
+   (`sanitizeGitHubText`, `CONTROL_CHAR_CODE_RANGES`) built for the previous design has no
+   remaining purpose (there is no longer any GitHub-supplied text reaching the DOM) and should
+   be removed, not carried forward — dead code otherwise. The `ProxyCheckResult`-style
+   discriminated union (`{ kind: 'orgRestricted'; message: string }`) also reverts to needing no
+   payload: detection becomes a plain boolean check, so `useRepoConfig.ts`'s `ProxyCheckResult`
+   can revert to a plain string union (`'ok' | 'notFound' | 'unauthorized' | 'orgRestricted' |
+   'error'`) rather than the discriminated union added in the first pass — simpler, and the
+   original one-off need for a payload (carrying the message) no longer exists.
 
-- **The restriction-docs link and indicator string are hardcoded string constants
-  (`ORG_RESTRICTION_DOCS_URL`, `ORG_RESTRICTION_INDICATOR`), never read from the response body's
-  own `documentation_url` field** (security-guidelines.md rule 2) — this is what test case 18
-  checks for.
+3. **The link is built from the user's own configured repo owner, never from the response
+   body**, as:
 
-- **New error classes (`RemoteOrgRestrictedError`, `RemoteWriteOrgRestrictedError`) carry the
-  sanitized GitHub message via the standard `Error.message` property**, rather than a custom field.
-  This mirrors the existing `RemoteUnauthorizedError`/`RemoteWriteConflictError` pattern in both
-  files exactly, so `handleFetchFailure`/`handleWriteFailure` stay a flat `instanceof` chain instead
-  of introducing a second way to carry error payloads.
+   ```
+   https://github.com/organizations/${encodeURIComponent(owner)}/settings/oauth_application_policy
+   ```
 
-- **Bidi/control-character stripping is built from numeric Unicode code points
-  (`CONTROL_CHAR_CODE_RANGES` + `String.fromCharCode`), not typed as literal characters or `\u`
-  escape sequences in the regex source.** This keeps the source file itself free of the exact
-  invisible/bidi characters security-guidelines.md rule 3 defends against, which is easier to audit
-  than a regex literal containing invisible bytes. The regex is built once at module load (not per
-  call), so there's no repeated-compilation cost per sanitize call.
+   `owner` is the same value already extracted by each composable's existing `splitOwnerRepo`
+   (the user's own Settings input, already validated as non-empty and free of `/`) — not
+   anything read from GitHub's response. `encodeURIComponent` is applied defensively even though
+   GitHub org/user logins are alphanumeric-and-hyphen only, because building a URL by
+   concatenating any external-ish string without encoding is the kind of pattern that becomes a
+   bug the day that assumption changes.
 
-- **Each composable phrases its org-restriction message in its own style**
-  (business-specifications.md rule 3 / test case 21): `useRepoConfig.ts`'s Settings-save message has
-  no "local data" reassurance (saving always persists to IndexedDB regardless of auth, per that
-  file's own doc comment); `useRemotePreferencesSync.ts` says "vos données locales sont
-  utilisées" (matching its sibling `ACCESS_REVOKED_MESSAGE`); `useRemotePreferencesWrite.ts` says
-  "vos données locales sont conservées" (matching its sibling `WRITE_FAILED_MESSAGE`/
-  `INVALID_REMOTE_CONTENT_MESSAGE`). All three still independently satisfy test case 17's content
-  requirement (states the org-OAuth-restriction, includes GitHub's text, links to the fixed URL).
+   This is a *narrower*, not weaker, version of the original security rule ("never
+   response-derived"): the org-restriction feature can only ever fire for the org the user
+   themselves is already configured against, so linking to that org's own OAuth policy page is
+   exactly the actionable page. It must still never read `documentation_url` or any other
+   response field.
 
-## Self-code review
+4. **The link renders as a real `<a>` element**, `target="_blank" rel="noopener noreferrer"` —
+   not markdown brackets, and not plain interpolated text. `rel="noopener noreferrer"` is
+   required alongside `target="_blank"` to prevent the opened GitHub tab from getting a `window
+   .opener` reference back to this app (reverse-tabnabbing) — this becomes a new
+   security-guidelines.md rule, replacing the now-moot bidi-stripping rule.
 
-Two issues were found and fixed while reviewing the new sanitization/detection code:
+5. **New shared type + component needed** (type-first per CLAUDE.md): a `UserMessage` type
+   (`string | { textBefore: string; linkLabel: string; linkUrl: string; textAfter: string }`) in
+   `src/types/`, and a small presentational component (e.g. `MessageWithLink.vue`) that renders
+   either the plain string or the three-part text+link+text, so the link-rendering logic isn't
+   tripled across `GitHubSyncSettings.vue` (`validationError`) and `HomePageContent.vue`
+   (`syncError`, `writeError`). This is a new file, which the original business spec's "no new
+   files" scope note no longer holds against — that note was about the three composables, not
+   about needing zero new files ever; a shared render helper for a genuinely new UI need (a
+   real link, not plain text) is a reasonable, minimal addition rather than tripled duplication.
 
-1. **Missing BOM in the stripped character ranges.** U+FEFF (byte-order mark / zero-width
-   no-break space) is another invisible character usable in spoofing, not covered by the initial
-   range list. Added `[0xfeff, 0xfeff]` to `CONTROL_CHAR_CODE_RANGES` in all three files.
-2. **No trim after stripping control characters.** If GitHub's message had leading/trailing
-   invisible characters, stripping them could leave stray whitespace in the composed message.
-   `sanitizeGitHubText` now trims the result after stripping.
+## What needs to change in the other spec files (for `/jli-writes-spec` etc.)
 
-One additional risk was checked and confirmed safe rather than changed: reusing a single
-module-level global (`/g`) `RegExp` object across repeated `sanitizeGitHubText` calls could in
-principle leak `lastIndex` state between calls — but `String.prototype.replace` resets `lastIndex`
-to 0 itself when the regex is global, so the shared compiled pattern is safe to reuse as written.
+- `business-specifications.md` rule 2: replace "include GitHub's own explanatory text" with the
+  fixed sentence above; replace the generic docs URL with the per-owner
+  `oauth_application_policy` URL.
+- `business-specifications.md` rule 3: delete or rewrite — message is now identical at all three
+  call sites, so "each keeps its own style" no longer applies to this specific message.
+- `security-guidelines.md` rule 2: rewrite from "hardcoded literal" to "built only from the
+  user's own configured owner, `encodeURIComponent`-escaped, never from the response body."
+- `security-guidelines.md` rule 3: replace bidi/control-char stripping with the
+  `rel="noopener noreferrer"` requirement for the new `target="_blank"` link.
+- `test-cases.md` 17–21: rewrite to match — fixed sentence + owner-derived link (17), link never
+  derived from `documentation_url` even when present (18), real anchor with
+  `target="_blank" rel="noopener noreferrer"` (19), no GitHub response text of any kind reaches
+  the rendered output even if it contains HTML/bidi/control characters (20, strengthened from
+  "stripped" to "never included"), identical message byte-for-byte at all three call sites (21,
+  reversed from "distinct tone" to "consistency guard").
 
-status: ready
+### Specifications Need Review
+
+Please review current code and results.
+
+status: review specs
