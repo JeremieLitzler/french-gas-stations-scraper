@@ -1,6 +1,12 @@
 <template>
-  <p v-if="syncError" role="alert" class="text-sm text-amber-700 mb-2">{{ syncError }}</p>
-  <p v-if="writeError" role="alert" class="text-sm text-red-700 mb-2">{{ writeError }}</p>
+  <p v-if="syncErrorText" role="alert" class="text-sm text-amber-700 mb-2">{{ syncErrorText }}</p>
+  <p v-else-if="syncErrorOrgRestriction" role="alert" class="text-sm text-amber-700 mb-2">
+    <OrgRestrictionNotice :owner="syncErrorOrgRestriction.owner" />
+  </p>
+  <p v-if="writeErrorText" role="alert" class="text-sm text-red-700 mb-2">{{ writeErrorText }}</p>
+  <p v-else-if="writeErrorOrgRestriction" role="alert" class="text-sm text-red-700 mb-2">
+    <OrgRestrictionNotice :owner="writeErrorOrgRestriction.owner" />
+  </p>
   <p v-if="divergedNotice" role="status" class="text-sm text-amber-700 mb-2">
     {{ divergedNotice }}
   </p>
@@ -37,6 +43,7 @@
 // (HomePageContent.spec.ts, C-17) showed renders the genuine StationPrices
 // subtree (with its own network-calling children) instead of the intended
 // component. StationManager does not exhibit this and is left auto-imported.
+import { computed } from 'vue'
 import StationPrices from './StationPrices.vue'
 import { useStationStorage } from '@/composables/useStationStorage'
 import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
@@ -47,6 +54,7 @@ import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWri
 import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
 import type { PreferencesFile } from '@/types/preferences'
 import type { Station } from '@/types/station'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 
 const { stations, loadStations, replaceStations } = useStationStorage()
 const { loadDefaultFuelType, saveDefaultFuelType, clearDefaultFuelType } = useDefaultFuelType()
@@ -58,6 +66,20 @@ const { syncError, syncOnLoad } = useRemotePreferencesSync()
 // ancestor of both StationPrices and StationManager — the two subtrees whose
 // mutations trigger a remote write (Sub-Issue D rule 1).
 const { writeError, writeSuccess, divergedNotice } = useRemotePreferencesWrite()
+
+// syncError/writeError each carry either a plain string or an org-OAuth-
+// restriction notice (issue #108) — split into typed computed refs here so
+// the template never needs to narrow the union itself.
+const syncErrorText = computed(() => (typeof syncError.value === 'string' ? syncError.value : null))
+const syncErrorOrgRestriction = computed<OrgRestrictionNotice | null>(() =>
+  typeof syncError.value === 'object' ? syncError.value : null,
+)
+const writeErrorText = computed(() =>
+  typeof writeError.value === 'string' ? writeError.value : null,
+)
+const writeErrorOrgRestriction = computed<OrgRestrictionNotice | null>(() =>
+  typeof writeError.value === 'object' ? writeError.value : null,
+)
 
 // Applies a merged remote read (Sub-Issue C, issue #64) through
 // useStationStorage/useDefaultFuelType's own setters, per the
