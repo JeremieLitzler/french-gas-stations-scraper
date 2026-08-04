@@ -23,6 +23,15 @@
  *   B-2 — valid repo config saves without validation while unauthenticated
  *   B-3 — saved config persists across reloads and after login
  *   B-4 — invalid repo config shows human-readable error once authenticated
+ *
+ * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
+ *   1 — file-path check org-restricted 403 resolves {owner} and skips the repo-level fallback
+ *   2 — file-path check non-org 403 falls back to the generic unavailable message
+ *   3 — file-path check 403 with unparseable JSON falls back to the generic message, no throw
+ *   4 — file-path check 404 falls through, repo-level check org-restricted 403 resolves {owner}
+ *   5 — file-path check 401 is unchanged (regression guard)
+ *   6 — file-path check 404 still falls through to the repo-level check (regression guard)
+ *   7 — file-path check 200 leaves validationError null (regression guard)
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -53,6 +62,40 @@ vi.mock('@/utils/indexedDb', () => ({
 const REPO_CONFIG_KEY = 'repoConfig'
 const REPO_NOT_REACHABLE_MESSAGE =
   "Le dépôt GitHub est introuvable ou inaccessible. Vérifiez son nom et vos droits d'accès."
+const VALIDATION_UNAVAILABLE_MESSAGE =
+  'Impossible de vérifier le dépôt GitHub pour le moment. Réessayez plus tard.'
+const SESSION_EXPIRED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
+
+// ---------------------------------------------------------------------------
+// Org-OAuth-restriction 403 helpers (issue #108)
+// ---------------------------------------------------------------------------
+
+function orgRestrictedResponse() {
+  return {
+    status: 403,
+    json: () =>
+      Promise.resolve({
+        message:
+          "Although you appear to have the correct authorization credentials, the `acme-corp` organization has enabled OAuth App access restrictions, meaning that data access to third-parties is limited. For more information on these restrictions, including how to enable this app, visit https://docs.github.com/articles/restricting-access-to-your-organization-s-data/",
+        documentation_url: 'https://docs.github.com/rest/repos/contents#create-or-update-file-contents',
+        status: '403',
+      }),
+  }
+}
+
+function rateLimited403Response() {
+  return {
+    status: 403,
+    json: () => Promise.resolve({ message: 'API rate limit exceeded for user ID.' }),
+  }
+}
+
+function unparseable403Response() {
+  return {
+    status: 403,
+    json: () => Promise.reject(new Error('Unexpected token < in JSON')),
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -134,5 +177,133 @@ describe('B-4: invalid repo config shows human-readable error once authenticated
 
     expect(store.get(REPO_CONFIG_KEY)).toEqual(invalidDraft)
     expect(validationError.value).toBe(REPO_NOT_REACHABLE_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 1: file-path check org-restricted 403 skips the repo-level fallback
+// ---------------------------------------------------------------------------
+
+describe('Scenario 1: file-path check org-restricted 403 resolves {owner} and skips the repo-level fallback', () => {
+  it('sets validationError to {owner} from the configured repo and calls fetch only once', async () => {
+    const draft: RepoConfigDraft = {
+      ownerRepo: 'acme-corp/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
+    const fetchMock = vi.fn().mockResolvedValue(orgRestrictedResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(draft, true)
+
+    expect(validationError.value).toEqual({ owner: 'acme-corp' })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 2: file-path check non-org 403 falls back to the generic message
+// ---------------------------------------------------------------------------
+
+describe('Scenario 2: file-path check non-org 403 falls back to the generic unavailable message', () => {
+  it('sets validationError to VALIDATION_UNAVAILABLE_MESSAGE, unchanged from today', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(rateLimited403Response()))
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(VALID_CONFIG, true)
+
+    expect(validationError.value).toBe(VALIDATION_UNAVAILABLE_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 3: file-path check 403 with unparseable JSON falls back to the generic message
+// ---------------------------------------------------------------------------
+
+describe('Scenario 3: file-path check 403 with unparseable JSON falls back to the generic message', () => {
+  it('sets validationError to VALIDATION_UNAVAILABLE_MESSAGE without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(unparseable403Response()))
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await expect(saveRepoConfig(VALID_CONFIG, true)).resolves.toBeUndefined()
+    expect(validationError.value).toBe(VALIDATION_UNAVAILABLE_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 4: file-path check 404 falls through, repo-level check org-restricted 403
+// ---------------------------------------------------------------------------
+
+describe('Scenario 4: file-path check 404 falls through to a repo-level org-restricted 403', () => {
+  it('sets validationError to {owner} once the repo-level check reports the org restriction', async () => {
+    const draft: RepoConfigDraft = {
+      ownerRepo: 'acme-corp/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 404 })
+      .mockResolvedValueOnce(orgRestrictedResponse())
+    vi.stubGlobal('fetch', fetchMock)
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(draft, true)
+
+    expect(validationError.value).toEqual({ owner: 'acme-corp' })
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 5: file-path check 401 is unchanged (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 5: file-path check 401 is unchanged (regression guard)', () => {
+  it('sets validationError to the existing session-expired message', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 401 }))
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(VALID_CONFIG, true)
+
+    expect(validationError.value).toBe(SESSION_EXPIRED_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 6: file-path check 404 still falls through to the repo-level check (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 6: file-path check 404 still falls through to the repo-level check (regression guard)', () => {
+  it('reflects the repo-level check outcome and calls fetch twice', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 404 })
+      .mockResolvedValueOnce({ status: 200 })
+    vi.stubGlobal('fetch', fetchMock)
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(VALID_CONFIG, true)
+
+    expect(validationError.value).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 7: file-path check 200 leaves validationError null (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 7: file-path check 200 leaves validationError null (regression guard)', () => {
+  it('sets validationError to null and calls fetch only once', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ status: 200 })
+    vi.stubGlobal('fetch', fetchMock)
+    const { validationError, saveRepoConfig } = await freshComposable()
+
+    await saveRepoConfig(VALID_CONFIG, true)
+
+    expect(validationError.value).toBeNull()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })

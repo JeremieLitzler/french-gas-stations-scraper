@@ -44,6 +44,12 @@
  * C-16 through C-18 (empty-state rendering, cross-view consistency) are
  * component-level scenarios: see StationPricesContent.spec.ts,
  * StationManagerTable.spec.ts, and HomePageContent.spec.ts.
+ *
+ * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
+ *   8  — remote-file fetch org-restricted 403 sets syncError to {owner}, local data untouched
+ *   9  — remote-file fetch non-org 403 falls back to the generic fetch-failed message
+ *   10 — remote-file fetch 401 is unchanged (regression guard)
+ *   11 — remote-file fetch 200 with a valid file applies normally, no syncError (regression guard)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -71,6 +77,30 @@ const REMOTE_FETCH_FAILED_MESSAGE =
 const INVALID_REMOTE_CONTENT_MESSAGE =
   'Le fichier de préférences distant est invalide. Vos données locales sont conservées.'
 const REMOTE_FETCH_TIMEOUT_MS = 10_000
+
+// ---------------------------------------------------------------------------
+// Org-OAuth-restriction 403 helpers (issue #108)
+// ---------------------------------------------------------------------------
+
+function orgRestrictedResponse() {
+  return {
+    status: 403,
+    json: () =>
+      Promise.resolve({
+        message:
+          "Although you appear to have the correct authorization credentials, the `alice` organization has enabled OAuth App access restrictions, meaning that data access to third-parties is limited. For more information on these restrictions, including how to enable this app, visit https://docs.github.com/articles/restricting-access-to-your-organization-s-data/",
+        documentation_url: 'https://docs.github.com/rest/repos/contents#create-or-update-file-contents',
+        status: '403',
+      }),
+  }
+}
+
+function rateLimited403Response() {
+  return {
+    status: 403,
+    json: () => Promise.resolve({ message: 'API rate limit exceeded for user ID.' }),
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -415,6 +445,80 @@ describe('C-15: the invalid-content message is distinct from the re-authenticati
     expect(unauthorizedMessage).toBe(ACCESS_REVOKED_MESSAGE)
     expect(invalidContentMessage).not.toBe(unauthorizedMessage)
     expect(invalidContentMessage).not.toMatch(/reconnect|reconnecter|se connecter/i)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 8: remote-file fetch org-restricted 403 sets syncError to {owner}
+// ---------------------------------------------------------------------------
+
+describe('Scenario 8: remote-file fetch org-restricted 403 sets syncError to {owner}', () => {
+  it('sets syncError to {owner}, never applies remote data, distinct from the fetch-failed and re-auth messages', async () => {
+    staleOverride = true
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(orgRestrictedResponse()))
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, syncOnLoad } = await freshComposable()
+    await syncOnLoad(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(syncError.value).toEqual({ owner: 'alice' })
+    expect(syncError.value).not.toBe(REMOTE_FETCH_FAILED_MESSAGE)
+    expect(syncError.value).not.toBe(ACCESS_REVOKED_MESSAGE)
+    expect(applyRemotePreferences).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 9: remote-file fetch non-org 403 falls back to the generic fetch-failed message
+// ---------------------------------------------------------------------------
+
+describe('Scenario 9: remote-file fetch non-org 403 falls back to the generic fetch-failed message', () => {
+  it('sets syncError to REMOTE_FETCH_FAILED_MESSAGE, unchanged from today', async () => {
+    staleOverride = true
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(rateLimited403Response()))
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, syncOnLoad } = await freshComposable()
+    await syncOnLoad(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(syncError.value).toBe(REMOTE_FETCH_FAILED_MESSAGE)
+    expect(applyRemotePreferences).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 10: remote-file fetch 401 is unchanged (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 10: remote-file fetch 401 is unchanged (regression guard)', () => {
+  it('sets syncError to the existing access-revoked message', async () => {
+    staleOverride = true
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 401 }))
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, syncOnLoad } = await freshComposable()
+    await syncOnLoad(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(syncError.value).toBe(ACCESS_REVOKED_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Scenario 11: remote-file fetch 200 with a valid file applies normally (regression guard)
+// ---------------------------------------------------------------------------
+
+describe('Scenario 11: remote-file fetch 200 with a valid file applies normally, no syncError (regression guard)', () => {
+  it('applies the remote preferences and leaves syncError null', async () => {
+    staleOverride = true
+    const remoteData: PreferencesFile = { favoriteStations: [], fuelTypeDefault: 'SP95' }
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubContentResponse(remoteData)))
+    const applyRemotePreferences = vi.fn().mockResolvedValue(undefined)
+
+    const { syncError, syncOnLoad } = await freshComposable()
+    await syncOnLoad(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(applyRemotePreferences).toHaveBeenCalledWith(remoteData)
+    expect(syncError.value).toBeNull()
   })
 })
 
