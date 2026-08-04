@@ -5,8 +5,8 @@
 When a user's GitHub organization has "OAuth App access restrictions" enabled, every
 call site that talks to the `github-api-proxy` function must recognize the resulting
 HTTP 403 and tell the user specifically what is wrong (the organization blocks
-third-party OAuth Apps) and how to fix it (a link to GitHub's restriction docs),
-instead of falling into a generic "unreachable"/"failed" message.
+third-party OAuth Apps) and how to fix it (a link to that organization's own OAuth App
+access settings page), instead of falling into a generic "unreachable"/"failed" message.
 
 ## Scope
 
@@ -29,31 +29,32 @@ it already forwards GitHub's status/body verbatim):
    other forbidden causes) or whose body can't be parsed falls back to that call
    site's existing generic failure message — unchanged from today.
 
-2. **Message content.** When the org-restriction case is detected, the user-visible
-   message must state that the organization restricts data access for third-party
-   OAuth Apps, include GitHub's own explanatory text from the response body (so the
-   organization name is visible to the user, since it's embedded in that text), and
-   link to `https://docs.github.com/articles/restricting-access-to-your-organization-s-data/`.
-   The GitHub-supplied text is shown as plain text, never interpreted as HTML.
+2. **Message content is fixed and identical at all three call sites.** GitHub's own
+   403 explanatory text is used only to detect the case (rule 1) and is never shown
+   to the user — no part of the response body reaches the displayed message. The
+   message shown is exactly:
 
-3. **Message tone stays call-site-specific.** Each of the three composables keeps
-   composing this message in its own existing style (language, and — for the write
-   path — the "your local data is kept" reassurance already used for its other
-   failure messages), the same way each composable already phrases 401/404/409
-   differently today. Only the underlying GitHub-restriction information (rule 2) is
-   shared.
+   > Le dépôt choisi se trouve sous une organisation n'autorisant pas
+   > l'authentification avec votre compte et le dépôt choisi. Veuillez visiter ce
+   > lien pour autoriser l'accès.
 
-4. **No change to unrelated statuses.** 401 (re-authentication), 404 (not found),
+   "lien" is a clickable link that opens, in a new browser tab (without navigating
+   away from the app), the settings page where an admin of that organization manages
+   OAuth App access restrictions. The link target is built only from the repo owner
+   the user has already configured in this app's own Settings — never from any field
+   in the GitHub response body (e.g. its `documentation_url`).
+
+3. **No change to unrelated statuses.** 401 (re-authentication), 404 (not found),
    409 (conflict), 200 (success), and other/unexpected statuses keep their current
    behavior exactly as-is; 403 is a new, additional branch alongside them.
 
-5. **`useRepoConfig.ts` short-circuits like a 401.** Today, a file-path check that
+4. **`useRepoConfig.ts` short-circuits like a 401.** Today, a file-path check that
    isn't 200/401/404 falls through to also check whether the repo itself is
    reachable. An org-OAuth-restriction 403 skips that fallback (it would 403 again
    for the same organization-wide reason) and resolves directly to the message from
    rule 2 — mirroring how a 401 already short-circuits.
 
-6. **Read and write paths surface it as a distinct, non-retryable failure.** In
+5. **Read and write paths surface it as a distinct, non-retryable failure.** In
    `useRemotePreferencesSync.ts` and `useRemotePreferencesWrite.ts`, the
    org-restriction 403 is surfaced as its own error state (not the generic
    fetch-failed / write-failed message, and not the re-authentication message —
@@ -64,6 +65,8 @@ it already forwards GitHub's status/body verbatim):
 - `netlify/functions/github-api-proxy.ts` — already forwards GitHub's status/body
   verbatim for non-401 responses.
 - Any UI affordance to let the user request org-admin approval from within the app —
-  the message only informs and links to GitHub's own docs.
+  the link only takes the user to GitHub's own settings page for that purpose.
+- Per-call-site wording variation for this message (unlike the app's other failure
+  messages, which do vary by call site) — rule 2's text is shown verbatim everywhere.
 
 status: ready
