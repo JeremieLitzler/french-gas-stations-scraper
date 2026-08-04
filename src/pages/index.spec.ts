@@ -72,6 +72,14 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
 // real (unmocked) @/utils/indexedDb, which throws in this happy-dom test
 // environment (no global indexedDB), rejecting StationPricesContent's
 // top-level Promise.all and leaving it stuck inside its <Suspense> boundary.
+//
+// Since issue #120, StationManager also renders GitHubSyncSettings
+// (unstubbed) in TC-10 below, so both mocks carry every property
+// GitHubSyncSettings.vue itself reads/calls (canInitiateLogin, login, logout
+// / validationError, saveRepoConfig) — not just the subset
+// StationPricesContent needs — since both composables are singletons and
+// this file's mock is the only one Vitest uses for every consumer in the
+// tree.
 // ---------------------------------------------------------------------------
 
 vi.mock('@/composables/useGitHubAuth', () => ({
@@ -79,6 +87,9 @@ vi.mock('@/composables/useGitHubAuth', () => ({
     isAuthenticated: ref(false),
     authError: ref(null),
     initializeAuthState: vi.fn().mockResolvedValue(undefined),
+    canInitiateLogin: vi.fn().mockReturnValue(false),
+    login: vi.fn(),
+    logout: vi.fn().mockResolvedValue(undefined),
     handleUnauthorized: vi.fn().mockResolvedValue(undefined),
   }),
 }))
@@ -86,7 +97,9 @@ vi.mock('@/composables/useGitHubAuth', () => ({
 vi.mock('@/composables/useRepoConfig', () => ({
   useRepoConfig: () => ({
     repoConfig: ref({ ownerRepo: '', filePath: '', revalidateCacheDays: null }),
+    validationError: ref(null),
     loadRepoConfig: vi.fn().mockResolvedValue(undefined),
+    saveRepoConfig: vi.fn().mockResolvedValue(undefined),
   }),
 }))
 
@@ -174,8 +187,17 @@ describe('TC-09: StationPrices content is visible after Suspense resolves', () =
 // TC-10: StationManager does not render an AppLoader internally
 // ---------------------------------------------------------------------------
 
-describe('TC-10: StationManager does not render an AppLoader inside itself', () => {
-  it('does not find an AppLoader component inside StationManager', async () => {
+// Since issue #120, StationManager does render an AppLoader internally — as
+// the <Suspense> fallback for its GitHub sync section (business-
+// specifications.md Rule 5) — but only while that section's own data is
+// still resolving. This test's mocks resolve immediately, so once
+// flushPromises() settles, no AppLoader remains inside StationManager; the
+// pending-state case (AppLoader present, rest of StationManager already
+// interactive) is covered by StationManager.spec.ts's own
+// "test-cases.md (issue #120) scenario 2/3" tests, which control the timing
+// directly instead of racing a real page-level load.
+describe('TC-10: StationManager renders no AppLoader once its own and its children\'s async data has resolved', () => {
+  it('does not find an AppLoader component inside StationManager after Suspense resolves', async () => {
     const IndexPage = (await import('./index.vue')).default
     const wrapper = mount(IndexPage, {
       global: {
@@ -196,7 +218,6 @@ describe('TC-10: StationManager does not render an AppLoader inside itself', () 
 
     const stationManager = wrapper.findComponent({ name: 'StationManager' })
     expect(stationManager.exists()).toBe(true)
-    // AppLoader is not rendered inside StationManager — it has no loading indicator
     const loaderInsideManager = stationManager.findComponent({ name: 'AppLoader' })
     expect(loaderInsideManager.exists()).toBe(false)
   })

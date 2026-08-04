@@ -5,6 +5,10 @@
  *   F-2 — github-auth-callback exchanges code for token and sets cookie
  *   F-3 — github-auth-callback with error parameter redirects to error state
  *   F-6 — Client Secret is never present in any response body or redirect URL
+ *
+ * Scenarios covered (test-cases.md, issue #120 — move GitHub sync settings):
+ *   5 — successful login redirects to the home page (was /settings)
+ *   6 — failed/errored login redirects to the home page (was /settings)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -81,7 +85,7 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe('F-2: github-auth-callback exchanges code for token and sets cookie', () => {
-  it('redirects to /settings?auth=success with a gh_token cookie carrying the exchanged token', async () => {
+  it('redirects to /?auth=success with a gh_token cookie carrying the exchanged token', async () => {
     stubSuccessfulTokenExchange()
     const event = buildEvent({
       headers: { cookie: `gh_oauth_state=${STATE_VALUE}` },
@@ -91,7 +95,7 @@ describe('F-2: github-auth-callback exchanges code for token and sets cookie', (
     const response = expectResponse(await authCallbackHandler(event, CONTEXT))
 
     expect(response.statusCode).toBe(302)
-    expect(response.headers?.Location).toBe('/settings?auth=success')
+    expect(response.headers?.Location).toBe('/?auth=success')
     const cookies = setCookies(response)
     expect(
       cookies.some(
@@ -123,7 +127,7 @@ describe('F-2: github-auth-callback exchanges code for token and sets cookie', (
 // ---------------------------------------------------------------------------
 
 describe('F-3: github-auth-callback with error parameter redirects to error state', () => {
-  it('redirects to /settings?auth=error and sets no gh_token cookie', async () => {
+  it('redirects to /?auth=error and sets no gh_token cookie', async () => {
     const event = buildEvent({
       queryStringParameters: { error: 'access_denied' },
     })
@@ -131,7 +135,7 @@ describe('F-3: github-auth-callback with error parameter redirects to error stat
     const response = expectResponse(await authCallbackHandler(event, CONTEXT))
 
     expect(response.statusCode).toBe(302)
-    expect(response.headers?.Location).toBe('/settings?auth=error')
+    expect(response.headers?.Location).toBe('/?auth=error')
     const cookies = setCookies(response)
     expect(cookies.some((cookie) => cookie.startsWith('gh_token='))).toBe(false)
   })
