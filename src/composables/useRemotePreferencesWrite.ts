@@ -12,7 +12,10 @@
  * "Enregistrer les modifications" (see the addendum in
  * `docs/decisions/ADR-012-github-repo-as-sync-backend.md`). The
  * default-fuel-type flow (`StationPricesContent.vue`) is
- * unaffected and still calls `pushPreferences` immediately on change.
+ * unaffected and still calls `pushPreferences` immediately on change — it
+ * passes `includeStationChanges: false` so a station edit still pending in
+ * `StationManager` never leaks into (and is never cleared by) a fuel-type
+ * push it wasn't reviewed from.
  *
  * The before/after preview and the per-row import merge (issue #63) share one
  * dialog component (`PreferencesDiffDialog.vue`, Sub-Issue D rule 2) — this
@@ -326,6 +329,7 @@ export function useRemotePreferencesWrite() {
     isAuthenticated: boolean,
     repoConfig: RepoConfigDraft,
     preferences: PreferencesFile,
+    includeStationChanges: boolean,
     onUnauthorized?: () => void | Promise<void>,
   ): Promise<void> => {
     if (!isAuthenticated) return
@@ -352,8 +356,12 @@ export function useRemotePreferencesWrite() {
     // Snapshot before the async GET below, not after: any station edit made
     // while the request is in flight must stay pending rather than being
     // silently included-but-unreviewed or dropped by a later blind clear
-    // (security-guidelines.md issue #110 rule 3).
-    const stationChangesSnapshot = pendingStationChanges.value
+    // (security-guidelines.md issue #110 rule 3). Callers that aren't the
+    // StationManager "Enregistrer les modifications" trigger (e.g. the
+    // default-fuel-type flow) pass includeStationChanges: false so this push
+    // never bundles or clears station edits it never showed for review
+    // (business-specifications.md: the fuel-type flow is unaffected).
+    const stationChangesSnapshot = includeStationChanges ? pendingStationChanges.value : []
     try {
       await resolvePendingWrite(
         ownerRepo,

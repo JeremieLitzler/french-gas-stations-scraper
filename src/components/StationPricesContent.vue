@@ -198,7 +198,13 @@ watch(derivedFuelTypes, (fuelTypes: string[]) => {
 // failures are non-blocking), so callers can await it unconditionally.
 async function pushFuelTypeChange(): Promise<void> {
   const preferences = buildPreferencesFile(stations.value, defaultFuelType.value)
-  await pushPreferences(isAuthenticated.value, repoConfig.value, preferences, handleUnauthorized)
+  await pushPreferences(
+    isAuthenticated.value,
+    repoConfig.value,
+    preferences,
+    false,
+    handleUnauthorized,
+  )
 }
 
 async function onSaveDefault(): Promise<void> {

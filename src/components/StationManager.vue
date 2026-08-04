@@ -24,7 +24,13 @@ const { repoConfig } = useRepoConfig()
 
 async function onSaveChanges(): Promise<void> {
   const preferences = buildPreferencesFile(stations.value, defaultFuelType.value)
-  await pushPreferences(isAuthenticated.value, repoConfig.value, preferences, handleUnauthorized)
+  await pushPreferences(
+    isAuthenticated.value,
+    repoConfig.value,
+    preferences,
+    true,
+    handleUnauthorized,
+  )
 }
 </script>
 
