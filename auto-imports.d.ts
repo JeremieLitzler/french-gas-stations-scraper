@@ -125,7 +125,7 @@ declare global {
   export type { FuelPrice } from './src/types/fuel-price'
   import('./src/types/fuel-price')
   // @ts-ignore
-  export type { PreferencesFile, DiffRowKind, StationDiffRow, FuelTypeDiff, PreferencesDiff, RemoteWritePreview } from './src/types/preferences'
+  export type { PreferencesFile, DiffRowKind, StationDiffRow, FuelTypeDiff, PreferencesDiff, StationFieldChange, StationChange, FuelTypeChange, RemoteWritePreview } from './src/types/preferences'
   import('./src/types/preferences')
   // @ts-ignore
   export type { PriceRow } from './src/types/price-row'

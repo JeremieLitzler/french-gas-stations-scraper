@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import type { StationDiffRow, FuelTypeDiff } from '@/types/preferences'
+import type {
+  StationDiffRow,
+  FuelTypeDiff,
+  StationChange,
+  StationFieldChange,
+} from '@/types/preferences'
 import { usePreferencesImport } from '@/composables/usePreferencesImport'
 import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
 import { useStationStorage } from '@/composables/useStationStorage'
@@ -60,6 +65,22 @@ const onChooseFuelType = (fuelTypeDiff: FuelTypeDiff, choice: 'file' | 'stored')
 
 const onConfirmWrite = async (): Promise<void> => {
   await confirmWrite(handleUnauthorized)
+}
+
+const FIELD_LABELS: Record<StationFieldChange['field'], string> = {
+  name: 'Nom',
+  url: 'URL',
+}
+
+function fieldLabel(field: StationFieldChange['field']): string {
+  return FIELD_LABELS[field]
+}
+
+// Prefixed with `kind` so an 'edited' and a 'removed'/'added' entry can never
+// collide even if they happen to share the same station URL within one batch.
+function stationChangeKey(change: StationChange): string {
+  if (change.kind === 'edited') return `edited-${change.url}`
+  return `${change.kind}-${change.station.url}`
 }
 </script>
 
@@ -182,12 +203,13 @@ const onConfirmWrite = async (): Promise<void> => {
     </div>
   </Teleport>
 
-  <!-- Write-confirm mode (Sub-Issue D, issue #64): before/after preview of the
-       remote file, a single confirm/cancel — the local state already written
-       to IndexedDB is already the value being pushed, so there is nothing to
-       merge (business-specifications.md Sub-Issue D rule 2). Every value below
-       renders through Vue's default text interpolation, never v-html
-       (security-guidelines.md rule 8). -->
+  <!-- Write-confirm mode (Sub-Issue D, issue #64): a field-level preview of
+       what changed (issue #110), a single confirm/cancel — the local state
+       already written to IndexedDB is already the value being pushed, so
+       there is nothing to merge (business-specifications.md Sub-Issue D rule
+       2). Every value below renders through Vue's default text
+       interpolation, never v-html (security-guidelines.md rule 8; issue
+       #110 rule 2). -->
   <Teleport to="body">
     <div
       v-if="isWriteDialogOpen && writeDiff"
@@ -203,15 +225,37 @@ const onConfirmWrite = async (): Promise<void> => {
           Aperçu des changements à enregistrer sur GitHub
         </h2>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <h3 class="text-sm font-medium mb-2">Actuel (GitHub)</h3>
-            <pre class="text-xs bg-gray-50 rounded p-3 overflow-x-auto">{{ writeDiff.beforeJson }}</pre>
-          </div>
-          <div>
-            <h3 class="text-sm font-medium mb-2">Nouveau</h3>
-            <pre class="text-xs bg-gray-50 rounded p-3 overflow-x-auto">{{ writeDiff.afterJson }}</pre>
-          </div>
+        <div v-if="writeDiff.stationChanges.length > 0">
+          <h3 class="text-sm font-medium mb-2">Stations</h3>
+          <ul class="flex flex-col gap-2 text-sm">
+            <li
+              v-for="change in writeDiff.stationChanges"
+              :key="stationChangeKey(change)"
+              class="border rounded p-2"
+            >
+              <template v-if="change.kind === 'added'">
+                <span class="text-green-600 font-medium">Ajoutée :</span> {{ change.station.name }}
+              </template>
+              <template v-else-if="change.kind === 'removed'">
+                <span class="text-red-600 font-medium">Supprimée :</span> {{ change.station.name }}
+              </template>
+              <template v-else>
+                <p class="font-medium break-all">{{ change.url }}</p>
+                <p v-for="fieldChange in change.fieldChanges" :key="fieldChange.field">
+                  {{ fieldLabel(fieldChange.field) }} :
+                  {{ fieldChange.before }} → {{ fieldChange.after }}
+                </p>
+              </template>
+            </li>
+          </ul>
+        </div>
+
+        <div v-if="writeDiff.fuelTypeChange">
+          <h3 class="text-sm font-medium mb-2">Carburant par défaut</h3>
+          <p class="text-sm">
+            {{ writeDiff.fuelTypeChange.before ?? 'aucun' }} →
+            {{ writeDiff.fuelTypeChange.after ?? 'aucun' }}
+          </p>
         </div>
 
         <div class="flex justify-end gap-3 pt-2">

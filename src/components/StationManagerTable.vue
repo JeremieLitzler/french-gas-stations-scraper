@@ -79,12 +79,9 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useStationStorage } from '@/composables/useStationStorage'
-import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
-import { useGitHubAuth } from '@/composables/useGitHubAuth'
-import { useRepoConfig } from '@/composables/useRepoConfig'
 import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
-import { buildPreferencesFile } from '@/utils/preferencesExport'
 import type { Station } from '@/types/station'
+import type { StationFieldChange } from '@/types/preferences'
 
 const SUCCESS_DISMISS_DELAY_MS = 2000
 const ALLOWED_ORIGIN = 'https://www.prix-carburants.gouv.fr'
@@ -103,22 +100,23 @@ interface RowDraft {
 // component mounts (Sub-Issue C rule 8, issue #64) — this component only
 // reads the shared singleton state (ADR-002), it does not load it itself.
 const { stations, addStation, removeStation, updateStation } = useStationStorage()
-const { defaultFuelType } = useDefaultFuelType()
-const { isAuthenticated, handleUnauthorized } = useGitHubAuth()
-const { repoConfig } = useRepoConfig()
-const { pushPreferences } = useRemotePreferencesWrite()
+const { markStationChange } = useRemotePreferencesWrite()
 
 const rowDrafts: Ref<RowDraft[]> = ref([])
 
-// Sub-Issue D, issue #64: pushes the just-saved station list to the user's
-// GitHub repo, reusing the same PreferencesFile shape the export/import
-// feature (issue #63) already builds. pushPreferences itself no-ops when the
-// user isn't authenticated or repo config is incomplete, and never throws
-// (business-specifications.md Sub-Issue D rule 4: write failures are
-// non-blocking), so callers can await it unconditionally.
-async function pushStationChange(): Promise<void> {
-  const preferences = buildPreferencesFile(stations.value, defaultFuelType.value)
-  await pushPreferences(isAuthenticated.value, repoConfig.value, preferences, handleUnauthorized)
+// Issue #110: station edits still save to IndexedDB immediately, but no
+// longer push to GitHub on every change — they only record what changed so
+// "Enregistrer les modifications" (StationManager.vue) can bundle every
+// pending edit into a single push once the user clicks it.
+function buildFieldChanges(original: Station, name: string, url: string): StationFieldChange[] {
+  const fieldChanges: StationFieldChange[] = []
+  if (original.name !== name) {
+    fieldChanges.push({ field: 'name', before: original.name, after: name })
+  }
+  if (original.url !== url) {
+    fieldChanges.push({ field: 'url', before: original.url, after: url })
+  }
+  return fieldChanges
 }
 
 /**
@@ -237,11 +235,15 @@ function scheduleSuccessDismiss(savedUrl: string): void {
 async function saveExistingRow(index: number, name: string, url: string): Promise<void> {
   const draft = rowDrafts.value[index]
   const originalUrl = draft.originalUrl
+  const original = stations.value.find((station) => station.url === originalUrl)
   try {
     await updateStation(originalUrl, { name, url })
     rowSuccessMap[originalUrl] = true
     scheduleSuccessDismiss(originalUrl)
-    await pushStationChange()
+    const fieldChanges = original ? buildFieldChanges(original, name, url) : []
+    if (fieldChanges.length > 0) {
+      markStationChange({ kind: 'edited', url: originalUrl, fieldChanges })
+    }
   } catch {
     draft.rowError = 'Could not save changes. Please try again.'
   }
@@ -249,9 +251,10 @@ async function saveExistingRow(index: number, name: string, url: string): Promis
 
 async function onDelete(originalUrl: string): Promise<void> {
   const draft = rowDrafts.value.find((row) => row.originalUrl === originalUrl)
+  const original = stations.value.find((station) => station.url === originalUrl)
   try {
     await removeStation(originalUrl)
-    await pushStationChange()
+    if (original) markStationChange({ kind: 'removed', station: original })
   } catch {
     if (draft) draft.rowError = 'Could not delete station. Please try again.'
   }
@@ -300,7 +303,7 @@ async function onNewRowBlur(): Promise<void> {
     newUrl.value = ''
     newNameError.value = ''
     newUrlError.value = ''
-    await pushStationChange()
+    markStationChange({ kind: 'added', station: { name: trimmedName, url: trimmedUrl } })
   } catch {
     newUrlError.value = 'Could not save station. Please try again.'
   }

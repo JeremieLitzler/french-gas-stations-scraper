@@ -1,7 +1,31 @@
 <script setup lang="ts">
+/**
+ * Object Calisthenics exception: six composables are called at the top level
+ * of setup() (beyond the two-instance-variable guideline) because this
+ * component now owns the "Enregistrer les modifications" trigger (issue
+ * #110) and, per the composable-caller-responsibility convention, must call
+ * every composable whose data or actions it needs itself — the same
+ * documented framework exception as GitHubSyncSettings.vue.
+ */
 import { usePreferencesImport } from '@/composables/usePreferencesImport'
+import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
+import { useStationStorage } from '@/composables/useStationStorage'
+import { useDefaultFuelType } from '@/composables/useDefaultFuelType'
+import { useGitHubAuth } from '@/composables/useGitHubAuth'
+import { useRepoConfig } from '@/composables/useRepoConfig'
+import { buildPreferencesFile } from '@/utils/preferencesExport'
 
 const { fuelTypeWarning, doOpenDialog } = usePreferencesImport()
+const { hasPendingChanges, isWriting, pushPreferences } = useRemotePreferencesWrite()
+const { stations } = useStationStorage()
+const { defaultFuelType } = useDefaultFuelType()
+const { isAuthenticated, handleUnauthorized } = useGitHubAuth()
+const { repoConfig } = useRepoConfig()
+
+async function onSaveChanges(): Promise<void> {
+  const preferences = buildPreferencesFile(stations.value, defaultFuelType.value)
+  await pushPreferences(isAuthenticated.value, repoConfig.value, preferences, handleUnauthorized)
+}
 </script>
 
 <template>
@@ -13,9 +37,12 @@ const { fuelTypeWarning, doOpenDialog } = usePreferencesImport()
         >https://www.prix-carburants.gouv.fr/</AppLink
       >
     </p>
-    <div class="flex gap-3 mb-4">
+    <div class="flex gap-3 mb-4 flex-wrap">
       <PreferencesExport />
       <PreferencesImport />
+      <Button v-if="hasPendingChanges" :disabled="isWriting" @click="onSaveChanges">
+        {{ isWriting ? 'Enregistrement…' : 'Enregistrer les modifications' }}
+      </Button>
     </div>
     <!-- fuelTypeWarning is shown here so it appears below both export/import buttons,
          outside the PreferencesImport component's own layout. -->

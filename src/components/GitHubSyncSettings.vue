@@ -151,14 +151,25 @@ async function onLogout(): Promise<void> {
       }}</span>
     </div>
 
-    <div class="flex gap-3">
-      <Button :disabled="cacheDaysError !== '' || isSaving" @click="onSave">
+    <div class="flex flex-col gap-3 sm:flex-row">
+      <Button
+        class="w-full sm:w-auto"
+        :disabled="cacheDaysError !== '' || isSaving"
+        @click="onSave"
+      >
         {{ isAuthenticated ? 'Enregistrer la fréquence' : 'Enregistrer les paramètres' }}
       </Button>
-      <Button v-if="!isAuthenticated" :disabled="!loginReady || isSaving" @click="onLogin">
+      <Button
+        v-if="!isAuthenticated"
+        class="w-full sm:w-auto"
+        :disabled="!loginReady || isSaving"
+        @click="onLogin"
+      >
         Se connecter avec GitHub
       </Button>
-      <Button v-else variant="outline" @click="onLogout">Se déconnecter</Button>
+      <Button v-else class="w-full sm:w-auto" variant="outline" @click="onLogout">
+        Se déconnecter
+      </Button>
     </div>
   </section>
 </template>
