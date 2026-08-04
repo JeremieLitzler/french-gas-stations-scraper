@@ -1,11 +1,18 @@
 /**
  * Singleton composable for pushing local preference changes to the user's
- * GitHub repo (Sub-Issue D, issue #64): whenever a station or default-fuel
- * change is saved to IndexedDB, the caller invokes `pushPreferences` with the
- * full up-to-date `{ fuelTypeDefault, favoriteStations }` snapshot. If a
- * remote file already exists, a before/after preview opens for the user to
- * confirm; if none exists yet, the file is created directly
+ * GitHub repo (Sub-Issue D, issue #64): the caller invokes `pushPreferences`
+ * with the full up-to-date `{ fuelTypeDefault, favoriteStations }` snapshot.
+ * If a remote file already exists, a field-level preview opens for the user
+ * to confirm; if none exists yet, the file is created directly
  * (business-specifications.md Sub-Issue D rule 2).
+ *
+ * Since issue #110, station-list edits (`StationManagerTable.vue`) no longer
+ * call `pushPreferences` on every change — they call `markStationChange` to
+ * record the edit, and the caller only pushes when the user clicks
+ * "Enregistrer les modifications" (see the addendum in
+ * `docs/decisions/ADR-012-github-repo-as-sync-backend.md`). The
+ * default-fuel-type flow (`StationPricesContent.vue`) is
+ * unaffected and still calls `pushPreferences` immediately on change.
  *
  * The before/after preview and the per-row import merge (issue #63) share one
  * dialog component (`PreferencesDiffDialog.vue`, Sub-Issue D rule 2) — this
@@ -30,10 +37,15 @@
  * exception (see useGitHubAuth.ts, useRepoConfig.ts, useRemotePreferencesSync.ts).
  */
 
-import { ref } from 'vue'
-import type { Ref } from 'vue'
+import { computed, ref } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import type { RepoConfigDraft } from '@/types/repo-config'
-import type { PreferencesFile, RemoteWritePreview } from '@/types/preferences'
+import type {
+  FuelTypeChange,
+  PreferencesFile,
+  RemoteWritePreview,
+  StationChange,
+} from '@/types/preferences'
 import { parseJsonFile } from '@/utils/preferencesImport'
 
 const PROXY_PATH = '/.netlify/functions/github-api-proxy'
@@ -61,6 +73,8 @@ interface PendingWrite {
   path: string
   sha: string | undefined
   content: string
+  /** The station-change snapshot this write covers — cleared on success, not the live list. */
+  stationChanges: StationChange[]
 }
 
 interface ExistingFile {
@@ -79,6 +93,11 @@ const writeError: Ref<string | null> = ref(null)
 const writeSuccess: Ref<boolean> = ref(false)
 const divergedNotice: Ref<string | null> = ref(null)
 const isWriting: Ref<boolean> = ref(false)
+// Station-list changes recorded since the last successful push (issue #110)
+// — appended by `markStationChange` as each edit is saved locally, read by
+// `hasPendingChanges` to show/hide "Enregistrer les modifications", and
+// bundled into the next push's preview/content.
+const pendingStationChanges: Ref<StationChange[]> = ref([])
 
 // Object Calisthenics exception: a seventh module-level variable, beyond the
 // six reactive refs above. It holds the write awaiting confirmation and is
@@ -154,8 +173,9 @@ async function fetchExistingFile(
 
 // Re-parses the existing remote file through the same shape validation
 // Sub-Issue C's read path enforces (security-guidelines.md rule 8) before its
-// content is ever placed in the write-confirm diff preview.
-function decodeAndValidateExistingFile(existingFile: ExistingFile): string {
+// content is ever compared against the local state for the write-confirm
+// diff preview (security-guidelines.md issue #110 rule 1).
+function decodeAndValidateExistingFile(existingFile: ExistingFile): PreferencesFile {
   let text: string
   try {
     text = decodeBase64Utf8(existingFile.content)
@@ -164,7 +184,33 @@ function decodeAndValidateExistingFile(existingFile: ExistingFile): string {
   }
   const parsed = parseJsonFile(text)
   if (parsed === null) throw new RemoteWriteContentInvalidError()
-  return toPreferencesJson(parsed)
+  return parsed
+}
+
+function buildFuelTypeChange(
+  before: PreferencesFile,
+  after: PreferencesFile,
+): FuelTypeChange | null {
+  if (before.fuelTypeDefault === after.fuelTypeDefault) return null
+  return { before: before.fuelTypeDefault, after: after.fuelTypeDefault }
+}
+
+function buildWritePreview(
+  before: PreferencesFile,
+  after: PreferencesFile,
+  stationChanges: StationChange[],
+): RemoteWritePreview {
+  return { stationChanges, fuelTypeChange: buildFuelTypeChange(before, after) }
+}
+
+// Removes only the change entries this push actually covered, by reference —
+// any edit recorded after the snapshot was taken (while the write was still
+// in flight) is left pending rather than silently dropped
+// (security-guidelines.md issue #110 rule 3).
+function clearPendingStationChanges(pushed: StationChange[]): void {
+  pendingStationChanges.value = pendingStationChanges.value.filter(
+    (change) => !pushed.includes(change),
+  )
 }
 
 async function handlePutResponse(response: Response): Promise<void> {
@@ -194,8 +240,8 @@ async function putRemoteFile(
   await handlePutResponse(response)
 }
 
-function openWriteDialog(beforeJson: string, afterJson: string): void {
-  writeDiff.value = { beforeJson, afterJson }
+function openWriteDialog(preview: RemoteWritePreview): void {
+  writeDiff.value = preview
   isWriteDialogOpen.value = true
 }
 
@@ -238,28 +284,44 @@ async function handleWriteFailure(
   writeError.value = WRITE_FAILED_MESSAGE
 }
 
-async function createRemoteFile(ownerRepo: OwnerRepo, path: string, content: string): Promise<void> {
+async function createRemoteFile(
+  ownerRepo: OwnerRepo,
+  path: string,
+  content: string,
+  stationChanges: StationChange[],
+): Promise<void> {
   await putRemoteFile(ownerRepo, path, content, undefined)
   divergedNotice.value = null
   writeSuccess.value = true
+  clearPendingStationChanges(stationChanges)
 }
 
 async function resolvePendingWrite(
   ownerRepo: OwnerRepo,
   path: string,
-  afterJson: string,
+  preferences: PreferencesFile,
+  stationChanges: StationChange[],
 ): Promise<void> {
+  const afterJson = toPreferencesJson(preferences)
   const existingFile = await fetchExistingFile(ownerRepo, path)
   if (existingFile === null) {
-    await createRemoteFile(ownerRepo, path, afterJson)
+    await createRemoteFile(ownerRepo, path, afterJson, stationChanges)
     return
   }
-  const beforeJson = decodeAndValidateExistingFile(existingFile)
-  pendingWrite = { ownerRepo, path, sha: existingFile.sha, content: afterJson }
-  openWriteDialog(beforeJson, afterJson)
+  const beforePreferences = decodeAndValidateExistingFile(existingFile)
+  pendingWrite = { ownerRepo, path, sha: existingFile.sha, content: afterJson, stationChanges }
+  openWriteDialog(buildWritePreview(beforePreferences, preferences, stationChanges))
 }
 
 export function useRemotePreferencesWrite() {
+  const hasPendingChanges: ComputedRef<boolean> = computed(
+    () => pendingStationChanges.value.length > 0,
+  )
+
+  const markStationChange = (change: StationChange): void => {
+    pendingStationChanges.value = [...pendingStationChanges.value, change]
+  }
+
   const pushPreferences = async (
     isAuthenticated: boolean,
     repoConfig: RepoConfigDraft,
@@ -273,21 +335,32 @@ export function useRemotePreferencesWrite() {
       writeError.value = INVALID_CONFIG_MESSAGE
       return
     }
-    // Guards against duplicate in-flight requests (e.g. two blur events firing
-    // in quick succession): without it, two calls could race on the initial
-    // GET and both resolve into a create/diff step for the same target file.
-    // The change that loses the race is not dropped silently — it is already
-    // in IndexedDB (the caller awaits its own storage write first), so the
-    // same persistent notice cancelWrite uses tells the user it hasn't
-    // reached GitHub yet (review-results.md, sub-issue-86).
+    // Guards against duplicate in-flight requests (e.g. a double click on
+    // "Enregistrer les modifications"): without it, two calls could race on
+    // the initial GET and both resolve into a create/diff step for the same
+    // target file. The change that loses the race is not dropped silently —
+    // it is already in IndexedDB (the caller awaits its own storage write
+    // first) and still recorded in pendingStationChanges, so the same
+    // persistent notice cancelWrite uses tells the user it hasn't reached
+    // GitHub yet (review-results.md, sub-issue-86).
     if (isWriting.value) {
       divergedNotice.value = DIVERGED_MESSAGE
       return
     }
     isWriting.value = true
     resetWriteFeedback()
+    // Snapshot before the async GET below, not after: any station edit made
+    // while the request is in flight must stay pending rather than being
+    // silently included-but-unreviewed or dropped by a later blind clear
+    // (security-guidelines.md issue #110 rule 3).
+    const stationChangesSnapshot = pendingStationChanges.value
     try {
-      await resolvePendingWrite(ownerRepo, repoConfig.filePath.trim(), toPreferencesJson(preferences))
+      await resolvePendingWrite(
+        ownerRepo,
+        repoConfig.filePath.trim(),
+        preferences,
+        stationChangesSnapshot,
+      )
     } catch (error) {
       await handleWriteFailure(error, onUnauthorized)
     } finally {
@@ -301,13 +374,14 @@ export function useRemotePreferencesWrite() {
     // for the same sha — the template also disables the button while
     // isWriting is true, this is the belt-and-braces check.
     if (isWriting.value) return
-    const { ownerRepo, path, sha, content } = pendingWrite
+    const { ownerRepo, path, sha, content, stationChanges } = pendingWrite
     isWriting.value = true
     resetWriteFeedback()
     try {
       await putRemoteFile(ownerRepo, path, content, sha)
       divergedNotice.value = null
       writeSuccess.value = true
+      clearPendingStationChanges(stationChanges)
     } catch (error) {
       await handleWriteFailure(error, onUnauthorized)
     } finally {
@@ -323,6 +397,8 @@ export function useRemotePreferencesWrite() {
   }
 
   return {
+    hasPendingChanges,
+    markStationChange,
     writeDiff,
     isWriteDialogOpen,
     writeError,
