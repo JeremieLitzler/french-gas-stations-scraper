@@ -104,4 +104,14 @@ describe('AppFooter', () => {
     const wrapper = mount(AppFooter, globalConfig)
     expect(wrapper.find('footer').text()).toContain('et')
   })
+
+  // test-cases.md (issue #120) scenario 4 — the GitHub sync settings move
+  // retires the standalone /settings page, so its footer link is removed.
+  it('renders no link with the text "Paramètres" or pointing to /settings', () => {
+    const wrapper = mount(AppFooter, globalConfig)
+    const links = wrapper.findAll('a')
+
+    expect(links.some((link) => link.text().includes('Paramètres'))).toBe(false)
+    expect(links.some((link) => link.attributes('href') === '/settings')).toBe(false)
+  })
 })

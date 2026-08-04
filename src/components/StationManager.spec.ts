@@ -16,6 +16,16 @@
  * markStationChange when a row is edited/added/deleted, and this file's new
  * button-visibility tests (TC-04 through TC-10) rely on that call flowing
  * through to hasPendingChanges the way the real composable does.
+ *
+ * Since issue #120, StationManager.vue also renders GitHubSyncSettings
+ * (unstubbed, in its own <Suspense>, right after the collapsible station
+ * list). The useGitHubAuth/useRepoConfig mocks below are extended with every
+ * property GitHubSyncSettings.vue itself reads/calls (authError,
+ * initializeAuthState, canInitiateLogin, login, logout / validationError,
+ * loadRepoConfig, saveRepoConfig) — not just the isAuthenticated/repoConfig
+ * subset StationManager's own onSaveChanges handler needs — since both
+ * composables are singletons and this file's mock is the only one Vitest
+ * will use for every consumer in the tree, including GitHubSyncSettings.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -85,10 +95,20 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
 }))
 
 const mockIsAuthenticated: Ref<boolean> = ref(false)
+const mockAuthError: Ref<string | null> = ref(null)
+const mockInitializeAuthState = vi.fn().mockResolvedValue(undefined)
+const mockCanInitiateLogin = vi.fn().mockReturnValue(false)
+const mockLogin = vi.fn()
+const mockLogout = vi.fn().mockResolvedValue(undefined)
 const mockHandleUnauthorized = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/composables/useGitHubAuth', () => ({
   useGitHubAuth: () => ({
     isAuthenticated: mockIsAuthenticated,
+    authError: mockAuthError,
+    initializeAuthState: mockInitializeAuthState,
+    canInitiateLogin: mockCanInitiateLogin,
+    login: mockLogin,
+    logout: mockLogout,
     handleUnauthorized: mockHandleUnauthorized,
   }),
 }))
@@ -98,8 +118,16 @@ const mockRepoConfig: Ref<RepoConfigDraft> = ref({
   filePath: '',
   revalidateCacheDays: null,
 })
+const mockValidationError: Ref<string | null> = ref(null)
+const mockLoadRepoConfig = vi.fn().mockResolvedValue(undefined)
+const mockSaveRepoConfig = vi.fn().mockResolvedValue(undefined)
 vi.mock('@/composables/useRepoConfig', () => ({
-  useRepoConfig: () => ({ repoConfig: mockRepoConfig }),
+  useRepoConfig: () => ({
+    repoConfig: mockRepoConfig,
+    validationError: mockValidationError,
+    loadRepoConfig: mockLoadRepoConfig,
+    saveRepoConfig: mockSaveRepoConfig,
+  }),
 }))
 
 // ---------------------------------------------------------------------------
@@ -120,8 +148,16 @@ beforeEach(() => {
   mockPushPreferences.mockResolvedValue(undefined)
   mockDefaultFuelType.value = null
   mockIsAuthenticated.value = false
+  mockAuthError.value = null
+  mockInitializeAuthState.mockResolvedValue(undefined)
+  mockCanInitiateLogin.mockReturnValue(false)
+  mockLogin.mockReset()
+  mockLogout.mockResolvedValue(undefined)
   mockHandleUnauthorized.mockResolvedValue(undefined)
   mockRepoConfig.value = { ownerRepo: '', filePath: '', revalidateCacheDays: null }
+  mockValidationError.value = null
+  mockLoadRepoConfig.mockResolvedValue(undefined)
+  mockSaveRepoConfig.mockResolvedValue(undefined)
   vi.clearAllMocks()
 })
 
@@ -148,9 +184,28 @@ function mountComponent() {
         PreferencesExport: { template: '<div />' },
         PreferencesImport: { template: '<div />' },
         PreferencesDiffDialog: { template: '<div />' },
+        // Stubbed with a marker element (not `true`) so tests can assert its
+        // presence/absence while GitHubSyncSettings itself is left unstubbed
+        // — the whole point of TC-120-02/03 below is exercising the real
+        // nested <Suspense> swap. Same pattern as src/pages/index.spec.ts.
+        AppLoader: { template: '<div class="app-loader-stub" />' },
       },
     },
   })
+}
+
+/**
+ * A promise plus its own resolve function, so a test can hold
+ * initializeAuthState()/loadRepoConfig() pending and resolve them on demand
+ * to observe GitHubSyncSettings's own <Suspense> fallback (issue #120,
+ * business-specifications.md Rule 5).
+ */
+function createDeferred(): { promise: Promise<void>; resolve: () => void } {
+  let resolve!: () => void
+  const promise = new Promise<void>((res) => {
+    resolve = res
+  })
+  return { promise, resolve }
 }
 
 // ---------------------------------------------------------------------------
@@ -982,5 +1037,94 @@ describe('TC-11: clicking "Enregistrer les modifications" triggers one bundled p
       true,
       mockHandleUnauthorized,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------
+// test-cases.md (issue #120) scenario 1: GitHub sync section is always
+// visible, right after the collapsible station list
+// ---------------------------------------------------------------------------
+
+describe('test-cases.md (issue #120) scenario 1: GitHub sync section is always visible, right after the collapsible station list', () => {
+  it('shows "Synchronisation GitHub" below the "Afficher / masquer la liste" toggle without expanding it', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const details = wrapper.find('details')
+    expect(details.attributes('open')).toBeUndefined()
+    expect(wrapper.text()).toContain('Synchronisation GitHub')
+  })
+
+  it('places the GitHub sync section after the <details> station list in document order', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const html = wrapper.html()
+    const detailsIndex = html.indexOf('</details>')
+    const syncSectionIndex = html.indexOf('Synchronisation GitHub')
+
+    expect(detailsIndex).toBeGreaterThan(-1)
+    expect(syncSectionIndex).toBeGreaterThan(detailsIndex)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// test-cases.md (issue #120) scenarios 2 & 3: the rest of Station Manager is
+// usable, and the GitHub sync section shows its own loading indicator, while
+// the section's own data (auth state, saved repo config) has not resolved
+// ---------------------------------------------------------------------------
+
+describe('test-cases.md (issue #120) scenario 2: the rest of Station Manager is usable before the GitHub sync section resolves', () => {
+  it('keeps the station list and import/export controls interactive while auth state and repo config are still pending', async () => {
+    const authDeferred = createDeferred()
+    const repoDeferred = createDeferred()
+    mockInitializeAuthState.mockImplementation(() => authDeferred.promise)
+    mockLoadRepoConfig.mockImplementation(() => repoDeferred.promise)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    // The GitHub sync section itself has not resolved yet.
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
+    expect(wrapper.find('#ownerRepo').exists()).toBe(false)
+
+    // The rest of Station Manager is already interactive.
+    expect(wrapper.findComponent({ name: 'PreferencesExport' }).exists()).toBe(true)
+    expect(wrapper.findComponent({ name: 'PreferencesImport' }).exists()).toBe(true)
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(mockUpdateStation).toHaveBeenCalledWith(
+      'https://www.prix-carburants.gouv.fr/station/11111',
+      expect.objectContaining({ name: 'Station A Updated' }),
+    )
+
+    authDeferred.resolve()
+    repoDeferred.resolve()
+    await flushPromises()
+  })
+})
+
+describe('test-cases.md (issue #120) scenario 3: the GitHub sync section shows its own loading indicator while resolving', () => {
+  it('shows the loading indicator in place of the section, then swaps to its fields once resolved', async () => {
+    const authDeferred = createDeferred()
+    const repoDeferred = createDeferred()
+    mockInitializeAuthState.mockImplementation(() => authDeferred.promise)
+    mockLoadRepoConfig.mockImplementation(() => repoDeferred.promise)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(true)
+    expect(wrapper.find('#ownerRepo').exists()).toBe(false)
+
+    authDeferred.resolve()
+    repoDeferred.resolve()
+    await flushPromises()
+
+    expect(wrapper.find('.app-loader-stub').exists()).toBe(false)
+    expect(wrapper.find('#ownerRepo').exists()).toBe(true)
   })
 })

@@ -31,6 +31,12 @@
  *   A-8  — no prior session and no callback indicator — unauthenticated with no error banner
  *   A-9  — an error-callback indicator shows a human-readable error
  *   A-10 — a 401 from a GitHub API call clears the authenticated state and prompts re-login
+ *
+ * Scenarios covered (test-cases.md, issue #120 — move GitHub sync settings):
+ *   7 — a successful callback landing on the home page (was /settings) marks
+ *       the user authenticated and cleans the URL (A-4, updated location)
+ *   8 — a failed callback landing on the home page (was /settings) shows the
+ *       error and cleans the URL (A-9, updated location)
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -81,7 +87,7 @@ async function freshComposable() {
 }
 
 function stubLocation(search: string): { href: string; search: string } {
-  const locationStub = { href: `http://localhost:3000/settings${search}`, search }
+  const locationStub = { href: `http://localhost:3000/${search}`, search }
   vi.stubGlobal('location', locationStub)
   return locationStub
 }
@@ -160,7 +166,7 @@ describe('A-4: a successful-callback indicator marks the user authenticated', ()
     expect(isAuthenticated.value).toBe(true)
     expect(authError.value).toBeNull()
     expect(store.get(AUTH_STATE_KEY)).toBe(true)
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', 'http://localhost:3000/settings')
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', 'http://localhost:3000/')
   })
 })
 
@@ -276,7 +282,7 @@ describe('A-9: an error-callback indicator shows a human-readable error', () => 
     expect(isAuthenticated.value).toBe(false)
     expect(authError.value).toBe(CALLBACK_ERROR_MESSAGE)
     expect(store.get(AUTH_STATE_KEY)).toBeUndefined()
-    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', 'http://localhost:3000/settings')
+    expect(replaceStateSpy).toHaveBeenCalledWith({}, '', 'http://localhost:3000/')
   })
 })
 
