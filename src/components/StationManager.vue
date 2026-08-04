@@ -39,7 +39,7 @@ async function onSaveChanges(): Promise<void> {
     <h2 class="text-xl font-semibold mb-1">Gérer mes stations</h2>
     <p class="mb-4">
       Gérez votre liste de stations en renseignant un nom et le lien depuis
-      <AppLink href="https://www.prix-carburants.gouv.fr/" target="_blank" rel="noopener"
+      <AppLink to="https://www.prix-carburants.gouv.fr/"
         >https://www.prix-carburants.gouv.fr/</AppLink
       >
     </p>

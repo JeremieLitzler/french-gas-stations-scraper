@@ -10,7 +10,7 @@
  * Renders the fixed org-OAuth-restriction message (business-specifications.md
  * rule 2, issue #108) with a real, clickable link to the configured
  * organization's own OAuth App access settings page. Reuses `AppLink`, which
- * already opens external links in a new tab with `rel="noopener"`
+ * already opens external links in a new tab with `rel="noopener noreferrer"`
  * (security-guidelines.md rule 4), instead of a one-off anchor element.
  *
  * The caller supplies only `owner` — the message text itself is fixed and
