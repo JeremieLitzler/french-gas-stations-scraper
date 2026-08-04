@@ -16,6 +16,12 @@
   external-link branch (review-results.md finding), to literally satisfy security-guidelines.md
   rule 4's stated requirement; this also tightens every other external link already using
   `AppLink` (`AppFooter.vue`, `StationManager.vue`).
+- `src/components/StationManager.vue` — its `AppLink` usage changed from
+  `href="..." target="_blank" rel="noopener"` to `to="..."` (review-results.md second-pass
+  finding). See "Non-trivial decisions" below.
+- `src/components/OrgRestrictionNotice.vue` — doc comment corrected from `rel="noopener"` to
+  `rel="noopener noreferrer"` (review-results.md second-pass finding), matching the `AppLink.vue`
+  fix above so the comment doesn't restate the claim the first review round rejected.
 - `src/composables/useRepoConfig.ts` — `classifyProxyResponse`/`checkProxyReachable` detect the
   org-restriction 403 as a boolean (`isOrgRestrictedResponse`, replacing the old
   message-extracting/sanitizing `extractOrgRestrictionMessage`); `resolveValidationError`
@@ -80,6 +86,20 @@
   currently reachable by any input this app accepts, but building a URL by concatenating
   unencoded input is the kind of pattern that becomes a bug the day that assumption changes.
 
+- **`StationManager.vue`'s `AppLink` usage was switched from `href`/`target`/`rel` attributes to
+  the `to` prop, instead of just dropping the redundant `rel`.** review-results.md's second-pass
+  finding was that this call site's own `rel="noopener"` attribute overrides `AppLink`'s internal
+  `rel="noopener noreferrer"` via Vue's fallthrough-attribute merge, so the `AppLink.vue` fix
+  above wasn't actually reaching this link. Investigating why revealed a deeper pre-existing
+  issue: `AppLink`'s `isExternal` check (`typeof to === 'string' && to.startsWith('http')`) only
+  fires off the `to` prop, not `href` — this call site passed `href`, so it was never taking the
+  external-link branch at all, and was falling through to `AppLink`'s `router-link` branch (only
+  still working as an external link by accident, because Vue Router skips its click-interception
+  for anchors carrying `target="_blank"`). Passing `to` instead of `href`/`target`/`rel` fixes
+  both problems at once: it takes the intended external-link branch, which supplies
+  `target="_blank" rel="noopener noreferrer"` itself, so no per-call-site `rel` can shadow it
+  again.
+
 ## Self-code review
 
 Three issues were found and fixed while reviewing the new code:
@@ -108,5 +128,18 @@ Additionally, after the review's `rel` finding, checked whether `AppLink.vue`'s 
 itself, and `src/pages/mentions-legales.spec.ts` (TC-05) already asserts external links
 elsewhere in this app carry `rel="noopener noreferrer"` — confirming `AppLink`'s prior
 `noopener`-only was the inconsistent outlier, not an established convention this change breaks.
+That check missed `src/components/layout/AppFooter.test.ts:90-96`, which does assert the old
+`rel="noopener"` value for `AppFooter.vue`'s `AppLink`-rendered links and will now fail — this
+is a `.test.ts` file, so per this command's rules it is not edited here; per user direction it
+is left for `/jli-writes-tests` to update (expected new value: `'noopener noreferrer'`, matching
+the `mentions-legales.spec.ts` TC-05 precedent).
+
+### Known follow-up: pre-existing test needs updating
+
+`src/components/layout/AppFooter.test.ts:90-96` (`it('all links have rel="noopener"', ...)`)
+was already failing against this branch's `AppLink.vue` change before this pass and is
+unaffected by today's fixes — it is not part of this task's `test-cases.md` and this command
+does not touch test files, so it is called out here rather than silently left for
+`/jli-runs-tests` to discover cold.
 
 status: ready
