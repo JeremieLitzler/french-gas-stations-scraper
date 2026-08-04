@@ -59,6 +59,14 @@ async function onSaveChanges(): Promise<void> {
       <summary class="cursor-pointer mb-2">Afficher / masquer la liste</summary>
       <StationManagerTable />
     </details>
+    <div class="mt-4">
+      <Suspense>
+        <GitHubSyncSettings />
+        <template #fallback>
+          <AppLoader />
+        </template>
+      </Suspense>
+    </div>
     <PreferencesDiffDialog />
   </div>
 </template>

@@ -1,6 +1,6 @@
 // GET — GitHub's OAuth redirect target. Validates `state`, exchanges `code` for an
 // access token server-side, and sets it as the `gh_token` session cookie. Redirects to
-// /settings?auth=success|error; the token never appears in the URL or response body.
+// /?auth=success|error; the token never appears in the URL or response body.
 import type { Handler, HandlerEvent, HandlerResponse } from '@netlify/functions'
 import {
   buildExpiredCookie,
@@ -14,8 +14,8 @@ import { jsonResponse, redirectResponse } from '../lib/http-responses'
 const STATE_COOKIE_NAME = 'gh_oauth_state'
 const TOKEN_COOKIE_NAME = 'gh_token'
 const TOKEN_COOKIE_MAX_AGE_SECONDS = 28800
-const SETTINGS_SUCCESS_PATH = '/settings?auth=success'
-const SETTINGS_ERROR_PATH = '/settings?auth=error'
+const HOME_SUCCESS_PATH = '/?auth=success'
+const HOME_ERROR_PATH = '/?auth=error'
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token'
 
 type CallbackValidation =
@@ -30,15 +30,15 @@ export const handler: Handler = async (event: HandlerEvent) => {
   const isSecureRequest = isHttpsRequest(event)
   const validation = validateCallbackRequest(event)
   if (!validation.ok) {
-    return redirectToSettingsError(isSecureRequest)
+    return redirectToHomeError(isSecureRequest)
   }
 
   const accessToken = await exchangeCodeForAccessToken(validation.code, validation.credentials)
   if (!accessToken) {
-    return redirectToSettingsError(isSecureRequest)
+    return redirectToHomeError(isSecureRequest)
   }
 
-  return redirectToSettingsSuccess(accessToken, isSecureRequest)
+  return redirectToHomeSuccess(accessToken, isSecureRequest)
 }
 
 function validateCallbackRequest(event: HandlerEvent): CallbackValidation {
@@ -98,17 +98,17 @@ function isAccessTokenPayload(payload: unknown): payload is { access_token: stri
   return typeof (payload as Record<string, unknown>).access_token === 'string'
 }
 
-function redirectToSettingsError(isSecureRequest: boolean): HandlerResponse {
+function redirectToHomeError(isSecureRequest: boolean): HandlerResponse {
   const expiredStateCookie = buildExpiredCookie(STATE_COOKIE_NAME, isSecureRequest)
-  return redirectResponse(SETTINGS_ERROR_PATH, [expiredStateCookie])
+  return redirectResponse(HOME_ERROR_PATH, [expiredStateCookie])
 }
 
-function redirectToSettingsSuccess(accessToken: string, isSecureRequest: boolean): HandlerResponse {
+function redirectToHomeSuccess(accessToken: string, isSecureRequest: boolean): HandlerResponse {
   const tokenCookie = buildSessionCookie(TOKEN_COOKIE_NAME, accessToken, {
     maxAgeSeconds: TOKEN_COOKIE_MAX_AGE_SECONDS,
     isSecureRequest,
     sameSite: 'Strict',
   })
   const expiredStateCookie = buildExpiredCookie(STATE_COOKIE_NAME, isSecureRequest)
-  return redirectResponse(SETTINGS_SUCCESS_PATH, [tokenCookie, expiredStateCookie])
+  return redirectResponse(HOME_SUCCESS_PATH, [tokenCookie, expiredStateCookie])
 }

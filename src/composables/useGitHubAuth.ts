@@ -5,8 +5,9 @@
  * It does not own repo configuration fields (`owner/repo`, file path,
  * `revalidate-cache-days`) or their IndexedDB persistence — those belong to
  * Sub-Issues B and E. `canInitiateLogin` accepts that config as a parameter so
- * the future Settings page can gate its "Login with GitHub" button without
- * this composable knowing where the values come from.
+ * the GitHub sync section (`GitHubSyncSettings.vue`, hosted inside
+ * `StationManager.vue` per issue #120) can gate its "Login with GitHub" button
+ * without this composable knowing where the values come from.
  *
  * The access token itself never reaches the browser (ADR-011) — it lives only
  * in the `gh_token` HttpOnly cookie set by the Netlify functions. The boolean
