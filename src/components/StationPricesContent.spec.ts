@@ -120,6 +120,21 @@ vi.mock('@/composables/useRemotePreferencesSync', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useRemotePreferencesWrite (issue #110, TC-21 regression) — a bare
+// vi.fn() is enough here: this file only asserts pushFuelTypeChange's call
+// arguments, it does not need the reactive pending-changes behaviour
+// StationManager.spec.ts's mock provides.
+// ---------------------------------------------------------------------------
+
+const mockPushPreferences = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@/composables/useRemotePreferencesWrite', () => ({
+  useRemotePreferencesWrite: () => ({
+    pushPreferences: mockPushPreferences,
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -195,6 +210,8 @@ beforeEach(() => {
   mockClearDefaultFuelType.mockImplementation(async () => {
     mockDefaultFuelType.value = null
   })
+  mockPushPreferences.mockReset()
+  mockPushPreferences.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -1218,5 +1235,85 @@ describe('Issue-28 TC-39: "Effacer le défaut" is a plain <button> element for k
     expect(clearButton).toBeDefined()
     expect(clearButton!.element.tagName).toBe('BUTTON')
     expect(clearButton!.attributes('type')).toBe('button')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-21 (issue #110, regression): the default-fuel-type push flow is
+// unaffected by the "Enregistrer les modifications" button — it still
+// pushes to GitHub immediately on change, passing includeStationChanges:
+// false so it never needs (and is never blocked by) that button.
+// ---------------------------------------------------------------------------
+
+describe('TC-21: changing the default fuel type still pushes to GitHub immediately, isolated from station-list changes', () => {
+  it('calls pushPreferences with includeStationChanges: false when "Définir par défaut" is clicked', async () => {
+    mockResults.value = [
+      { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
+    ]
+
+    activeWrapper = await mountAndSeedSelection(mockResults.value)
+
+    const saveButton = activeWrapper
+      .findAll('.default-fuel-button')
+      .find((b) => b.text() === 'Définir par défaut')
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockPushPreferences).toHaveBeenCalledTimes(1)
+    expect(mockPushPreferences).toHaveBeenCalledWith(
+      false,
+      { ownerRepo: '', filePath: '', revalidateCacheDays: null },
+      expect.objectContaining({ fuelTypeDefault: 'SP95' }),
+      false,
+      expect.any(Function),
+    )
+  })
+
+  it('calls pushPreferences with includeStationChanges: false when "Mettre à jour le défaut" is clicked', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      {
+        stationName: 'Station A',
+        url: 'https://example.com/station/a',
+        fuels: [
+          { type: 'SP95', price: 1.89 },
+          { type: 'Gasoil', price: 1.75 },
+        ],
+      },
+    ]
+
+    activeWrapper = await mountAndSeedSelection(mockResults.value)
+
+    const fuelButtons = activeWrapper.findAll('.fuel-type-selector button')
+    const gasoilButton = fuelButtons.find((b) => b.text() === 'Gasoil')
+    await gasoilButton!.trigger('click')
+    await nextTick()
+
+    const updateButton = activeWrapper
+      .findAll('.default-fuel-button')
+      .find((b) => b.text() === 'Mettre à jour le défaut')
+    await updateButton!.trigger('click')
+    await flushPromises()
+
+    const [, , , includeStationChanges] = mockPushPreferences.mock.calls[0]
+    expect(includeStationChanges).toBe(false)
+  })
+
+  it('calls pushPreferences with includeStationChanges: false when "Effacer le défaut" is clicked', async () => {
+    mockDefaultFuelType.value = 'SP95'
+    mockResults.value = [
+      { stationName: 'Station A', url: 'https://example.com/station/a', fuels: [{ type: 'SP95', price: 1.89 }] },
+    ]
+
+    activeWrapper = await mountAndSeedSelection(mockResults.value)
+
+    const clearButton = activeWrapper
+      .findAll('.default-fuel-button')
+      .find((b) => b.text() === 'Effacer le défaut')
+    await clearButton!.trigger('click')
+    await flushPromises()
+
+    const [, , , includeStationChanges] = mockPushPreferences.mock.calls[0]
+    expect(includeStationChanges).toBe(false)
   })
 })

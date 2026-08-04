@@ -3,12 +3,28 @@
  *
  * useStationStorage is mocked so tests control the reactive station list
  * and assert which storage operations are called.
+ *
+ * Since issue #110, StationManager.vue also calls useRemotePreferencesWrite,
+ * useDefaultFuelType, useGitHubAuth, and useRepoConfig at the top level of
+ * its setup(). useDefaultFuelType/useGitHubAuth/useRepoConfig are mocked with
+ * plain refs (StationManager only reads their current value when the new
+ * "Enregistrer les modifications" button is clicked, it never awaits their
+ * load functions itself). useRemotePreferencesWrite is mocked with a small
+ * reactive implementation of markStationChange/hasPendingChanges — not a
+ * bare vi.fn() — because StationManagerTable.vue (mounted for real here,
+ * unstubbed, same as before issue #110) calls the *same* mocked
+ * markStationChange when a row is edited/added/deleted, and this file's new
+ * button-visibility tests (TC-04 through TC-10) rely on that call flowing
+ * through to hasPendingChanges the way the real composable does.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref } from 'vue'
+import type { Ref } from 'vue'
 import StationManager from './StationManager.vue'
+import type { RepoConfigDraft } from '@/types/repo-config'
+import type { StationChange } from '@/types/preferences'
 
 // ---------------------------------------------------------------------------
 // Mock useStationStorage
@@ -35,6 +51,58 @@ vi.mock('@/composables/useStationStorage', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useRemotePreferencesWrite (issue #110) — a small reactive stand-in,
+// not a bare vi.fn(), so markStationChange calls from the real
+// (unstubbed) StationManagerTable actually drive hasPendingChanges here.
+// ---------------------------------------------------------------------------
+
+const mockPendingStationChanges: Ref<StationChange[]> = ref([])
+const mockHasPendingChanges = computed(() => mockPendingStationChanges.value.length > 0)
+const mockMarkStationChange = vi.fn((change: StationChange) => {
+  mockPendingStationChanges.value = [...mockPendingStationChanges.value, change]
+})
+const mockIsWriting = ref(false)
+const mockPushPreferences = vi.fn().mockResolvedValue(undefined)
+
+vi.mock('@/composables/useRemotePreferencesWrite', () => ({
+  useRemotePreferencesWrite: () => ({
+    hasPendingChanges: mockHasPendingChanges,
+    markStationChange: mockMarkStationChange,
+    isWriting: mockIsWriting,
+    pushPreferences: mockPushPreferences,
+  }),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock useDefaultFuelType, useGitHubAuth, useRepoConfig (issue #110) — read
+// by StationManager.vue's onSaveChanges handler when the new button is
+// clicked.
+// ---------------------------------------------------------------------------
+
+const mockDefaultFuelType: Ref<string | null> = ref(null)
+vi.mock('@/composables/useDefaultFuelType', () => ({
+  useDefaultFuelType: () => ({ defaultFuelType: mockDefaultFuelType }),
+}))
+
+const mockIsAuthenticated: Ref<boolean> = ref(false)
+const mockHandleUnauthorized = vi.fn().mockResolvedValue(undefined)
+vi.mock('@/composables/useGitHubAuth', () => ({
+  useGitHubAuth: () => ({
+    isAuthenticated: mockIsAuthenticated,
+    handleUnauthorized: mockHandleUnauthorized,
+  }),
+}))
+
+const mockRepoConfig: Ref<RepoConfigDraft> = ref({
+  ownerRepo: '',
+  filePath: '',
+  revalidateCacheDays: null,
+})
+vi.mock('@/composables/useRepoConfig', () => ({
+  useRepoConfig: () => ({ repoConfig: mockRepoConfig }),
+}))
+
+// ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
@@ -47,6 +115,13 @@ beforeEach(() => {
   mockAddStation.mockResolvedValue(undefined)
   mockRemoveStation.mockResolvedValue(undefined)
   mockUpdateStation.mockResolvedValue(undefined)
+  mockPendingStationChanges.value = []
+  mockIsWriting.value = false
+  mockPushPreferences.mockResolvedValue(undefined)
+  mockDefaultFuelType.value = null
+  mockIsAuthenticated.value = false
+  mockHandleUnauthorized.mockResolvedValue(undefined)
+  mockRepoConfig.value = { ownerRepo: '', filePath: '', revalidateCacheDays: null }
   vi.clearAllMocks()
 })
 
@@ -717,5 +792,195 @@ describe('TC-31: Success message is per-row and does not appear on other rows', 
 
     expect(firstDataRow.text()).toContain('Saved')
     expect(secondDataRow.text()).not.toContain('Saved')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// "Enregistrer les modifications" button visibility (issue #110, test-cases.md)
+//
+// StationManagerTable is mounted for real (not stubbed) inside StationManager
+// here, so editing a row through it exercises the same markStationChange
+// call the real app makes — driving this file's mocked hasPendingChanges the
+// way the real composable would.
+// ---------------------------------------------------------------------------
+
+function findSaveChangesButton(wrapper: ReturnType<typeof mountComponent>) {
+  return wrapper.findAll('button').find((button) => button.text().includes('Enregistrer les modifications'))
+}
+
+// ---------------------------------------------------------------------------
+// TC-04: No local changes yet — the button is not shown
+// ---------------------------------------------------------------------------
+
+describe('TC-04: "Enregistrer les modifications" is not shown when no station-list change is pending', () => {
+  it('does not render the button on initial load', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-05: Editing an existing station's name shows the button
+// ---------------------------------------------------------------------------
+
+describe('TC-05: editing an existing station name makes the button visible', () => {
+  it('renders "Enregistrer les modifications" after a name is edited and blurred', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-06: Editing an existing station's URL shows the button
+// ---------------------------------------------------------------------------
+
+describe('TC-06: editing an existing station URL makes the button visible', () => {
+  it('renders "Enregistrer les modifications" after a URL is edited and blurred', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowUrlInput = wrapper.findAll('input')[3]
+    await firstRowUrlInput.setValue('https://www.prix-carburants.gouv.fr/station/99999')
+    await firstRowUrlInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-07: Adding a new station shows the button
+// ---------------------------------------------------------------------------
+
+describe('TC-07: adding a new station makes the button visible', () => {
+  it('renders "Enregistrer les modifications" after a new station is saved', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const rows = wrapper.findAll('tr')
+    const newRow = rows[1]
+    const [nameInput, urlInput] = newRow.findAll('input')
+
+    await nameInput.setValue('New Station')
+    await urlInput.setValue('https://www.prix-carburants.gouv.fr/station/77777')
+    await urlInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-08: Deleting a station shows the button
+// ---------------------------------------------------------------------------
+
+describe('TC-08: deleting a station makes the button visible', () => {
+  it('renders "Enregistrer les modifications" after a station is deleted', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const deleteButtons = wrapper.findAll('button.delete-button')
+    await deleteButtons[0].trigger('click')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-09: Editing two different stations keeps the button visible throughout
+// ---------------------------------------------------------------------------
+
+describe('TC-09: editing two different stations in a row keeps the button visible, with no flicker', () => {
+  it('stays visible after the first edit and after the second edit', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+
+    const secondRowNameInput = wrapper.findAll('input')[4]
+    await secondRowNameInput.setValue('Station B Updated')
+    await secondRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+    expect(mockMarkStationChange).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-10: The button becomes visible for a local edit even without GitHub sync configured
+// ---------------------------------------------------------------------------
+
+describe('TC-10: editing a station makes the button visible even while GitHub sync is not configured', () => {
+  it('renders the button after an edit while unauthenticated with no repo config', async () => {
+    mockIsAuthenticated.value = false
+    mockRepoConfig.value = { ownerRepo: '', filePath: '', revalidateCacheDays: null }
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(findSaveChangesButton(wrapper)).toBeDefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-11 (dispatch half): clicking the button triggers a single bundled push
+// ---------------------------------------------------------------------------
+
+describe('TC-11: clicking "Enregistrer les modifications" triggers one bundled push', () => {
+  it('calls pushPreferences once with includeStationChanges: true and the current preferences snapshot', async () => {
+    mockIsAuthenticated.value = true
+    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    const secondRowUrlInput = wrapper.findAll('input')[5]
+    await secondRowUrlInput.setValue('https://www.prix-carburants.gouv.fr/station/88888')
+    await secondRowUrlInput.trigger('blur')
+    await flushPromises()
+
+    expect(mockMarkStationChange).toHaveBeenCalledTimes(2)
+
+    const saveChangesButton = findSaveChangesButton(wrapper)
+    await saveChangesButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockPushPreferences).toHaveBeenCalledTimes(1)
+    expect(mockPushPreferences).toHaveBeenCalledWith(
+      true,
+      { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 },
+      expect.objectContaining({
+        fuelTypeDefault: null,
+        favoriteStations: expect.any(Array),
+      }),
+      true,
+      mockHandleUnauthorized,
+    )
   })
 })
