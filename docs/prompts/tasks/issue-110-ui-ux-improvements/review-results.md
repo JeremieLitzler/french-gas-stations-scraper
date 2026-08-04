@@ -23,27 +23,44 @@ E:\...\src\composables\usePreferencesImport.spec.ts
 
 type-check: fails, but exactly as anticipated and documented in
 `technical-specifications.md`'s "Test impact for the next phase" section — the `RemoteWritePreview`
-shape change breaks two pre-existing assertions in
-`src/composables/useRemotePreferencesWrite.spec.ts` that `/jli-writes-tests` will rewrite.
+shape change and `pushPreferences`'s new `includeStationChanges` parameter break pre-existing
+assertions/call sites in `src/composables/useRemotePreferencesWrite.spec.ts` that `/jli-writes-tests`
+will rewrite.
 
 ```
+src/composables/useRemotePreferencesWrite.spec.ts(155,11): error TS2554: Expected 4-5 arguments, but got 3.
 src/composables/useRemotePreferencesWrite.spec.ts(158,29): error TS2339: Property 'beforeJson' does not exist on type 'RemoteWritePreview'.
 src/composables/useRemotePreferencesWrite.spec.ts(159,29): error TS2339: Property 'beforeJson' does not exist on type 'RemoteWritePreview'.
 src/composables/useRemotePreferencesWrite.spec.ts(160,29): error TS2339: Property 'afterJson' does not exist on type 'RemoteWritePreview'.
+src/composables/useRemotePreferencesWrite.spec.ts(178,11): error TS2554: Expected 4-5 arguments, but got 3.
 src/composables/useRemotePreferencesWrite.spec.ts(181,29): error TS2339: Property 'beforeJson' does not exist on type 'RemoteWritePreview'.
 src/composables/useRemotePreferencesWrite.spec.ts(182,29): error TS2339: Property 'afterJson' does not exist on type 'RemoteWritePreview'.
+src/composables/useRemotePreferencesWrite.spec.ts(201,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(225,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(251,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(271,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(294,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(316,11): error TS2554: Expected 4-5 arguments, but got 3.
+src/composables/useRemotePreferencesWrite.spec.ts(338,11): error TS2554: Expected 4-5 arguments, but got 3.
 ```
 
 ## Checklist findings
 
-### 1. `pendingStationChanges` is a shared singleton consumed unconditionally by `pushPreferences`, leaking into the fuel-type flow the ADR addendum says is "unaffected"
+Previous finding (`pendingStationChanges` leaking from `StationManager` into the fuel-type push)
+verified fixed: `pushPreferences` now takes an explicit `includeStationChanges: boolean` (4th
+argument, `useRemotePreferencesWrite.ts:328-334`), `StationManager.vue:27-33` passes `true`,
+`StationPricesContent.vue:201-207` passes `false`. Traced the snapshot/clear path end to end —
+`stationChangesSnapshot = includeStationChanges ? pendingStationChanges.value : []`
+(`useRemotePreferencesWrite.ts:364`) — confirming a fuel-type-only push can no longer bundle,
+display, or clear a station edit still pending review in `StationManager`, matching
+business-specifications.md's "unaffected" scoping and test-cases.md TC-21. Also verified against
+security-guidelines.md rule 3 (snapshot taken before the `fetchExistingFile` GET, cleared by
+reference via `clearPendingStationChanges`, not a blind `= []`) and rule 1/2 (diff values sourced
+only from already-validated local state and the re-validated remote file; template uses text
+interpolation only, no `v-html`).
 
-- Where: `src/composables/useRemotePreferencesWrite.ts:356` (`stationChangesSnapshot = pendingStationChanges.value` inside `pushPreferences`), consumed by both call sites — `src/components/StationManager.vue:25-28` (`onSaveChanges`, the intended trigger) and `src/components/StationPricesContent.vue:199-202` (`pushFuelTypeChange`, called from `onSaveDefault`).
-- What's wrong: `pushPreferences` has no way to know which caller invoked it, so it always reads and bundles the *global* `pendingStationChanges` list — the one meant to represent "edits made in `StationManagerTable` since the last click of 'Enregistrer les modifications'". `StationPricesContent.vue`'s fuel-type save was never changed to exclude it (technical-specifications.md's decision #3 explicitly assumes "it naturally gets an empty stationChanges list" — that assumption doesn't hold once a station edit is pending at the time the user saves a fuel type).
-- Failure scenario: user edits a station's name in `StationManager` (saved to IndexedDB, `markStationChange` records it, "Enregistrer les modifications" becomes visible) but does not click it. They then go select a new default fuel type and click "Enregistrer" in `StationPricesContent` (same page, no navigation needed — both components render together, see `src/pages/index.spec.ts`). `onSaveDefault` → `pushFuelTypeChange` → `pushPreferences` silently scoops up the pending station edit: if no remote file exists yet it is pushed with zero review (`createRemoteFile`, no dialog per Sub-Issue D rule 2); if a remote file exists, the write-confirm dialog opens from the fuel-type "Enregistrer" click showing an unrelated station change the user never asked to review from that button. Either way, `clearPendingStationChanges` then hides "Enregistrer les modifications" in `StationManager` — even though the user never clicked it. This contradicts business-specifications.md's explicit scoping ("the issue only scopes the new button to `StationManager`") and ADR-012's addendum ("the default fuel type save flow... unaffected by this addendum").
-- Same root cause also works in reverse: because station-side diffing is now sourced only from the tracked `stationChanges` list (not derived by comparing before/after station arrays), a real station-list drift against the remote file that isn't currently sitting in `pendingStationChanges` (e.g. a previous push failed and was cleared, or the remote diverged from another device) will no longer surface in the fuel-type-triggered dialog at all, even though the full current station list is still included in the PUT content.
-- Suggested direction: give `pushPreferences` an explicit parameter (e.g. `includeStationChanges: boolean`, or have `StationPricesContent.vue` pass an empty array) so only the `StationManager`-triggered call bundles/clears `pendingStationChanges`, keeping the fuel-type flow's write scoped to `fuelTypeChange` only as the business spec requires.
+No new issues found.
 
 All other checklist items ✓
 
-status: changes requested
+status: approved
