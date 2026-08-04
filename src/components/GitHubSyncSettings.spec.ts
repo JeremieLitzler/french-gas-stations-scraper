@@ -21,6 +21,21 @@
  *   E-5 — owner/repo and file path fields disabled after login
  *   E-6 — owner/repo and file path fields re-enabled after logout
  *   E-7 — login button reflects the login-readiness check
+ *
+ * Scenarios covered (test-cases.md, issue #110 — settings page mobile layout):
+ *   TC-01 — save/connect buttons stack vertically, full width, while unauthenticated
+ *   TC-02 — save/disconnect buttons stack vertically, full width, while authenticated
+ *   TC-03 — both button rows carry the `sm:` classes that put them side by side
+ *           by side from the sm breakpoint up
+ *
+ * happy-dom does not evaluate CSS media queries, so "mobile" vs "wider
+ * viewport" cannot be asserted via actual layout. Tailwind is mobile-first
+ * here: unprefixed classes (`flex-col`, `w-full`) are the default/mobile
+ * layout, and `sm:`-prefixed classes (`sm:flex-row`, `sm:w-auto`) are the
+ * override that takes effect from the sm breakpoint up. TC-01/02 assert the
+ * unprefixed classes are present (mobile: stacked, full width); TC-03
+ * asserts the `sm:` classes are also present (wider viewports: side by side,
+ * auto width) in both auth states.
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -109,6 +124,16 @@ function findButtonByText(wrapper: VueWrapper, text: string) {
 
 function inputElement(wrapper: VueWrapper, id: string): HTMLInputElement {
   return wrapper.find(`#${id}`).element as HTMLInputElement
+}
+
+/**
+ * The container `<div>` wrapping the save/connect (or save/disconnect)
+ * button pair — the element carrying the responsive stack/side-by-side
+ * classes (GitHubSyncSettings.vue's `<div class="flex flex-col gap-3
+ * sm:flex-row">`).
+ */
+function buttonRowContainer(wrapper: VueWrapper) {
+  return findButtonByText(wrapper, 'Enregistrer').element.parentElement as HTMLElement
 }
 
 beforeEach(() => {
@@ -266,5 +291,71 @@ describe('E-7: login button reflects the login-readiness check', () => {
     await wrapper.find('#revalidateCacheDays').setValue('7')
 
     expect(findButtonByText(wrapper, 'Se connecter avec GitHub').attributes('disabled')).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-01 (issue #110): unauthenticated mobile layout — save/connect stacked, full width
+// ---------------------------------------------------------------------------
+
+describe('TC-01: save and connect buttons stack vertically and span full width on mobile (unauthenticated)', () => {
+  it('renders "Enregistrer les paramètres" and "Se connecter avec GitHub" as full-width buttons in a flex-col row', async () => {
+    mockIsAuthenticated.value = false
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const saveButton = findButtonByText(wrapper, 'Enregistrer les paramètres')
+    const connectButton = findButtonByText(wrapper, 'Se connecter avec GitHub')
+
+    expect(buttonRowContainer(wrapper).classList.contains('flex-col')).toBe(true)
+    expect(saveButton.classes()).toContain('w-full')
+    expect(connectButton.classes()).toContain('w-full')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-02 (issue #110): authenticated mobile layout — save/disconnect stacked, full width
+// ---------------------------------------------------------------------------
+
+describe('TC-02: save and disconnect buttons stack vertically and span full width on mobile (authenticated)', () => {
+  it('renders "Enregistrer la fréquence" and "Se déconnecter" as full-width buttons in a flex-col row', async () => {
+    mockIsAuthenticated.value = true
+    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const saveButton = findButtonByText(wrapper, 'Enregistrer la fréquence')
+    const disconnectButton = findButtonByText(wrapper, 'Se déconnecter')
+
+    expect(buttonRowContainer(wrapper).classList.contains('flex-col')).toBe(true)
+    expect(saveButton.classes()).toContain('w-full')
+    expect(disconnectButton.classes()).toContain('w-full')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-03 (issue #110): wider viewports keep the buttons side by side, in both auth states
+// ---------------------------------------------------------------------------
+
+describe('TC-03: the button row carries the sm: classes that keep buttons side by side on wider viewports', () => {
+  it('unauthenticated: the row is sm:flex-row and both buttons are sm:w-auto', async () => {
+    mockIsAuthenticated.value = false
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(buttonRowContainer(wrapper).classList.contains('sm:flex-row')).toBe(true)
+    expect(findButtonByText(wrapper, 'Enregistrer les paramètres').classes()).toContain('sm:w-auto')
+    expect(findButtonByText(wrapper, 'Se connecter avec GitHub').classes()).toContain('sm:w-auto')
+  })
+
+  it('authenticated: the row is sm:flex-row and both buttons are sm:w-auto', async () => {
+    mockIsAuthenticated.value = true
+    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(buttonRowContainer(wrapper).classList.contains('sm:flex-row')).toBe(true)
+    expect(findButtonByText(wrapper, 'Enregistrer la fréquence').classes()).toContain('sm:w-auto')
+    expect(findButtonByText(wrapper, 'Se déconnecter').classes()).toContain('sm:w-auto')
   })
 })
