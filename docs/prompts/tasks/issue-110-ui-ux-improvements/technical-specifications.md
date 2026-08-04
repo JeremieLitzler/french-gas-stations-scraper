@@ -9,14 +9,20 @@
   state), `hasPendingChanges` (computed) and `markStationChange` to the composable's public
   surface; `decodeAndValidateExistingFile` now returns the parsed `PreferencesFile` instead of
   re-serialised JSON text; the write-confirm preview is now built from
-  `pendingStationChanges` + a fuel-type before/after comparison instead of raw JSON diffing.
+  `pendingStationChanges` + a fuel-type before/after comparison instead of raw JSON diffing;
+  `pushPreferences` takes a new `includeStationChanges: boolean` parameter so only the
+  `StationManager`-triggered call bundles/clears `pendingStationChanges` (review fix, see decision
+  #3).
 - `src/components/StationManagerTable.vue` — station add/edit/delete no longer call
   `pushPreferences`; they call `markStationChange` with the specific field(s) that changed.
   Removed the now-unused `useGitHubAuth`/`useRepoConfig`/`useDefaultFuelType`/
   `buildPreferencesFile` imports.
 - `src/components/StationManager.vue` — added the "Enregistrer les modifications" button
   (visible only while `hasPendingChanges` is true) and the composables/handler needed to trigger
-  the batched push.
+  the batched push; calls `pushPreferences(..., includeStationChanges: true, ...)`.
+- `src/components/StationPricesContent.vue` — `pushFuelTypeChange` now calls
+  `pushPreferences(..., includeStationChanges: false, ...)` so a station edit pending in
+  `StationManager` never leaks into a fuel-type-triggered push (review fix, see decision #3).
 - `src/components/PreferencesDiffDialog.vue` — the GitHub write-confirm section's template now
   renders `writeDiff.stationChanges`/`writeDiff.fuelTypeChange` as field-level rows instead of
   `<pre>` JSON blocks; added `fieldLabel`/`stationChangeKey` helpers.
@@ -43,12 +49,16 @@
    composable-caller-responsibility convention forbids (composables never call other composables
    internally).
 
-3. **`pushPreferences`'s public signature is unchanged** — it still reads
-   `pendingStationChanges` internally rather than taking it as a parameter. This keeps
-   `StationPricesContent.vue`'s existing fuel-type-only call site untouched: it naturally gets an
-   empty `stationChanges` list (no station edits happened) and only ever shows a
-   `fuelTypeChange`, satisfying the "default fuel type flow is unaffected" rule without an
-   `if (source === ...)` branch anywhere.
+3. **`pushPreferences` takes an explicit `includeStationChanges: boolean` parameter** (added in
+   review, replacing an earlier draft that read `pendingStationChanges` unconditionally). The
+   earlier draft assumed `StationPricesContent.vue`'s fuel-type-only call site would "naturally"
+   see an empty `stationChanges` list — that assumption breaks the moment a station edit is
+   pending in `StationManager` at the time the user saves a default fuel type: both components
+   render on the same page, so `pendingStationChanges` is genuinely non-empty at that call site
+   too. `StationManager.vue` passes `true` (it is the intended trigger for bundling and clearing
+   station edits); `StationPricesContent.vue` passes `false`, so a station edit still pending
+   review in `StationManager` is never bundled into, shown by, or cleared by a fuel-type push
+   (business-specifications.md: "the default fuel type save flow ... is unaffected").
 
 4. **The pending-changes snapshot is taken synchronously at the top of `pushPreferences`, before
    the `fetchExistingFile` GET, and only that snapshot is cleared on success** (via
@@ -69,14 +79,26 @@
    occur even if an edited and a removed/added entry happen to reference the same URL within one
    batch.
 
-## Known limitation (documented, not fixed — out of test-cases.md scope)
+## Known limitations (documented, not fixed — out of test-cases.md scope)
 
-If the very same row is edited twice before "Enregistrer les modifications" is clicked (e.g. the
-name field is blurred, then blurred again with a further change), each save appends its own
-`edited` entry rather than merging into one before→final row — the dialog would show two rows for
-that station instead of one collapsed row. `test-cases.md` only requires that edits to
-*different* stations bundle correctly (covered), not that repeated edits to the *same* field
-collapse. Left as-is to avoid a stable-identity/coalescing mechanism the spec doesn't ask for.
+1. If the very same row is edited twice before "Enregistrer les modifications" is clicked (e.g.
+   the name field is blurred, then blurred again with a further change), each save appends its
+   own `edited` entry rather than merging into one before→final row — the dialog would show two
+   rows for that station instead of one collapsed row. `test-cases.md` only requires that edits to
+   *different* stations bundle correctly (covered), not that repeated edits to the *same* field
+   collapse. Left as-is to avoid a stable-identity/coalescing mechanism the spec doesn't ask for.
+
+2. The fuel-type-triggered push (`includeStationChanges: false`) can no longer surface a real
+   station-list drift against the remote file that isn't currently sitting in
+   `pendingStationChanges` (e.g. a previous push failed and was cleared elsewhere, or the remote
+   was changed from another device) — decision #1 sources station diffs only from the tracked
+   `StationChange` event log, not from comparing the fetched remote array against the local one.
+   Pre-issue-110 behaviour could surface this via full JSON diffing; re-deriving it here would mean
+   reintroducing array-comparison diffing for one call site only, which test-cases.md does not ask
+   for and which decision #1 deliberately moved away from. The PUT content itself is unaffected —
+   it always sends the full, current, correct preferences file; only the write-confirm *preview*
+   would miss an unreviewed station-side drift on a fuel-type-only save. Flagged for a follow-up
+   issue if this turns out to matter in practice.
 
 ## Self-review: issues found and fixed
 
@@ -93,6 +115,12 @@ collapse. Left as-is to avoid a stable-identity/coalescing mechanism the spec do
    station removed and a *different* new station added with the same URL later in the same
    session (or any coincidental URL reuse across change kinds within one batch) would have
    produced duplicate `:key` values. Prefixed every generated key with the change's `kind`.
+4. **Fixed (review loop-back)** — `pushPreferences` read the shared `pendingStationChanges`
+   unconditionally, so a station edit still pending in `StationManager` leaked into a fuel-type
+   push from `StationPricesContent.vue`: it could be pushed with zero review (create-file path) or
+   shown/cleared from a dialog opened by the wrong button. Added the `includeStationChanges`
+   parameter (decision #3) so only the `StationManager`-triggered call bundles and clears
+   `pendingStationChanges`.
 
 ## Test impact for the next phase
 
@@ -105,5 +133,13 @@ now caller-tracked rather than derived, D-1/D-2's setup will also need an explic
 show — the composable alone can no longer infer "a station was added/renamed" from a before/after
 `PreferencesFile` pair. D-3 through D-9 assert PUT bodies, success flags, and error messages, none
 of which changed shape, and should be unaffected.
+
+`pushPreferences` also gained a new required `includeStationChanges: boolean` parameter (4th
+positional argument, before the existing optional `onUnauthorized` callback — review fix, decision
+#3). Every existing `pushPreferences(true, REPO_CONFIG, ...)` call in
+`useRemotePreferencesWrite.spec.ts` (D-1 through D-9) needs `true` inserted as the 4th argument to
+keep exercising the `StationManager`-equivalent path; a new test case should call it with `false`
+and assert a pending `markStationChange(...)` entry is neither bundled into the preview/PUT
+content nor cleared on success, covering the fuel-type-flow isolation this fix adds.
 
 status: ready
