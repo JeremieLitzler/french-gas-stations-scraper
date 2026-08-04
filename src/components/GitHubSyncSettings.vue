@@ -23,6 +23,7 @@ import { ref, computed } from 'vue'
 import { useGitHubAuth } from '@/composables/useGitHubAuth'
 import { useRepoConfig } from '@/composables/useRepoConfig'
 import type { RepoConfigDraft } from '@/types/repo-config'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 
 const CACHE_DAYS_ERROR_MESSAGE = 'Le nombre de jours doit être un entier positif.'
 
@@ -36,6 +37,16 @@ const {
   handleUnauthorized,
 } = useGitHubAuth()
 const { repoConfig, validationError, loadRepoConfig, saveRepoConfig } = useRepoConfig()
+
+// validationError carries either a plain string or an org-OAuth-restriction
+// notice (issue #108) — split into two typed computed refs here so the
+// template never needs to narrow the union itself.
+const validationErrorText = computed(() =>
+  typeof validationError.value === 'string' ? validationError.value : null,
+)
+const validationErrorOrgRestriction = computed<OrgRestrictionNotice | null>(() =>
+  typeof validationError.value === 'object' ? validationError.value : null,
+)
 
 // The auth flag and the repo config live under separate IndexedDB keys with
 // no data dependency between them, so loading them in parallel halves the
@@ -116,7 +127,12 @@ async function onLogout(): Promise<void> {
     <h2 class="text-xl font-semibold">Synchronisation GitHub</h2>
 
     <p v-if="authError" role="alert" class="text-sm text-red-600">{{ authError }}</p>
-    <p v-if="validationError" role="alert" class="text-sm text-red-600">{{ validationError }}</p>
+    <p v-if="validationErrorText" role="alert" class="text-sm text-red-600">
+      {{ validationErrorText }}
+    </p>
+    <p v-else-if="validationErrorOrgRestriction" role="alert" class="text-sm text-red-600">
+      <OrgRestrictionNotice :owner="validationErrorOrgRestriction.owner" />
+    </p>
 
     <div class="flex flex-col gap-1">
       <Label for="ownerRepo">Dépôt (owner/repo)</Label>

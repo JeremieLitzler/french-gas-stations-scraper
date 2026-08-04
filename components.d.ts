@@ -46,6 +46,7 @@ declare module 'vue' {
     LogOut: typeof import('./src/components/ui/icon/LogOut.vue')['default']
     Menu: typeof import('./src/components/ui/icon/Menu.vue')['default']
     Moon: typeof import('./src/components/ui/icon/Moon.vue')['default']
+    OrgRestrictionNotice: typeof import('./src/components/OrgRestrictionNotice.vue')['default']
     PaintBrush: typeof import('./src/components/ui/icon/PaintBrush.vue')['default']
     PencilLine: typeof import('./src/components/ui/icon/PencilLine.vue')['default']
     PreferencesDiffDialog: typeof import('./src/components/PreferencesDiffDialog.vue')['default']

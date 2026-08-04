@@ -26,6 +26,7 @@ import { ref, toRaw } from 'vue'
 import type { Ref } from 'vue'
 import { get, set } from '@/utils/indexedDb'
 import type { RepoConfigDraft } from '@/types/repo-config'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 
 const REPO_CONFIG_KEY = 'repoConfig'
 const DEFAULT_REVALIDATE_CACHE_DAYS = 7
@@ -38,44 +39,12 @@ const REPO_NOT_REACHABLE_MESSAGE =
 const VALIDATION_UNAVAILABLE_MESSAGE =
   'Impossible de vérifier le dépôt GitHub pour le moment. Réessayez plus tard.'
 const SESSION_EXPIRED_MESSAGE = 'Votre session GitHub a expiré. Merci de vous reconnecter.'
+// Detection only (business-specifications.md rule 1) — never shown to the
+// user; the fixed, owner-linked message text lives in OrgRestrictionNotice.vue
+// (security-guidelines.md rule 2).
 const ORG_RESTRICTION_INDICATOR = 'OAuth App access restrictions'
-// Hardcoded literal (security-guidelines.md rule 2) — never built from the
-// proxy response body's own `documentation_url`.
-const ORG_RESTRICTION_DOCS_URL =
-  'https://docs.github.com/articles/restricting-access-to-your-organization-s-data/'
-const ORG_RESTRICTION_MESSAGE_PREFIX =
-  "Votre organisation GitHub restreint l'accès aux applications OAuth tierces : "
-const ORG_RESTRICTION_MESSAGE_SUFFIX = " Plus d'informations : "
-// Ranges of Unicode control / bidi-override / invisible characters to strip
-// from GitHub's echoed message text (security-guidelines.md rule 3). Built
-// from numeric code points rather than typed literally, so this source file
-// never itself contains the invisible/bidi characters it defends against.
-const CONTROL_CHAR_CODE_RANGES: ReadonlyArray<readonly [number, number]> = [
-  [0x0000, 0x0008],
-  [0x000b, 0x000c],
-  [0x000e, 0x001f],
-  [0x007f, 0x009f],
-  [0x200b, 0x200f],
-  [0x202a, 0x202e],
-  [0x2060, 0x2069],
-  [0xfeff, 0xfeff],
-]
 
-function buildControlCharsPattern(): RegExp {
-  const classBody = CONTROL_CHAR_CODE_RANGES.map(
-    ([start, end]) => String.fromCharCode(start) + '-' + String.fromCharCode(end),
-  ).join('')
-  return new RegExp('[' + classBody + ']', 'g')
-}
-
-const CONTROL_CHARS_PATTERN = buildControlCharsPattern()
-
-type ProxyCheckResult =
-  | { kind: 'ok' }
-  | { kind: 'notFound' }
-  | { kind: 'unauthorized' }
-  | { kind: 'orgRestricted'; message: string }
-  | { kind: 'error' }
+type ProxyCheckResult = 'ok' | 'notFound' | 'unauthorized' | 'orgRestricted' | 'error'
 type UnauthorizedCallback = (() => void | Promise<void>) | undefined
 
 interface OwnerRepo {
@@ -85,7 +54,7 @@ interface OwnerRepo {
 
 // Module-level state — all consumers share the same reference (ADR-002).
 const repoConfig: Ref<RepoConfigDraft> = ref(emptyRepoConfig())
-const validationError: Ref<string | null> = ref(null)
+const validationError: Ref<string | OrgRestrictionNotice | null> = ref(null)
 
 // Object Calisthenics exception: a third module-level variable, beyond the two above.
 // It exists solely to guard against a stale, slower `saveRepoConfig` call overwriting
@@ -118,41 +87,29 @@ function buildProxyUrl(ownerRepo: OwnerRepo, path?: string): string {
   return `${PROXY_PATH}?${params.toString()}`
 }
 
-function sanitizeGitHubText(text: string): string {
-  const withoutControlChars = text.replace(CONTROL_CHARS_PATTERN, '')
-  return withoutControlChars.trim()
-}
-
 // Wrapped in try/catch (security-guidelines.md rule 1): the 403 body's exact
 // shape is GitHub's, not a contract this project controls, so any parse
-// failure or unexpected shape resolves to null (the generic-failure path)
-// instead of throwing.
-async function extractOrgRestrictionMessage(response: Response): Promise<string | null> {
+// failure or unexpected shape resolves to false (the generic-failure path)
+// instead of throwing. The body's `message` text itself is never returned —
+// only this boolean — per security-guidelines.md rule 2.
+async function isOrgRestrictedResponse(response: Response): Promise<boolean> {
   try {
     const body: unknown = await response.json()
-    if (typeof body !== 'object' || body === null) return null
+    if (typeof body !== 'object' || body === null) return false
     const record = body as Record<string, unknown>
-    if (typeof record.message !== 'string') return null
-    if (!record.message.includes(ORG_RESTRICTION_INDICATOR)) return null
-    return sanitizeGitHubText(record.message)
+    if (typeof record.message !== 'string') return false
+    return record.message.includes(ORG_RESTRICTION_INDICATOR)
   } catch {
-    return null
+    return false
   }
-}
-
-function buildOrgRestrictionMessage(githubMessage: string): string {
-  return ORG_RESTRICTION_MESSAGE_PREFIX + githubMessage + ORG_RESTRICTION_MESSAGE_SUFFIX + ORG_RESTRICTION_DOCS_URL
 }
 
 async function classifyProxyResponse(response: Response): Promise<ProxyCheckResult> {
-  if (response.status === 200) return { kind: 'ok' }
-  if (response.status === 401) return { kind: 'unauthorized' }
-  if (response.status === 404) return { kind: 'notFound' }
-  if (response.status === 403) {
-    const message = await extractOrgRestrictionMessage(response)
-    if (message !== null) return { kind: 'orgRestricted', message }
-  }
-  return { kind: 'error' }
+  if (response.status === 200) return 'ok'
+  if (response.status === 401) return 'unauthorized'
+  if (response.status === 404) return 'notFound'
+  if (response.status === 403 && (await isOrgRestrictedResponse(response))) return 'orgRestricted'
+  return 'error'
 }
 
 async function checkProxyReachable(ownerRepo: OwnerRepo, path?: string): Promise<ProxyCheckResult> {
@@ -160,7 +117,7 @@ async function checkProxyReachable(ownerRepo: OwnerRepo, path?: string): Promise
     const response = await fetch(buildProxyUrl(ownerRepo, path))
     return await classifyProxyResponse(response)
   } catch {
-    return { kind: 'error' }
+    return 'error'
   }
 }
 
@@ -187,24 +144,24 @@ async function notifyUnauthorized(onUnauthorized: UnauthorizedCallback): Promise
 async function resolveValidationError(
   draft: RepoConfigDraft,
   onUnauthorized: UnauthorizedCallback,
-): Promise<string | null> {
+): Promise<string | OrgRestrictionNotice | null> {
   const ownerRepo = splitOwnerRepo(draft.ownerRepo)
   if (!ownerRepo) return INVALID_FORMAT_MESSAGE
   const filePath = draft.filePath.trim()
   if (!filePath) return MISSING_FILE_PATH_MESSAGE
   const fileCheck = await checkProxyReachable(ownerRepo, filePath)
-  if (fileCheck.kind === 'ok') return null
-  if (fileCheck.kind === 'unauthorized') return notifyUnauthorized(onUnauthorized)
-  // Short-circuits like a 401 (business-specifications.md rule 5): an
+  if (fileCheck === 'ok') return null
+  if (fileCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
+  // Short-circuits like a 401 (business-specifications.md rule 4): an
   // org-OAuth-restriction 403 would 403 again for the same organization-wide
   // reason, so the repo-level fallback below is skipped.
-  if (fileCheck.kind === 'orgRestricted') return buildOrgRestrictionMessage(fileCheck.message)
-  if (fileCheck.kind === 'error') return VALIDATION_UNAVAILABLE_MESSAGE
+  if (fileCheck === 'orgRestricted') return { owner: ownerRepo.owner }
+  if (fileCheck === 'error') return VALIDATION_UNAVAILABLE_MESSAGE
   const repoCheck = await checkProxyReachable(ownerRepo)
-  if (repoCheck.kind === 'ok') return null
-  if (repoCheck.kind === 'unauthorized') return notifyUnauthorized(onUnauthorized)
-  if (repoCheck.kind === 'orgRestricted') return buildOrgRestrictionMessage(repoCheck.message)
-  if (repoCheck.kind === 'notFound') return REPO_NOT_REACHABLE_MESSAGE
+  if (repoCheck === 'ok') return null
+  if (repoCheck === 'unauthorized') return notifyUnauthorized(onUnauthorized)
+  if (repoCheck === 'orgRestricted') return { owner: ownerRepo.owner }
+  if (repoCheck === 'notFound') return REPO_NOT_REACHABLE_MESSAGE
   return VALIDATION_UNAVAILABLE_MESSAGE
 }
 

@@ -45,6 +45,7 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import type { RepoConfigDraft } from '@/types/repo-config'
 import type { PreferencesFile } from '@/types/preferences'
+import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 import { isPreferencesStale } from '@/utils/preferencesSyncTimestamp'
 import { parseJsonFile } from '@/utils/preferencesImport'
 
@@ -55,15 +56,10 @@ const REMOTE_FETCH_FAILED_MESSAGE =
   'Impossible de récupérer vos préférences depuis GitHub. Merci de vous reconnecter.'
 const INVALID_REMOTE_CONTENT_MESSAGE =
   'Le fichier de préférences distant est invalide. Vos données locales sont conservées.'
+// Detection only (business-specifications.md rule 1) — never shown to the
+// user; the fixed, owner-linked message text lives in OrgRestrictionNotice.vue
+// (security-guidelines.md rule 2).
 const ORG_RESTRICTION_INDICATOR = 'OAuth App access restrictions'
-// Hardcoded literal (security-guidelines.md rule 2) — never built from the
-// proxy response body's own `documentation_url`.
-const ORG_RESTRICTION_DOCS_URL =
-  'https://docs.github.com/articles/restricting-access-to-your-organization-s-data/'
-const ORG_RESTRICTION_MESSAGE_PREFIX =
-  "Votre organisation GitHub restreint l'accès aux applications OAuth tierces. "
-const ORG_RESTRICTION_MESSAGE_SUFFIX =
-  " Vos données locales sont utilisées. Plus d'informations : "
 
 type UnauthorizedCallback = (() => void | Promise<void>) | undefined
 type ApplyRemotePreferences = (data: PreferencesFile) => Promise<void>
@@ -75,60 +71,29 @@ interface OwnerRepo {
 
 class RemoteUnauthorizedError extends Error {}
 class RemoteContentInvalidError extends Error {}
+// Carries the repo owner (never GitHub response text) via the standard
+// Error.message property, mirroring RemoteUnauthorizedError's pattern.
 class RemoteOrgRestrictedError extends Error {}
-
-// Ranges of Unicode control / bidi-override / invisible characters to strip
-// from GitHub's echoed message text (security-guidelines.md rule 3). Built
-// from numeric code points rather than typed literally, so this source file
-// never itself contains the invisible/bidi characters it defends against.
-const CONTROL_CHAR_CODE_RANGES: ReadonlyArray<readonly [number, number]> = [
-  [0x0000, 0x0008],
-  [0x000b, 0x000c],
-  [0x000e, 0x001f],
-  [0x007f, 0x009f],
-  [0x200b, 0x200f],
-  [0x202a, 0x202e],
-  [0x2060, 0x2069],
-  [0xfeff, 0xfeff],
-]
-
-function buildControlCharsPattern(): RegExp {
-  const classBody = CONTROL_CHAR_CODE_RANGES.map(
-    ([start, end]) => String.fromCharCode(start) + '-' + String.fromCharCode(end),
-  ).join('')
-  return new RegExp('[' + classBody + ']', 'g')
-}
-
-const CONTROL_CHARS_PATTERN = buildControlCharsPattern()
-
-function sanitizeGitHubText(text: string): string {
-  const withoutControlChars = text.replace(CONTROL_CHARS_PATTERN, '')
-  return withoutControlChars.trim()
-}
-
-function buildOrgRestrictionMessage(githubMessage: string): string {
-  return ORG_RESTRICTION_MESSAGE_PREFIX + githubMessage + ORG_RESTRICTION_MESSAGE_SUFFIX + ORG_RESTRICTION_DOCS_URL
-}
 
 // Wrapped in try/catch (security-guidelines.md rule 1): the 403 body's exact
 // shape is GitHub's, not a contract this project controls, so any parse
-// failure or unexpected shape resolves to null (the generic-failure path)
-// instead of throwing.
-async function extractOrgRestrictionMessage(response: Response): Promise<string | null> {
+// failure or unexpected shape resolves to false (the generic-failure path)
+// instead of throwing. The body's `message` text itself is never returned —
+// only this boolean — per security-guidelines.md rule 2.
+async function isOrgRestrictedResponse(response: Response): Promise<boolean> {
   try {
     const body: unknown = await response.json()
-    if (typeof body !== 'object' || body === null) return null
+    if (typeof body !== 'object' || body === null) return false
     const record = body as Record<string, unknown>
-    if (typeof record.message !== 'string') return null
-    if (!record.message.includes(ORG_RESTRICTION_INDICATOR)) return null
-    return sanitizeGitHubText(record.message)
+    if (typeof record.message !== 'string') return false
+    return record.message.includes(ORG_RESTRICTION_INDICATOR)
   } catch {
-    return null
+    return false
   }
 }
 
 // Module-level state — all consumers share the same reference (ADR-002).
-const syncError: Ref<string | null> = ref(null)
+const syncError: Ref<string | OrgRestrictionNotice | null> = ref(null)
 
 function hasCompleteRepoConfig(
   config: RepoConfigDraft,
@@ -173,9 +138,8 @@ async function requestRemoteFile(ownerRepo: OwnerRepo, path: string): Promise<Re
   if (response.status === 401) {
     throw new RemoteUnauthorizedError('GitHub access is unauthorized.')
   }
-  if (response.status === 403) {
-    const message = await extractOrgRestrictionMessage(response)
-    if (message !== null) throw new RemoteOrgRestrictedError(message)
+  if (response.status === 403 && (await isOrgRestrictedResponse(response))) {
+    throw new RemoteOrgRestrictedError(ownerRepo.owner)
   }
   if (response.status !== 200) {
     throw new Error(`GitHub proxy returned unexpected status ${response.status}.`)
@@ -271,11 +235,12 @@ async function handleFetchFailure(
     syncError.value = INVALID_REMOTE_CONTENT_MESSAGE
     return null
   }
-  // Distinct, non-retryable failure (business-specifications.md rule 6):
+  // Distinct, non-retryable failure (business-specifications.md rule 5):
   // re-authenticating would not fix an org-level restriction, so this is
   // neither the generic fetch-failed message nor the re-auth message above.
+  // error.message carries the repo owner (never GitHub response text).
   if (error instanceof RemoteOrgRestrictedError) {
-    syncError.value = buildOrgRestrictionMessage(error.message)
+    syncError.value = { owner: error.message }
     return null
   }
   syncError.value = REMOTE_FETCH_FAILED_MESSAGE

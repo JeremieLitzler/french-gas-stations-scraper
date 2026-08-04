@@ -1,99 +1,102 @@
 # Technical Specifications: Handle GitHub org OAuth restriction (403)
 
-## Why this file stops at "review specs" instead of code
+## Files changed
 
-Mid-implementation, the user redirected the message design (see conversation): instead of
-echoing GitHub's own 403 message text with a fixed generic docs link, the app should show one
-fixed French sentence with a link built from the user's own configured repo owner, opening in a
-new tab. This contradicts several rules already written into `business-specifications.md` and
-`security-guidelines.md`, and several scenarios in `test-cases.md` no longer describe the
-intended behavior. Rather than have `/jli-codes` silently rewrite those three files (owned by
-`/jli-writes-spec`, `/jli-verifies-security`, `/jli-writes-tests-spec`), this file records the
-fully-resolved design below so the spec-revision commands can transcribe it directly without
-re-asking the user anything.
+- `src/types/org-restriction-notice.ts` (new) — `OrgRestrictionNotice { owner: string }`, the
+  shape carried by `validationError`/`syncError`/`writeError` when the org-restriction case is
+  detected.
+- `src/utils/orgRestrictionNotice.ts` (new) — `buildOrgRestrictionSettingsUrl(owner)`, the pure
+  function that builds the percent-encoded per-organization settings-page URL
+  (security-guidelines.md rule 3).
+- `src/components/OrgRestrictionNotice.vue` (new) — renders the fixed French sentence
+  (business-specifications.md rule 2) with the "lien" word as a real link, reusing the existing
+  `AppLink` component for the `target="_blank" rel="noopener"` new-tab behavior
+  (security-guidelines.md rule 4) instead of a one-off anchor.
+- `src/composables/useRepoConfig.ts` — `classifyProxyResponse`/`checkProxyReachable` detect the
+  org-restriction 403 as a boolean (`isOrgRestrictedResponse`, replacing the old
+  message-extracting/sanitizing `extractOrgRestrictionMessage`); `resolveValidationError`
+  resolves it to `{ owner }` and skips the repo-level fallback, mirroring the 401 short-circuit.
+- `src/composables/useRemotePreferencesSync.ts` — `requestRemoteFile` throws
+  `RemoteOrgRestrictedError` (now carrying the owner, not GitHub's text) on an org-restricted
+  403; `handleFetchFailure` maps it to `{ owner }`.
+- `src/composables/useRemotePreferencesWrite.ts` — `fetchExistingFile` and `handlePutResponse`
+  (now taking `owner` as a parameter) both throw `RemoteWriteOrgRestrictedError` carrying the
+  owner; `handleWriteFailure` maps it to `{ owner }`.
+- `src/components/GitHubSyncSettings.vue`, `src/components/HomePageContent.vue` — each error ref
+  (`validationError`, `syncError`, `writeError`) is split into two local computed refs (plain
+  text vs. `OrgRestrictionNotice`) so the template renders either the existing `{{ }}`
+  interpolation or `<OrgRestrictionNotice :owner="..." />`, never a raw object.
 
-## Resolved design (confirmed with the user)
+## Non-trivial decisions
 
-1. **Message text is fixed and identical at all three call sites** (no more per-composable tone
-   variation, no more "your local data is kept" reassurance tied to this message):
+- **`ProxyCheckResult` reverts from a discriminated union back to a plain string union.** The
+  first pass (superseded) needed to carry GitHub's message text alongside the "orgRestricted"
+  outcome, which required a `{ kind: '...' }` shape. The redesign no longer displays any
+  response text — detection is now a pure boolean — so the payload-carrying reason for the
+  union no longer exists; the simpler `'ok' | 'notFound' | 'unauthorized' | 'orgRestricted' |
+  'error'` union is restored.
 
-   > Le dépôt choisi se trouve sous une organisation n'autorisant pas l'authentification avec
-   > votre compte et le dépôt choisi. Veuillez visiter ce **lien** pour autoriser l'accès.
+- **The owner is threaded through as a plain function/error-constructor argument, not
+  re-derived from the response.** `useRepoConfig.ts`'s `resolveValidationError` already has
+  `ownerRepo` in scope at both the file-check and repo-check call sites, so building
+  `{ owner: ownerRepo.owner }` there needs no new plumbing. In the two remote-preferences
+  composables, `RemoteOrgRestrictedError`/`RemoteWriteOrgRestrictedError` carry the owner via
+  the standard `Error.message` property (mirroring the existing
+  `RemoteUnauthorizedError`/`RemoteWriteConflictError` pattern in both files) instead of a
+  custom field — `handlePutResponse` gained an `owner: string` parameter since it previously had
+  no access to `ownerRepo` (it only received the fetch `Response`).
 
-   (Typo fixed from the user's literal wording: "choisit" → "choisi" — the earlier occurrence
-   is the past participle modifying "dépôt", matching the second, already-correct occurrence in
-   the same sentence. Flagging this fix explicitly rather than silently carrying a typo into
-   product copy; revert in `/jli-writes-spec` if the exact literal string is wanted instead.)
+- **A new component (`OrgRestrictionNotice.vue`) owns both the fixed sentence and the link,
+  reused at all three render sites, rather than duplicating the sentence in each of the two
+  view components.** business-specifications.md rule 2 now requires the text to be identical
+  everywhere (unlike the old per-call-site tone), so centralizing it removes the risk of the
+  three copies drifting apart and satisfies test-cases.md scenario 22 (byte-identical output)
+  by construction instead of by discipline. This follows the same small,
+  single-purpose-message-component precedent already in the codebase (`EmptyStationsMessage.vue`).
 
-2. **GitHub's own 403 `message` body text is no longer displayed anywhere.** It is still read,
-   but only to *detect* the org-restriction case (does it contain `"OAuth App access
-   restrictions"`) — the extracted text itself is discarded, never interpolated into the
-   user-visible message. Consequence: the bidi/control-character stripping
-   (`sanitizeGitHubText`, `CONTROL_CHAR_CODE_RANGES`) built for the previous design has no
-   remaining purpose (there is no longer any GitHub-supplied text reaching the DOM) and should
-   be removed, not carried forward — dead code otherwise. The `ProxyCheckResult`-style
-   discriminated union (`{ kind: 'orgRestricted'; message: string }`) also reverts to needing no
-   payload: detection becomes a plain boolean check, so `useRepoConfig.ts`'s `ProxyCheckResult`
-   can revert to a plain string union (`'ok' | 'notFound' | 'unauthorized' | 'orgRestricted' |
-   'error'`) rather than the discriminated union added in the first pass — simpler, and the
-   original one-off need for a payload (carrying the message) no longer exists.
+- **The link is rendered via the existing `AppLink` component, not a new one-off `<a>`.**
+  `AppLink` already implements exactly the required external-link behavior
+  (`target="_blank" rel="noopener"`, used elsewhere in `AppFooter.vue`/`StationManager.vue`), so
+  reusing it satisfies security-guidelines.md rule 4 by construction and avoids a second,
+  slightly different implementation of the same security-sensitive attribute pair. `AppLink`
+  uses `rel="noopener"` (not `noopener noreferrer`); `noopener` alone already fully closes the
+  `window.opener` reverse-tabnabbing vector security-guidelines.md rule 4 is about, so matching
+  this project's one established convention was chosen over introducing a second, inconsistent
+  external-link pattern for `noreferrer`'s purely-cosmetic (referrer-header) difference.
 
-3. **The link is built from the user's own configured repo owner, never from the response
-   body**, as:
+- **Each composable's error ref stays `string | OrgRestrictionNotice | null`, split into two
+  typed computed refs inside the consuming component rather than in the composable.** This
+  keeps every composable's public return shape a single ref per error state (no API change
+  beyond the value type), and keeps the `typeof`-based narrowing (`'object'` vs `'string'`) a
+  template-adjacent concern local to each `.vue` file, since only one component consumes each
+  ref today.
 
-   ```
-   https://github.com/organizations/${encodeURIComponent(owner)}/settings/oauth_application_policy
-   ```
+- **`buildOrgRestrictionSettingsUrl` percent-encodes the owner even though GitHub logins are
+  alphanumeric-and-hyphen only today** (security-guidelines.md rule 3) — defensive, not
+  currently reachable by any input this app accepts, but building a URL by concatenating
+  unencoded input is the kind of pattern that becomes a bug the day that assumption changes.
 
-   `owner` is the same value already extracted by each composable's existing `splitOwnerRepo`
-   (the user's own Settings input, already validated as non-empty and free of `/`) — not
-   anything read from GitHub's response. `encodeURIComponent` is applied defensively even though
-   GitHub org/user logins are alphanumeric-and-hyphen only, because building a URL by
-   concatenating any external-ish string without encoding is the kind of pattern that becomes a
-   bug the day that assumption changes.
+## Self-code review
 
-   This is a *narrower*, not weaker, version of the original security rule ("never
-   response-derived"): the org-restriction feature can only ever fire for the org the user
-   themselves is already configured against, so linking to that org's own OAuth policy page is
-   exactly the actionable page. It must still never read `documentation_url` or any other
-   response field.
+Three issues were found and fixed while reviewing the new code:
 
-4. **The link renders as a real `<a>` element**, `target="_blank" rel="noopener noreferrer"` —
-   not markdown brackets, and not plain interpolated text. `rel="noopener noreferrer"` is
-   required alongside `target="_blank"` to prevent the opened GitHub tab from getting a `window
-   .opener` reference back to this app (reverse-tabnabbing) — this becomes a new
-   security-guidelines.md rule, replacing the now-moot bidi-stripping rule.
+1. **`typeof x === 'object'` narrowing double-checked against `null`.** Since
+   `typeof null === 'object'` in JavaScript, `typeof validationError.value === 'object' ?
+   validationError.value : null` needed verifying it still resolves correctly when the ref is
+   `null` — it does, because the true-branch's value *is* `validationError.value`, which is
+   `null` in that case, so the computed still yields `null` either way. Confirmed correct, no
+   change needed, but left as a note here since it's non-obvious.
+2. **`handlePutResponse` was missing `ownerRepo` in scope.** Unlike `fetchExistingFile` (which
+   receives `ownerRepo` directly), `handlePutResponse` previously only received the `Response`.
+   Added an explicit `owner: string` parameter (passed as `ownerRepo.owner` from its one call
+   site in `putRemoteFile`) rather than threading the whole `OwnerRepo` object through, since
+   only the owner is ever needed here.
+3. **Redundant `ORG_RESTRICTION_INDICATOR`/`isOrgRestrictedResponse` duplication across all
+   three composables was reconsidered and kept as-is.** Extracting it to a shared util would
+   remove three small, identical functions, but business-specifications.md's Scope section
+   still lists only these three composables with "no new files" for that specific concern, and
+   the established convention in this codebase (`splitOwnerRepo`, `buildProxyUrl`,
+   `hasCompleteRepoConfig`) is already to duplicate such small per-file helpers rather than
+   share them across these three composables — consistent, not a new pattern.
 
-5. **New shared type + component needed** (type-first per CLAUDE.md): a `UserMessage` type
-   (`string | { textBefore: string; linkLabel: string; linkUrl: string; textAfter: string }`) in
-   `src/types/`, and a small presentational component (e.g. `MessageWithLink.vue`) that renders
-   either the plain string or the three-part text+link+text, so the link-rendering logic isn't
-   tripled across `GitHubSyncSettings.vue` (`validationError`) and `HomePageContent.vue`
-   (`syncError`, `writeError`). This is a new file, which the original business spec's "no new
-   files" scope note no longer holds against — that note was about the three composables, not
-   about needing zero new files ever; a shared render helper for a genuinely new UI need (a
-   real link, not plain text) is a reasonable, minimal addition rather than tripled duplication.
-
-## What needs to change in the other spec files (for `/jli-writes-spec` etc.)
-
-- `business-specifications.md` rule 2: replace "include GitHub's own explanatory text" with the
-  fixed sentence above; replace the generic docs URL with the per-owner
-  `oauth_application_policy` URL.
-- `business-specifications.md` rule 3: delete or rewrite — message is now identical at all three
-  call sites, so "each keeps its own style" no longer applies to this specific message.
-- `security-guidelines.md` rule 2: rewrite from "hardcoded literal" to "built only from the
-  user's own configured owner, `encodeURIComponent`-escaped, never from the response body."
-- `security-guidelines.md` rule 3: replace bidi/control-char stripping with the
-  `rel="noopener noreferrer"` requirement for the new `target="_blank"` link.
-- `test-cases.md` 17–21: rewrite to match — fixed sentence + owner-derived link (17), link never
-  derived from `documentation_url` even when present (18), real anchor with
-  `target="_blank" rel="noopener noreferrer"` (19), no GitHub response text of any kind reaches
-  the rendered output even if it contains HTML/bidi/control characters (20, strengthened from
-  "stripped" to "never included"), identical message byte-for-byte at all three call sites (21,
-  reversed from "distinct tone" to "consistency guard").
-
-### Specifications Need Review
-
-Please review current code and results.
-
-status: review specs
+status: ready
