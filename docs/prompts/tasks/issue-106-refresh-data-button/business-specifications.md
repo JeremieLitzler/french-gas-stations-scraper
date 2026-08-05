@@ -52,6 +52,15 @@ newly-applied default.
 Rule 7: The remote GitHub file itself is never modified by this action — it is a
 read-only pull. No preference change made this way is ever pushed back to GitHub.
 
+Rule 8: The action is disabled (visible but inactive) whenever there are local
+station-list edits not yet pushed to GitHub, since confirming a refresh at that point
+would silently discard those edits along with the rest of the local list (Rule 3). An
+explanatory message accompanies the disabled state so the reason is discoverable rather
+than the action simply disappearing.
+Example: with an unsaved station edit pending (the "Enregistrer les modifications"
+action is showing), "Refresh data" is visible but disabled, with a message explaining
+that pending changes must be saved or discarded first.
+
 ## Out of Scope
 
 - Any write to the remote GitHub file.
