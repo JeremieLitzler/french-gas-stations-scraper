@@ -26,6 +26,15 @@
  * subset StationManager's own onSaveChanges handler needs — since both
  * composables are singletons and this file's mock is the only one Vitest
  * will use for every consumer in the tree, including GitHubSyncSettings.
+ *
+ * Since issue #106, StationManager.vue also calls useRemotePreferencesSync
+ * for the "Actualiser les données" on-demand refresh action.
+ * useRemotePreferencesSync is mocked with plain refs/vi.fn()s (unlike
+ * useRemotePreferencesWrite above) because nothing in this file's tests
+ * needs the mock to drive real reactive derivations — canRefreshNow's own
+ * auth/repo-config logic is unit-tested directly in
+ * useRemotePreferencesSync.spec.ts, so here it is a bare vi.fn() whose
+ * return value each test sets explicitly to control button visibility.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
@@ -131,6 +140,23 @@ vi.mock('@/composables/useRepoConfig', () => ({
 }))
 
 // ---------------------------------------------------------------------------
+// Mock useRemotePreferencesSync (issue #106) — the "Actualiser les données"
+// on-demand refresh action.
+// ---------------------------------------------------------------------------
+
+const mockIsRefreshing: Ref<boolean> = ref(false)
+const mockRefreshNow = vi.fn().mockResolvedValue(undefined)
+const mockCanRefreshNow = vi.fn().mockReturnValue(false)
+
+vi.mock('@/composables/useRemotePreferencesSync', () => ({
+  useRemotePreferencesSync: () => ({
+    isRefreshing: mockIsRefreshing,
+    refreshNow: mockRefreshNow,
+    canRefreshNow: mockCanRefreshNow,
+  }),
+}))
+
+// ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
 
@@ -158,6 +184,9 @@ beforeEach(() => {
   mockValidationError.value = null
   mockLoadRepoConfig.mockResolvedValue(undefined)
   mockSaveRepoConfig.mockResolvedValue(undefined)
+  mockIsRefreshing.value = false
+  mockRefreshNow.mockResolvedValue(undefined)
+  mockCanRefreshNow.mockReturnValue(false)
   vi.clearAllMocks()
 })
 
@@ -184,6 +213,11 @@ function mountComponent() {
         PreferencesExport: { template: '<div class="preferences-export-stub" />' },
         PreferencesImport: { template: '<div class="preferences-import-stub" />' },
         PreferencesDiffDialog: { template: '<div />' },
+        // StationManager.vue's own refresh-confirmation dialog (issue #106)
+        // renders via <Teleport to="body">. Stubbing teleport keeps it
+        // inside the mounted wrapper's own DOM tree so wrapper.find/findAll
+        // see it directly, matching PreferencesDiffDialog.spec.ts's pattern.
+        teleport: true,
         // Stubbed with a marker element (not `true`) so tests can assert its
         // presence/absence while GitHubSyncSettings itself is left unstubbed
         // — the whole point of TC-120-02/03 below is exercising the real
@@ -1126,5 +1160,184 @@ describe('test-cases.md (issue #120) scenario 3: the GitHub sync section shows i
 
     expect(wrapper.find('.app-loader-stub').exists()).toBe(false)
     expect(wrapper.find('#ownerRepo').exists()).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// "Actualiser les données" on-demand refresh (issue #106, test-cases.md)
+// ---------------------------------------------------------------------------
+
+function findRefreshButton(wrapper: ReturnType<typeof mountComponent>) {
+  return wrapper.findAll('button').find((button) => button.text().includes('Actualis'))
+}
+
+function findRefreshDialog(wrapper: ReturnType<typeof mountComponent>) {
+  return wrapper.find('[aria-labelledby="refresh-dialog-title"]')
+}
+
+describe('TC-1: "Actualiser les données" is hidden when GitHub sync is not configured', () => {
+  it('does not render the refresh button when canRefreshNow returns false', async () => {
+    mockCanRefreshNow.mockReturnValue(false)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(findRefreshButton(wrapper)).toBeUndefined()
+  })
+})
+
+describe('TC-2: "Actualiser les données" is visible and enabled when GitHub sync is configured and authenticated', () => {
+  it('renders the refresh button, enabled', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const refreshButton = findRefreshButton(wrapper)
+    expect(refreshButton).toBeDefined()
+    expect(refreshButton!.attributes('disabled')).toBeUndefined()
+  })
+})
+
+describe('TC-3: clicking "Actualiser les données" opens a confirmation prompt without changing data', () => {
+  it('shows the confirmation dialog and does not call refreshNow', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    await findRefreshButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    expect(findRefreshDialog(wrapper).exists()).toBe(true)
+    expect(mockRefreshNow).not.toHaveBeenCalled()
+  })
+})
+
+describe('TC-4: cancelling the confirmation makes no request and leaves data unchanged', () => {
+  it('closes the dialog without calling refreshNow', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    await findRefreshButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    const cancelButton = findRefreshDialog(wrapper)
+      .findAll('button')
+      .find((button) => button.text() === 'Annuler')
+    await cancelButton!.trigger('click')
+    await flushPromises()
+
+    expect(findRefreshDialog(wrapper).exists()).toBe(false)
+    expect(mockRefreshNow).not.toHaveBeenCalled()
+  })
+})
+
+describe('TC-5 (dispatch half): confirming the prompt calls refreshNow with the current auth/repo config', () => {
+  it('calls refreshNow once after the confirm button is clicked', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+    mockIsAuthenticated.value = true
+    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    await findRefreshButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    const confirmButton = findRefreshDialog(wrapper)
+      .findAll('button')
+      .find((button) => button.text().includes('Confirmer'))
+    await confirmButton!.trigger('click')
+    await flushPromises()
+
+    expect(mockRefreshNow).toHaveBeenCalledTimes(1)
+    expect(mockRefreshNow).toHaveBeenCalledWith(
+      true,
+      { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 },
+      expect.any(Function),
+      mockHandleUnauthorized,
+    )
+    // The dialog closes synchronously before refreshNow is awaited.
+    expect(findRefreshDialog(wrapper).exists()).toBe(false)
+  })
+})
+
+describe('TC-9: a refresh in progress shows a loading indication and disables the trigger', () => {
+  it('shows "Actualisation…" and disables the button while isRefreshing is true', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+    mockIsRefreshing.value = true
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const refreshButton = findRefreshButton(wrapper)
+    expect(refreshButton!.text()).toContain('Actualisation…')
+    expect(refreshButton!.attributes('disabled')).toBeDefined()
+  })
+})
+
+describe('TC-12: "Actualiser les données" is disabled while a local edit is pending a GitHub push', () => {
+  it('disables the button and shows an explanatory message after a station edit is made', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    const refreshButton = findRefreshButton(wrapper)
+    expect(refreshButton!.attributes('disabled')).toBeDefined()
+    expect(wrapper.text()).toContain(
+      "Enregistrez ou annulez vos modifications en attente avant d'actualiser les données.",
+    )
+  })
+
+  it('clicking the disabled button opens no confirmation prompt and makes no request', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    await findRefreshButton(wrapper)!.trigger('click')
+    await flushPromises()
+
+    expect(findRefreshDialog(wrapper).exists()).toBe(false)
+    expect(mockRefreshNow).not.toHaveBeenCalled()
+  })
+})
+
+describe('TC-13: "Actualiser les données" becomes enabled again once the pending change is resolved', () => {
+  it('re-enables the button and hides the message once no pending change remains', async () => {
+    mockCanRefreshNow.mockReturnValue(true)
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    const firstRowNameInput = wrapper.findAll('input')[2]
+    await firstRowNameInput.setValue('Station A Updated')
+    await firstRowNameInput.trigger('blur')
+    await flushPromises()
+
+    expect(findRefreshButton(wrapper)!.attributes('disabled')).toBeDefined()
+
+    // "Push the pending change ... or otherwise clear it" (test-cases.md TC-13).
+    mockPendingStationChanges.value = []
+    await flushPromises()
+
+    expect(findRefreshButton(wrapper)!.attributes('disabled')).toBeUndefined()
+    expect(wrapper.text()).not.toContain(
+      "Enregistrez ou annulez vos modifications en attente avant d'actualiser les données.",
+    )
   })
 })
