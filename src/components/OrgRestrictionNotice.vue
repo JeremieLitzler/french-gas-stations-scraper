@@ -1,7 +1,5 @@
 <template>
-  Le dépôt choisi se trouve sous une organisation n'autorisant pas l'authentification avec votre
-  compte et le dépôt choisi. Veuillez visiter ce <AppLink :to="settingsUrl">lien</AppLink> pour
-  autoriser l'accès.
+  Le dépôt choisi se trouve sous une organisation n'autorisant pas l'authentification avec votre compte et le dépôt choisi. Veuillez visiter ce <AppLink :to="settingsUrl">lien</AppLink> pour autoriser l'accès.
 </template>
 
 <script setup lang="ts">
