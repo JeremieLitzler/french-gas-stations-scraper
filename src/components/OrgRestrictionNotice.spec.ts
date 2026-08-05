@@ -5,6 +5,17 @@
  * rel/target behavior) rather than stubbing it, so the rendered `<a>` seen
  * here is the real external-link markup AppLink produces.
  *
+ * OrgRestrictionNotice.vue's template has no wrapping element — it compiles
+ * to a Fragment with three root nodes (text, <AppLink>, text). Mounted
+ * directly, @vue/test-utils' wrapper.text() computes
+ * getRootNodes().map(el => el.textContent.trim()).join('') — it trims each
+ * root node individually before joining with no separator, which strips the
+ * real spaces around the link regardless of what the template contains. The
+ * fixture below wraps the component in a single-root <p>, matching how it is
+ * always mounted in production (GitHubSyncSettings.vue/HomePageContent.vue
+ * each render it inside one <p role="alert">), so wrapper.text() only trims
+ * the outer edges and the interior spacing is read correctly.
+ *
  * Scenarios covered (test-cases.md, issue #108 — org OAuth 403 restriction):
  *   17 — the message is exactly the fixed sentence, "lien" rendered as a clickable link
  *   18 — the link points to the configured owner's own settings page
@@ -15,6 +26,7 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import { defineComponent } from 'vue'
 import OrgRestrictionNotice from './OrgRestrictionNotice.vue'
 import AppLink from './AppLink.vue'
 
@@ -26,8 +38,14 @@ const router = createRouter({
   routes: [{ path: '/', component: { template: '<div />' } }],
 })
 
+const SingleRootHost = defineComponent({
+  components: { OrgRestrictionNotice },
+  props: { owner: { type: String, required: true } },
+  template: '<p role="alert"><OrgRestrictionNotice :owner="owner" /></p>',
+})
+
 function mountNotice(owner: string) {
-  return mount(OrgRestrictionNotice, {
+  return mount(SingleRootHost, {
     props: { owner },
     global: { plugins: [router], components: { AppLink } },
   })
