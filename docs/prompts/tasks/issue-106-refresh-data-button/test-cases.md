@@ -67,4 +67,16 @@
 - **Action:** Click "Refresh data", confirm, and observe the requests made to the GitHub API proxy during the whole flow.
 - **Expected:** Only a read request is made. No write request is sent. The remote file is unchanged afterward.
 
+## Pending Local Changes
+
+### TC-12: The action is disabled while a local edit is pending a GitHub push
+- **Precondition:** As TC-2 (authenticated, repo config complete). A local station-list edit has been made and not yet pushed (the "Enregistrer les modifications" action is showing).
+- **Action:** Navigate to the Station Manager.
+- **Expected:** "Refresh data" is visible but disabled. A message next to it explains that pending changes must be saved or discarded first. Clicking it opens no confirmation prompt and makes no request.
+
+### TC-13: The action becomes enabled again once the pending change is resolved
+- **Precondition:** As TC-12 (action disabled by a pending edit).
+- **Action:** Push the pending change via "Enregistrer les modifications" (or otherwise clear it so that action stops showing).
+- **Expected:** "Refresh data" becomes enabled. The explanatory message is no longer shown.
+
 status: ready
