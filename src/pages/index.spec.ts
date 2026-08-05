@@ -107,6 +107,14 @@ vi.mock('@/composables/useRemotePreferencesSync', () => ({
   useRemotePreferencesSync: () => ({
     syncError: ref(null),
     syncOnLoad: vi.fn().mockResolvedValue(undefined),
+    // isRefreshing/refreshNow/canRefreshNow (issue #106) are read by
+    // StationManager.vue's own "Actualiser les données" action, called at
+    // its setup() top level (unstubbed in TC-10 below) — canRefreshNow
+    // returns false since isAuthenticated/repoConfig above are both empty,
+    // matching every other composable mock in this file.
+    isRefreshing: ref(false),
+    refreshNow: vi.fn().mockResolvedValue(undefined),
+    canRefreshNow: vi.fn().mockReturnValue(false),
   }),
 }))
 

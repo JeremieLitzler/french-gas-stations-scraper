@@ -50,6 +50,16 @@
  *   9  — remote-file fetch non-org 403 falls back to the generic fetch-failed message
  *   10 — remote-file fetch 401 is unchanged (regression guard)
  *   11 — remote-file fetch 200 with a valid file applies normally, no syncError (regression guard)
+ *
+ * Scenarios covered (test-cases.md, issue #106 — on-demand refresh):
+ *   TC-1/TC-2 — canRefreshNow visibility condition (auth + complete repo config)
+ *   TC-5      — refreshNow fetches regardless of staleness, never checks isPreferencesStale
+ *   TC-6/TC-8 — refreshNow shares refreshFromRemote's failure/validation handling with
+ *               syncOnLoad (regression guards; the exhaustive per-status/shape scenarios
+ *               already live above against syncOnLoad, the same underlying code path)
+ *   TC-9      — a second concurrent refreshNow call is a no-op while one is in flight
+ *   TC-10     — a hung refreshNow fetch aborts after REMOTE_FETCH_TIMEOUT_MS
+ *   TC-11     — refreshNow never issues a write request (GET only)
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -549,5 +559,186 @@ describe('C-19: a hung remote fetch does not block the app indefinitely', () => 
 
     expect(applyRemotePreferences).not.toHaveBeenCalled()
     expect(syncError.value).toBe(REMOTE_FETCH_FAILED_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// canRefreshNow: the same auth + complete-repo-config condition syncOnLoad
+// gates on, exposed for the "Refresh data" action's visibility (TC-1/TC-2)
+// ---------------------------------------------------------------------------
+
+describe('canRefreshNow', () => {
+  it('is false when unauthenticated, even with a complete repo config', async () => {
+    const { canRefreshNow } = await freshComposable()
+
+    expect(canRefreshNow(false, REPO_CONFIG)).toBe(false)
+  })
+
+  it('is false when authenticated but the repo config is incomplete', async () => {
+    const { canRefreshNow } = await freshComposable()
+    const incompleteConfig: RepoConfigDraft = {
+      ownerRepo: '',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
+
+    expect(canRefreshNow(true, incompleteConfig)).toBe(false)
+  })
+
+  it('is true when authenticated and the repo config is complete', async () => {
+    const { canRefreshNow } = await freshComposable()
+
+    expect(canRefreshNow(true, REPO_CONFIG)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-5: Confirmed refresh fetches despite local data not being stale
+// ---------------------------------------------------------------------------
+
+describe('TC-5: refreshNow bypasses the staleness check', () => {
+  it('fetches even when isPreferencesStale would report fresh data, without ever calling it', async () => {
+    staleOverride = false
+    const remoteData: PreferencesFile = {
+      favoriteStations: [
+        { name: 'Remote Station', url: 'https://www.prix-carburants.gouv.fr/station/33333333' },
+      ],
+      fuelTypeDefault: 'SP95',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(githubContentResponse(remoteData))
+    vi.stubGlobal('fetch', fetchMock)
+    const applyRemotePreferences = vi.fn().mockResolvedValue(undefined)
+
+    const { syncError, refreshNow } = await freshComposable()
+    const { isPreferencesStale } = await import('@/utils/preferencesSyncTimestamp')
+    await refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(isPreferencesStale).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(applyRemotePreferences).toHaveBeenCalledWith(remoteData)
+    expect(syncError.value).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-6/TC-8: refreshNow shares refreshFromRemote's failure/validation
+// handling with syncOnLoad — regression guards proving the on-demand path
+// goes through the exact same mapping already exhaustively covered above.
+// ---------------------------------------------------------------------------
+
+describe('TC-6: a failed on-demand refresh shows an error and never applies remote data', () => {
+  it('sets the access-revoked message when the remote fetch returns 401', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 401 }))
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, refreshNow } = await freshComposable()
+    await refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(applyRemotePreferences).not.toHaveBeenCalled()
+    expect(syncError.value).toBe(ACCESS_REVOKED_MESSAGE)
+  })
+})
+
+describe('TC-8: an on-demand refresh rejects malformed remote content wholesale', () => {
+  it('rejects a file with an invalid station entry, never applies it', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        githubContentResponseRaw({
+          fuelTypeDefault: 'SP95',
+          favoriteStations: [{ name: 'Missing URL Station' }],
+        }),
+      ),
+    )
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, refreshNow } = await freshComposable()
+    await refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(applyRemotePreferences).not.toHaveBeenCalled()
+    expect(syncError.value).toBe(INVALID_REMOTE_CONTENT_MESSAGE)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-9: A refresh in progress blocks a second concurrent trigger
+// ---------------------------------------------------------------------------
+
+describe('TC-9: a second concurrent refreshNow call is a no-op while one is in flight', () => {
+  it('does not start a second fetch, and isRefreshing is true only until both calls settle', async () => {
+    let resolveFetch!: (response: unknown) => void
+    const fetchMock = vi.fn(
+      () =>
+        new Promise((resolve) => {
+          resolveFetch = resolve
+        }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    const applyRemotePreferences = vi.fn().mockResolvedValue(undefined)
+
+    const { isRefreshing, refreshNow } = await freshComposable()
+
+    const firstCall = refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+    await Promise.resolve()
+    expect(isRefreshing.value).toBe(true)
+
+    await refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+
+    resolveFetch(githubContentResponse({ favoriteStations: [], fuelTypeDefault: null }))
+    await firstCall
+
+    expect(isRefreshing.value).toBe(false)
+    expect(applyRemotePreferences).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-10: A hung fetch does not block the UI indefinitely
+// ---------------------------------------------------------------------------
+
+describe('TC-10: a hung refreshNow fetch does not block the UI indefinitely', () => {
+  it('aborts after the bounded wait, shows the fetch-failed message, and resets isRefreshing', async () => {
+    vi.useFakeTimers()
+
+    const fetchMock = vi.fn((_url: string, options?: { signal?: AbortSignal }) => {
+      return new Promise<Response>((_resolve, reject) => {
+        options?.signal?.addEventListener('abort', () => {
+          reject(new DOMException('The operation was aborted.', 'AbortError'))
+        })
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const applyRemotePreferences = vi.fn()
+
+    const { syncError, isRefreshing, refreshNow } = await freshComposable()
+    const refreshPromise = refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+
+    await vi.advanceTimersByTimeAsync(REMOTE_FETCH_TIMEOUT_MS)
+    await refreshPromise
+
+    expect(applyRemotePreferences).not.toHaveBeenCalled()
+    expect(syncError.value).toBe(REMOTE_FETCH_FAILED_MESSAGE)
+    expect(isRefreshing.value).toBe(false)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TC-11: A confirmed refresh never writes to the remote GitHub file
+// ---------------------------------------------------------------------------
+
+describe('TC-11: refreshNow never issues a write request', () => {
+  it('calls fetch with no HTTP method override (GET), never PUT/POST', async () => {
+    const remoteData: PreferencesFile = { favoriteStations: [], fuelTypeDefault: null }
+    const fetchMock = vi.fn().mockResolvedValue(githubContentResponse(remoteData))
+    vi.stubGlobal('fetch', fetchMock)
+    const applyRemotePreferences = vi.fn().mockResolvedValue(undefined)
+
+    const { refreshNow } = await freshComposable()
+    await refreshNow(true, REPO_CONFIG, applyRemotePreferences)
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, options] = fetchMock.mock.calls[0] as [string, RequestInit | undefined]
+    expect(options?.method ?? 'GET').toBe('GET')
   })
 })
