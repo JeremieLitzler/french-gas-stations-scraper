@@ -51,9 +51,8 @@ import { useGitHubAuth } from '@/composables/useGitHubAuth'
 import { useRepoConfig } from '@/composables/useRepoConfig'
 import { useRemotePreferencesSync } from '@/composables/useRemotePreferencesSync'
 import { useRemotePreferencesWrite } from '@/composables/useRemotePreferencesWrite'
-import { getPreferencesSyncedAt, restorePreferencesSyncedAt } from '@/utils/preferencesSyncTimestamp'
+import { applyRemotePreferences as applyRemotePreferencesData } from '@/utils/applyRemotePreferences'
 import type { PreferencesFile } from '@/types/preferences'
-import type { Station } from '@/types/station'
 import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 
 const { stations, loadStations, replaceStations } = useStationStorage()
@@ -84,50 +83,17 @@ const writeErrorOrgRestriction = computed<OrgRestrictionNotice | null>(() =>
 // Applies a merged remote read (Sub-Issue C, issue #64) through
 // useStationStorage/useDefaultFuelType's own setters, per the
 // composable-caller-responsibility convention — useRemotePreferencesSync
-// never calls those composables itself.
-//
-// The two setters below are independent IndexedDB writes, so a failure of
-// the second (default fuel) after the first (stations) already succeeded
-// would otherwise leave the station list replaced from remote while the
-// default fuel stays stale — contradicting useRemotePreferencesSync's
-// syncError message, which implies nothing changed (review-results.md,
-// sub-issue-85). Rolling the station list back to its pre-merge value on
-// that failure restores the "local data unchanged" guarantee the caller
-// already relies on.
+// never calls those composables itself. The rollback-on-failure logic is
+// shared with StationManager.vue's on-demand refresh (issue #106) via
+// @/utils/applyRemotePreferences, rather than duplicated here.
 async function applyRemotePreferences(data: PreferencesFile): Promise<void> {
-  const previousStations = stations.value
-  const previousSyncedAt = await getPreferencesSyncedAt()
-  await replaceStations(data.favoriteStations)
-  await applyDefaultFuelOrRollback(data.fuelTypeDefault, previousStations, previousSyncedAt)
-}
-
-// Every setter called during the merge (replaceStations, saveDefaultFuelType,
-// clearDefaultFuelType) marks the sync timestamp fresh as a side effect of its
-// own contract for direct user edits (Sub-Issue C rule 5). A rolled-back merge
-// is neither that nor a successful remote read (rule 4), so the rollback must
-// also restore the pre-merge timestamp — otherwise the failed merge leaves
-// IndexedDB looking freshly synced and the next load skips retrying the fetch
-// that just failed (review-results.md, sub-issue-85, second pass).
-async function applyDefaultFuelOrRollback(
-  fuelTypeDefault: string | null,
-  previousStations: Station[],
-  previousSyncedAt: number | undefined,
-): Promise<void> {
-  try {
-    await applyDefaultFuel(fuelTypeDefault)
-  } catch (error) {
-    await replaceStations(previousStations)
-    await restorePreferencesSyncedAt(previousSyncedAt)
-    throw error
-  }
-}
-
-async function applyDefaultFuel(fuelTypeDefault: string | null): Promise<void> {
-  if (fuelTypeDefault === null) {
-    await clearDefaultFuelType()
-    return
-  }
-  await saveDefaultFuelType(fuelTypeDefault)
+  await applyRemotePreferencesData(
+    data,
+    stations.value,
+    replaceStations,
+    saveDefaultFuelType,
+    clearDefaultFuelType,
+  )
 }
 
 // The auth flag, repo config, station list, and default fuel type live under

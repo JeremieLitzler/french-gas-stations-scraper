@@ -35,6 +35,13 @@
  * `applyRemotePreferences` write) falls back to the generic re-auth-style
  * fetch-failed message the spec groups network/404/401 failures under.
  *
+ * `refreshNow` (issue #106) is the on-demand counterpart to `syncOnLoad`:
+ * same `applyRemotePreferences` callback, same `refreshFromRemote` fetch/
+ * validate/apply path, but it skips the `isPreferencesStale` check that
+ * `syncOnLoad` gates on, and guards itself against a second concurrent call
+ * via `isRefreshing` (security-guidelines.md rule 3) since, unlike
+ * `syncOnLoad`, it can be triggered repeatedly by a user click.
+ *
  * Object Calisthenics exception: the composable function body exceeds five
  * lines because Vue composable conventions require grouping all returned
  * reactive state and operations in one function — documented framework
@@ -94,6 +101,10 @@ async function isOrgRestrictedResponse(response: Response): Promise<boolean> {
 
 // Module-level state — all consumers share the same reference (ADR-002).
 const syncError: Ref<string | OrgRestrictionNotice | null> = ref(null)
+// Guards the on-demand refresh (issue #106, security-guidelines.md rule 3)
+// against a second concurrent trigger — syncOnLoad needs no equivalent guard
+// since it only ever runs once, from HomePageContent.vue's own top-level await.
+const isRefreshing: Ref<boolean> = ref(false)
 
 function hasCompleteRepoConfig(
   config: RepoConfigDraft,
@@ -104,6 +115,16 @@ function hasCompleteRepoConfig(
     config.revalidateCacheDays !== null &&
     config.revalidateCacheDays > 0
   )
+}
+
+// Exposed so a caller (StationManager.vue's "Refresh data" action, issue
+// #106 rule 1) can show/hide the action using the exact same condition
+// syncOnLoad already gates on, instead of re-deriving it. Named with a verb
+// (like useGitHubAuth.ts's canInitiateLogin), not an "is"-prefixed noun, so
+// it reads unambiguously as a function to call rather than a boolean ref —
+// unlike this file's genuinely reactive isRefreshing.
+function canRefreshNow(isAuthenticated: boolean, repoConfig: RepoConfigDraft): boolean {
+  return isAuthenticated && hasCompleteRepoConfig(repoConfig)
 }
 
 function splitOwnerRepo(ownerRepo: string): OwnerRepo | null {
@@ -293,8 +314,34 @@ export function useRemotePreferencesSync() {
     await refreshFromRemote(repoConfig, applyRemotePreferences, onUnauthorized)
   }
 
+  // On-demand refresh (issue #106, business-specifications.md rule 3): goes
+  // through the same refreshFromRemote path as syncOnLoad — same fetch,
+  // shape validation, and apply/rollback — but skips the staleness check, so
+  // it always fetches regardless of how recently local data was synced.
+  const refreshNow = async (
+    isAuthenticated: boolean,
+    repoConfig: RepoConfigDraft,
+    applyRemotePreferences: ApplyRemotePreferences,
+    onUnauthorized?: () => void | Promise<void>,
+  ): Promise<void> => {
+    if (!isAuthenticated) return
+    if (!hasCompleteRepoConfig(repoConfig)) return
+    // Belt-and-braces: StationManager.vue also disables its trigger button
+    // while isRefreshing is true (security-guidelines.md rule 3).
+    if (isRefreshing.value) return
+    isRefreshing.value = true
+    try {
+      await refreshFromRemote(repoConfig, applyRemotePreferences, onUnauthorized)
+    } finally {
+      isRefreshing.value = false
+    }
+  }
+
   return {
     syncError,
     syncOnLoad,
+    isRefreshing,
+    refreshNow,
+    canRefreshNow,
   }
 }
