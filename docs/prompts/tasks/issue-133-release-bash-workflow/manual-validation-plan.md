@@ -5,6 +5,17 @@ there is no TypeScript export, composable, or component for Vitest to exercise, 
 produces a manual runbook instead of `.spec.ts` files. Each `test-cases.md` scenario below maps
 to concrete steps against GitHub itself. Run this after `/jli-commits`, before `/jli-ships`.
 
+**Stage 1 and Stage 2 have since been run for real** — see `test-results.md` for the full
+outcome. Two bugs surfaced only under live execution and are already fixed on `develop`:
+`publish` was missing `environment: name: CI` (couldn't see the environment-scoped
+`GH_APP_ID`/`GH_APP_KEY` secrets, [PR #138](https://github.com/JeremieLitzler/french-gas-stations-scraper/pull/138)),
+and it never configured a git identity before `release.sh`'s `git tag -a`
+([PR #140](https://github.com/JeremieLitzler/french-gas-stations-scraper/pull/140)). Neither gap
+was visible from reading the YAML or from code review — both only showed up once `release.sh`
+actually ran against a real GitHub Environment and a real annotated tag, which is exactly the
+scenario this manual-runbook approach (versus a Vitest spec) was meant to catch. Stage 3 is
+still pending — `main` doesn't exist yet as a branch in this repository.
+
 ## Stage 0 — setup
 
 1. Confirm `.github/workflows/release-bash.yml`'s `env:` block still reads:
