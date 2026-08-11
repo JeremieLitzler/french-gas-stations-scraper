@@ -29,16 +29,26 @@ rtk git status
 
 ## Choosing the commit type from what changed
 
+Two rules decide the type:
+
+- **Markdown-only** changes always use `docs`, scoped to the artifact.
+- Changes that touch **source code** (or `*.spec.ts` test files) use `<type>` — the
+  conventional-commit type `/jli-sets-up` inferred for this issue, encoded in the
+  current branch name as `<type>/<slug>` (e.g. branch `fix/vi-mock-hoisting-fix` ->
+  `<type>` = `fix`). Read the current branch (`rtk git status` or
+  `rtk git branch --show-current`) and parse `<type>` from it — never choose it freely.
+
 Stage and commit the changed files with the message that matches them:
 
 | Changed files | Commit message |
 |---|---|
-| only `business-specifications.md` | `feat(specs): define specs for <short desc> (#[id])` |
-| only `security-guidelines.md` | `feat(security): add security guidelines for <short desc> (#[id])` |
-| only `test-cases.md` | `test(cases): define test scenarios for <short desc> (#[id])` |
-| source files + `technical-specifications.md` (+ `review-results.md`) | implementation message summarising the change from `business-specifications.md` |
-| `*.spec.ts` test files | `test: add tests for <short desc> (#[id])` |
-| `test-results.md` | `test: record test results for <short desc> (#[id])` |
+| only `business-specifications.md` | `docs(specs): define specs for <short desc> (#[id])` |
+| only `security-guidelines.md` | `docs(security): add security guidelines for <short desc> (#[id])` |
+| only `test-cases.md` | `docs(cases): define test scenarios for <short desc> (#[id])` |
+| source files + `technical-specifications.md` | `<type>: <imperative summary of the change from business-specifications.md> (#[id])` |
+| `*.spec.ts` test files | `<type>: add tests for <short desc> (#[id])` |
+| only `review-results.md` | `docs(review): record code review for <short desc> (#[id])` |
+| `test-results.md` | `docs(results): record test results for <short desc> (#[id])` |
 
 General conventional-commit rules: subject in imperative mood, lowercase, no period,
 ≤72 chars; put overflow in the body. Other file classes: `.claude/deprecated-agents`,
