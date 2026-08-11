@@ -26,6 +26,7 @@ Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 | [ADR-012](./ADR-012-github-repo-as-sync-backend.md)               | User-Owned GitHub Repository as Remote Sync Backend             | Accepted | 2026-04-30 |
 | [ADR-013](./ADR-013-page-level-load-orchestrator.md)              | Page-Level Load Orchestrator for Shared Singleton State Under Async Mutation | Accepted | 2026-07-21 |
 | [ADR-014](./ADR-014-scheduled-function-pat-auth.md)               | Scheduled Netlify Function with Fine-Grained PAT for Daily Price History     | Proposed | 2026-07-23 |
+| [ADR-015](./ADR-015-bash-script-release-workflow.md)              | Bash Script (`release.sh`) as a Second Release Workflow                     | Proposed | 2026-08-11 |
 
 ## How to Add a New ADR
 
