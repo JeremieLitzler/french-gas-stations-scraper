@@ -37,18 +37,28 @@ jobs:
           PULL_REQUEST_MERGED: ${{ github.event.pull_request.merged }}
           RELEASE_TARGET_BRANCH: ${{ env.RELEASE_TARGET_BRANCH }}
         run: |
+          emit_outputs() {
+            echo "is_preview=$is_preview" >>"$GITHUB_OUTPUT"
+            echo "is_publish=$is_publish" >>"$GITHUB_OUTPUT"
+            echo "target_branch=$RELEASE_TARGET_BRANCH" >>"$GITHUB_OUTPUT"
+          }
+
           is_preview=false
           is_publish=false
-          if [[ "$BASE_REF" == "$RELEASE_TARGET_BRANCH" ]]; then
-            if [[ "$EVENT_ACTION" == "closed" ]]; then
-              [[ "$PULL_REQUEST_MERGED" == "true" ]] && is_publish=true
-            else
-              is_preview=true
-            fi
+
+          if [[ "$BASE_REF" != "$RELEASE_TARGET_BRANCH" ]]; then
+            emit_outputs
+            exit 0
           fi
-          echo "is_preview=$is_preview" >>"$GITHUB_OUTPUT"
-          echo "is_publish=$is_publish" >>"$GITHUB_OUTPUT"
-          echo "target_branch=$RELEASE_TARGET_BRANCH" >>"$GITHUB_OUTPUT"
+
+          if [[ "$EVENT_ACTION" != "closed" ]]; then
+            is_preview=true
+            emit_outputs
+            exit 0
+          fi
+
+          [[ "$PULL_REQUEST_MERGED" == "true" ]] && is_publish=true
+          emit_outputs
 
   preview:
     name: Preview release
@@ -71,7 +81,6 @@ jobs:
           persist-credentials: false
 
       - name: Run release.sh --dry-run
-        id: release_preview
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -113,7 +122,6 @@ jobs:
           persist-credentials: true
 
       - name: Run release.sh
-        id: release_publish
         shell: bash
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
