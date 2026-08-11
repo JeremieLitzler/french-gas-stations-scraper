@@ -1,0 +1,129 @@
+name: Release (release.sh)
+run-name: ${{ github.actor }} runs release.sh (${{ github.event.pull_request.merged && 'publish' || 'preview' }}) on #${{ github.event.pull_request.number }}
+
+# Second, independent release pipeline (ADR-015). Runs the vendored scripts/release/release.sh
+# instead of the npm-based semantic-release in release.yml (ADR-004). release.yml is untouched
+# and keeps running in parallel; no retirement decision has been made for either pipeline.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+# Source/target branch pair as easily-changed configuration (`on:` triggers cannot reference
+# expressions, so the actual filtering happens in the determine-mode job below). Point both at
+# temporary branches for validation, then switch to develop/main.
+env:
+  RELEASE_SOURCE_BRANCH: temp-source-branch
+  RELEASE_TARGET_BRANCH: temp-target-branch
+
+permissions:
+  contents: read
+
+jobs:
+  determine-mode:
+    name: Determine release mode
+    runs-on: ubuntu-latest
+    outputs:
+      is_preview: ${{ steps.decide.outputs.is_preview }}
+      is_publish: ${{ steps.decide.outputs.is_publish }}
+      target_branch: ${{ steps.decide.outputs.target_branch }}
+    steps:
+      - name: Decide preview vs publish vs skip
+        id: decide
+        shell: bash
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          EVENT_ACTION: ${{ github.event.action }}
+          PULL_REQUEST_MERGED: ${{ github.event.pull_request.merged }}
+          RELEASE_TARGET_BRANCH: ${{ env.RELEASE_TARGET_BRANCH }}
+        run: |
+          is_preview=false
+          is_publish=false
+          if [[ "$BASE_REF" == "$RELEASE_TARGET_BRANCH" ]]; then
+            if [[ "$EVENT_ACTION" == "closed" ]]; then
+              [[ "$PULL_REQUEST_MERGED" == "true" ]] && is_publish=true
+            else
+              is_preview=true
+            fi
+          fi
+          echo "is_preview=$is_preview" >>"$GITHUB_OUTPUT"
+          echo "is_publish=$is_publish" >>"$GITHUB_OUTPUT"
+          echo "target_branch=$RELEASE_TARGET_BRANCH" >>"$GITHUB_OUTPUT"
+
+  preview:
+    name: Preview release
+    needs: determine-mode
+    if: needs.determine-mode.outputs.is_preview == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    concurrency:
+      group: release-bash-preview-${{ github.event.pull_request.number }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Run release.sh --dry-run
+        id: release_preview
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set +e
+          bash scripts/release/release.sh --yes --dry-run 2>&1 | tee release-output.log
+          script_exit_code=${PIPESTATUS[0]}
+          set -e
+          if [[ $script_exit_code -ne 0 ]] && grep -q "no commit to release in range" release-output.log; then
+            echo "No releasable commits since the last tag; nothing to preview."
+            exit 0
+          fi
+          exit "$script_exit_code"
+
+  publish:
+    name: Publish release
+    needs: determine-mode
+    if: needs.determine-mode.outputs.is_publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    concurrency:
+      group: release-bash-publish-${{ needs.determine-mode.outputs.target_branch }}
+      cancel-in-progress: false
+    steps:
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.GH_APP_ID }}
+          private-key: ${{ secrets.GH_APP_KEY }}
+
+      - name: Checkout target branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.determine-mode.outputs.target_branch }}
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: true
+
+      - name: Run release.sh
+        id: release_publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set +e
+          bash scripts/release/release.sh --yes 2>&1 | tee release-output.log
+          script_exit_code=${PIPESTATUS[0]}
+          set -e
+          if [[ $script_exit_code -ne 0 ]] && grep -q "no commit to release in range" release-output.log; then
+            echo "No releasable commits since the last tag; nothing to publish."
+            exit 0
+          fi
+          exit "$script_exit_code"
