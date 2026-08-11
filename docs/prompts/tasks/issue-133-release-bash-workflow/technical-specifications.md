@@ -26,8 +26,12 @@
 
 **`scripts/release/VENDORED.md` records the pin and sync procedure instead of annotating `release.sh` itself.** Keeping `release.sh` byte-for-byte identical to upstream (confirmed via `diff` against the fetched copy) means a future deliberate sync can diff the two files directly with no noise from repo-local comments.
 
+**Review fix: `determine-mode`'s decision step uses guard clauses, not nested `if`/`else`.** The first pass nested a `closed`-vs-open check inside a target-branch check with an `else` branch; code review flagged this against Object Calisthenics rule 2 and the fact that the surrounding prose claimed flat branching that the code didn't actually have. The step now exits early after emitting outputs for the "wrong target branch" and "not closed" cases via a small `emit_outputs()` helper (rule 1: extract the repeated three-line output block into a named function instead of repeating it at each exit point), leaving one `if` per guard and no `else` anywhere.
+
+**Review fix: removed the unused `release_preview`/`release_publish` step `id`s.** Nothing downstream ever read `steps.release_preview.*` or `steps.release_publish.*` — dead identifiers flagged in code review. Dropped rather than wired to job `outputs:` since no consumer is planned; an `id` can be re-added if a future change needs to reference the step's outcome.
+
 ## Object Calisthenics note
 
-This feature is entirely YAML workflow configuration plus one vendored external shell script — there is no application code to apply class-shape rules (indentation levels, instance variables, first-class collections, etc.) to. The `determine-mode` step keeps one level of branching depth and named, non-abbreviated shell variables where that's meaningful in a CI script.
+This feature is entirely YAML workflow configuration plus one vendored external shell script — there is no application code to apply class-shape rules (indentation levels, instance variables, first-class collections, etc.) to. The `determine-mode` step keeps one level of branching depth per guard clause (no nested `if`, no `else`) and named, non-abbreviated shell variables where that's meaningful in a CI script.
 
 status: ready
