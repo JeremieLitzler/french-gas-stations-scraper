@@ -17,8 +17,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PreferencesFile } from '@/types/preferences'
 import type { Station } from '@/types/station'
 
-const mockGetPreferencesSyncedAt = vi.fn()
-const mockRestorePreferencesSyncedAt = vi.fn().mockResolvedValue(undefined)
+const { mockGetPreferencesSyncedAt, mockRestorePreferencesSyncedAt } = vi.hoisted(() => ({
+  mockGetPreferencesSyncedAt: vi.fn(),
+  mockRestorePreferencesSyncedAt: vi.fn().mockResolvedValue(undefined),
+}))
 
 vi.mock('@/utils/preferencesSyncTimestamp', () => ({
   getPreferencesSyncedAt: mockGetPreferencesSyncedAt,
