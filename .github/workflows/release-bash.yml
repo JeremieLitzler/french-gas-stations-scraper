@@ -10,11 +10,11 @@ on:
     types: [opened, synchronize, reopened, closed]
 
 # Source/target branch pair as easily-changed configuration (`on:` triggers cannot reference
-# expressions, so the actual filtering happens in the determine-mode job below). Point both at
-# temporary branches for validation, then switch to develop/main.
+# expressions, so the actual filtering happens in the determine-mode job below). Validated
+# against temp-source-branch/temp-target-branch (issue #133); now pointed at the real pair.
 env:
-  RELEASE_SOURCE_BRANCH: temp-source-branch
-  RELEASE_TARGET_BRANCH: temp-target-branch
+  RELEASE_SOURCE_BRANCH: develop
+  RELEASE_TARGET_BRANCH: main
 
 permissions:
   contents: read
