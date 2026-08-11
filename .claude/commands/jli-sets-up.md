@@ -125,7 +125,8 @@ errors that the branch already exists — delete the stale local branch, then re
 
 - Changes to `.claude/deprecated-agents`, `CLAUDE.md`, or `.claude/settings.local.json` → `ci(agent): …`
 - Changes to `.claude/commands/jli-*.md` → `ci(commands): …`
-- Changes under `docs/` → `docs: …` (pipeline artifacts use the scoped types below)
+- Changes under `docs/` → `docs: …` (pipeline artifacts follow the rules in `jli-commits.md`,
+  which reuses this `type` for commits that touch source code)
 - Changes under `.github/workflows` → `ci: …`
 - Everything else follows conventional commits: `feat`, `fix`, `docs`, `style`, `refactor`,
   `test`, `chore`, `perf`, `ci`. Subject: imperative, lowercase, no period, ≤72 chars.
