@@ -100,6 +100,8 @@ jobs:
     needs: determine-mode
     if: needs.determine-mode.outputs.is_publish == 'true'
     runs-on: ubuntu-latest
+    environment:
+      name: CI
     permissions:
       contents: read
     concurrency:
