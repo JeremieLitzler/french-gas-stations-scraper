@@ -8,8 +8,9 @@ opened (e.g. `@docs/prompts/tasks/issue-<id>-<slug>`). If it is empty, stop and 
 
 Run from the feature worktree root (your current directory). Parse the issue `[id]` from the
 task-folder name. The pipeline scripts resolve the bare repo automatically. This command is
-outward-facing and irreversible — honour the two approval gates below. It does NOT remove the
-worktree (you are standing in it); cleanup is a separate command run from `develop`.
+outward-facing and irreversible — honour the CI-check gate and the two approval gates below.
+It does NOT remove the worktree (you are standing in it); cleanup is a separate command run
+from `develop`.
 
 ## Sub-issue task folders
 
@@ -43,10 +44,25 @@ bash scripts/pipeline/pr-create.sh "$(pwd)" "<title>" /tmp/pr-body.md
 **Approval gate 1:** before running `pr-create.sh`, show the user the proposed PR title and
 body and ask for approval. If they decline, stop.
 
-## Step 2 — Merge (after approval)
+## Step 2 — Verify CI checks (hard gate, before merge)
 
-**Approval gate 2:** show the user the PR URL and ask for approval to merge. If they decline,
-stop — the PR stays open for them to merge manually.
+```bash
+rtk gh pr checks <pr-url>
+```
+
+Every required check must show `pass`. If any check is `fail`, `pending`, or `queued`, stop —
+do not proceed to Step 3 or ask for merge approval. Tell the user exactly which checks are not
+green and wait: either they fix the failure and push a new commit (loop back to
+`/jli-runs-tests`/`/jli-codes` as appropriate), or they explicitly tell you to proceed anyway
+(e.g. a known-flaky, non-blocking check). Never decide on your own to bypass a red or pending
+check — merging only on the human's explicit say-so once checks are green (or explicitly
+overridden) is the whole point of this gate.
+
+## Step 3 — Merge (after approval)
+
+**Approval gate 2:** show the user the PR URL, confirm the CI checks are green (per Step 2),
+and ask for approval to merge. If they decline, stop — the PR stays open for them to merge
+manually.
 
 ```bash
 bash scripts/pipeline/pr-complete.sh <pr-url>

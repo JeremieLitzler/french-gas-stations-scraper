@@ -239,7 +239,11 @@ hints:
 - `/jli-writes-spec` and `/jli-codes` warn when their artifact contains `### ADR Required` —
   approve the ADR (add it under `docs/decisions/`, update the index) before continuing.
 - `/jli-ships` pauses for confirmation before opening the PR and again before merging,
-  because those actions are outward-facing and irreversible.
+  because those actions are outward-facing and irreversible. Between the two, it runs a hard
+  CI-check gate (`gh pr checks`): every required check must be green before the merge
+  confirmation is even asked for. A red or pending check stops the command outright — the
+  human must either fix it (looping back into the chain) or explicitly say to proceed anyway,
+  rather than the merge happening unconditionally.
 
 ## Maintaining the chain
 
