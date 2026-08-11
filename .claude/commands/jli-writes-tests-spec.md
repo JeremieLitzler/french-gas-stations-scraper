@@ -30,7 +30,9 @@ If the spec describes a structural/cleanup task with no runtime-observable behav
 
 ## Output contract
 
-Create `[task-folder]/test-cases.md`. End it with `status: ready` as the last line.
+Create `[task-folder]/test-cases.md`. End it with `status: ready` as the last line. Write each
+prose paragraph as a single unwrapped line — no manual line breaks mid-paragraph; let the
+renderer soft-wrap.
 
 ## Shell command retry limit
 

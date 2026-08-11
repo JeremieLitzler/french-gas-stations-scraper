@@ -60,6 +60,8 @@ Write `[task-folder]/technical-specifications.md`:
 - For every non-trivial decision (one a reasonable engineer could make differently — choice
   of data structure, helper vs inline, error-handling strategy, splitting responsibilities),
   a one-to-two sentence explanation of WHY.
+- Write each prose paragraph as a single unwrapped line — no manual line breaks
+  mid-paragraph; let the renderer soft-wrap.
 
 If the implementation introduces an architectural decision not yet in `docs/decisions/`, add
 before the final status line:

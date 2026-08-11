@@ -71,6 +71,8 @@ what `/jli-codes` must act on:
 - No summary section.
 - End with `status: approved` as the last line. If any finding exists, use
   `status: changes requested` instead. The status line is always last.
+- Write each prose paragraph as a single unwrapped line — no manual line breaks
+  mid-paragraph; let the renderer soft-wrap.
 
 If you hit the 3-failing-shell-command limit, record the error output and end the file with
 `status: changes requested`.

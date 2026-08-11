@@ -97,6 +97,8 @@ Rules:
 - If any test fails, replace the Results section with failure details and replace
   `status: passed` with `status: failed`.
 - The status line is always the last line of the file.
+- Write each prose paragraph as a single unwrapped line — no manual line breaks
+  mid-paragraph; let the renderer soft-wrap.
 
 ## Shell command retry limit
 
