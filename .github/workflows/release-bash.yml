@@ -1,9 +1,8 @@
 name: Release (release.sh)
 run-name: ${{ github.actor }} runs release.sh (${{ github.event.pull_request.merged && 'publish' || 'preview' }}) on #${{ github.event.pull_request.number }}
 
-# Second, independent release pipeline (ADR-015). Runs the vendored scripts/release/release.sh
-# instead of the npm-based semantic-release in release.yml (ADR-004). release.yml is untouched
-# and keeps running in parallel; no retirement decision has been made for either pipeline.
+# Sole release pipeline (ADR-015). Runs the vendored scripts/release/release.sh, replacing the
+# npm-based semantic-release workflow (ADR-004, release.yml), which has been retired (#148).
 
 on:
   pull_request:

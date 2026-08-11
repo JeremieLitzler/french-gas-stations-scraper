@@ -1,7 +1,7 @@
 # ADR-004: Semantic Release for Versioning
 
 **Date:** 2026-02-11
-**Status:** Accepted (Pre-existing)
+**Status:** Superseded by [ADR-015](./ADR-015-bash-script-release-workflow.md) (2026-08-11)
 
 ## Context
 
@@ -46,3 +46,4 @@ Installed packages:
 - Commit format: `feat:`, `fix:`, `chore:`, `docs:`, `refactor:` etc.
 - Breaking changes: `feat!:` or `BREAKING CHANGE:` in commit footer
 - Changelog lives at `CHANGELOG.md` in project root
+- Retired 2026-08-11 (issue #148): `release.yml` and the `semantic-release` npm dependency chain were removed once [ADR-015](./ADR-015-bash-script-release-workflow.md)'s `release-bash.yml` proved itself as the replacement.
