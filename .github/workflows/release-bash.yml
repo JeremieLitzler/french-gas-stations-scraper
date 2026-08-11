@@ -123,6 +123,14 @@ jobs:
           token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
+      - name: Configure git identity for the GitHub App
+        env:
+          APP_ID: ${{ secrets.GH_APP_ID }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+
       - name: Run release.sh
         shell: bash
         env:
