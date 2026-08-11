@@ -70,7 +70,9 @@ architectural choice with its context, rationale, and consequences. In doubt, as
 
 Create or update `business-specifications.md` in the task folder (its parent for a sub-issue
 subfolder). End it with `status: ready` as the last line. Do NOT use horizontal rules (`---`)
-anywhere in the file.
+anywhere in the file. Write each prose paragraph as a single unwrapped line — no manual line
+breaks mid-paragraph; let the renderer soft-wrap. Only break lines for actual markdown
+structure (headings, list items, code fences).
 
 ## Shell command retry limit
 

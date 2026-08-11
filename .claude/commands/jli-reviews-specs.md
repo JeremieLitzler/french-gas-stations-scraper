@@ -105,7 +105,8 @@ End the file with a status line as its last line:
 - `status: review specs` — amendments are needed (the common case).
 - `status: approved` — the feedback requests no changes and the artifacts are coherent.
 
-Do NOT use horizontal rules (`---`) anywhere in the file.
+Do NOT use horizontal rules (`---`) anywhere in the file. Write each prose paragraph as a
+single unwrapped line — no manual line breaks mid-paragraph; let the renderer soft-wrap.
 
 ## Commit rules reference
 

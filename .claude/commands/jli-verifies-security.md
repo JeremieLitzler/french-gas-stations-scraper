@@ -49,6 +49,8 @@ the final status line:
 ## Output contract
 
 Create `[task-folder]/security-guidelines.md`. End it with `status: ready` as the last line.
+Write each prose paragraph as a single unwrapped line — no manual line breaks mid-paragraph;
+let the renderer soft-wrap.
 
 ## Shell command retry limit
 

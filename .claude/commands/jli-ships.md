@@ -26,7 +26,9 @@ tell the user to finish `/jli-runs-tests @<task-folder>` first.
 
 Derive the PR title from `business-specifications.md` (short imperative summary, ≤70 chars).
 Write the PR body to a temp file: a summary of what changed and why, a test-plan checklist,
-and `Closes #[id]`. Target branch is always `develop` — never `main`.
+and `Closes #[id]`. Target branch is always `develop` — never `main`. Write each prose
+paragraph as a single unwrapped line — no manual line breaks mid-paragraph; let the renderer
+soft-wrap.
 
 ```bash
 cat > /tmp/pr-body.md << 'EOF'
