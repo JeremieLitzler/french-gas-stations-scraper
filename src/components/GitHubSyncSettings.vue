@@ -168,6 +168,7 @@ async function onLogout(): Promise<void> {
       }}</span>
     </div>
 
+    <!-- GitHub Auth compoment start (to extract) -->
     <div class="flex flex-col gap-3 sm:flex-row">
       <Button
         class="w-full sm:w-auto"
@@ -188,5 +189,6 @@ async function onLogout(): Promise<void> {
         Se déconnecter
       </Button>
     </div>
+    <!-- GitHub Auth compoment end -->
   </section>
 </template>
