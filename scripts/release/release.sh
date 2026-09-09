@@ -131,7 +131,13 @@ REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner) \
 REPO_URL="https://github.com/${REPO}"
 
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
-[[ $CURRENT_BRANCH == "main" ]] || warn "you are on '${CURRENT_BRANCH}', not 'main'"
+# Local hunk (see scripts/release/VENDORED.md): upstream checks for "main"; this
+# repo's single trunk is "develop" and releases are cut from a "release/*" branch
+# (a detached checkout of the pushed sha reports "HEAD"). Accept all three quietly.
+case $CURRENT_BRANCH in
+  develop | release/* | HEAD) ;;
+  *) warn "you are on '${CURRENT_BRANCH}', not 'develop' or a 'release/*' branch" ;;
+esac
 
 [[ -n $TO_REF ]] || TO_REF="HEAD"
 git rev-parse --verify --quiet "$TO_REF" >/dev/null || die "unknown ref: $TO_REF"

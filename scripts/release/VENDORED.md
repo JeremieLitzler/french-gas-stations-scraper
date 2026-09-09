@@ -7,6 +7,14 @@
 - **Pinned commit**: `de0a43a7790f509371219087c10602a0f8c39bb9`
 - **Vendored on**: 2026-08-11
 
+## Local modifications
+
+One hunk diverges from upstream, applied on 2026-09-09 for the single-trunk release migration (ADR-016):
+
+- **Preflight branch check** (near line 133). Upstream warns unless `CURRENT_BRANCH == "main"`. This repo's single long-lived branch is `develop`, and a release is cut from a pushed `release/*` branch (checked out detached in CI, so `git rev-parse --abbrev-ref HEAD` reports `HEAD`). The check is widened to a `case` that accepts `develop`, `release/*`, and `HEAD` without warning. No other behaviour changes.
+
+When syncing a deliberate upstream update, re-apply this hunk on top of the new copy.
+
 ## Syncing a deliberate update
 
 1. Diff the upstream file at the new commit against this copy before touching anything: `gh api repos/JeremieLitzler/semantic-release-script-testing/contents/release.sh?ref=<new-commit> --jq '.content' | base64 -d`

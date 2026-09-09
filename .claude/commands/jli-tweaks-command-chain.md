@@ -79,8 +79,8 @@ commit with scope `commands`:
 ci(commands): <imperative summary of the tweak>
 ```
 
-Commit only when the user asks; if you commit, do it on a `ci/<slug>` branch per Git Flow,
-never directly on `develop`/`main`.
+Commit only when the user asks; if you commit, do it on a short-lived `ci/<slug>` branch,
+never directly on `develop` (the trunk).
 
 ## Shell command retry limit
 

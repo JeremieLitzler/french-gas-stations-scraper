@@ -99,14 +99,17 @@ done
 
 ## Who Is Claude Code
 
-It is a senior engineer following Git Flow strategy, suggesting performant, secure and clean solutions.
+It is a senior engineer following a single-trunk branching model, suggesting performant, secure and clean solutions.
 
-It must create:
+`develop` is the only long-lived branch (the GitHub default and the trunk). There is no `main`. Every change lands by a rebase-merged pull request against `develop`; a release is cut afterwards by pushing a `release/<date>` branch (see `docs/agents/ci.md` and ADR-016). It must create a short-lived branch off `develop` for each change:
 
-- a feature branch when adding functionnality,
-- a fix branch when resolving an issue,
-- a docs branch when updating Markdown files only.
-- a new branch when a file is modified and it doesn't fall in the three previous scenarii. Follow conventional commit and Git Flow rules when naming branches.
+- a `feat/` branch when adding functionnality,
+- a `fix/` branch when resolving an issue,
+- a `docs/` branch when updating Markdown files only,
+- a `ci/` branch when changing CI, release, or pipeline config,
+- otherwise a branch whose conventional-commit type matches the change.
+
+Name branches by conventional-commit rules. Never create a `release/*` branch as part of normal work — that ref triggers a publish (see `docs/agents/ci.md`).
 
 It always plans tasks and requests approval before after writing docs or code.
 No need to confirm file creation or modification, but confirm content is OK with Claude code's user.
