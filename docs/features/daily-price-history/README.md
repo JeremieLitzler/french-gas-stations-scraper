@@ -12,7 +12,8 @@ Once a day, with no user present, scrapes every favorite station and appends the
 - `netlify/functions/lib/priceHistoryCsv.ts`, `netlify/functions/lib/csvEscaping.ts` — build and merge the CSV.
 - `netlify/functions/lib/githubContentsClient.ts` — `sha`-based create-or-update against the GitHub Contents API.
 - `netlify/functions/lib/stationHtmlParser.ts` — the parse logic, server-side.
-- **Netlify environment variables** — the fine-grained PAT, and the fixed `owner/repo` plus preferences file path this function has no browser session to read.
+- `netlify/functions/lib/environment.ts` — `readHistoryConfig()` reads the four env vars below (`HistoryConfig`), returning `null` if any is missing.
+- **Netlify environment variables** — `HISTORY_GITHUB_PAT` (the fine-grained PAT), `HISTORY_GITHUB_OWNER`, `HISTORY_GITHUB_REPO`, and `HISTORY_PREFS_FILE_PATH` (the preferences file's path in that repo). This function has no browser session to read any of it from. The history file name itself is not an env var — it is the hardcoded constant `HISTORY_FILE_PATH = 'history.csv'`.
 
 ## Behaviour & rules
 
@@ -20,9 +21,9 @@ Once a day, with no user present, scrapes every favorite station and appends the
 
 **No local-hour guard.** `isTargetLocalHour` / `TARGET_LOCAL_HOUR` were removed — their bug was silently skipping a legitimate invocation that landed outside the one accepted local hour. `isScheduledInvocation`, confirming the call came from Netlify's scheduler, is the only check before a run.
 
-**Authentication.** A fixed, fine-grained Personal Access Token, scoped to only the target repository with Contents read/write, stored as a Netlify environment variable. It does not use, and is not affected by, the browser OAuth session (ADR-011) — a user logging out in their browser has no effect on this job. An invalid or expired token fails the run with no write (no partial file); the failure is visible only in Netlify function logs, since no user is present to notify.
+**Authentication.** A fixed, fine-grained Personal Access Token (`HISTORY_GITHUB_PAT`), scoped to only the target repository with Contents read/write. It does not use, and is not affected by, the browser OAuth session (ADR-011) — a user logging out in their browser has no effect on this job. An invalid or expired token fails the run with no write (no partial file); the failure is visible only in Netlify function logs, since no user is present to notify.
 
-**Inputs.** Favorite stations are read from the same remote preferences JSON the SPA syncs (`favoriteStations`), not from IndexedDB. The owner/repo and preferences file path are fixed environment variables, kept in sync manually with whatever the user set in the Settings UI — the function does not discover them dynamically.
+**Inputs.** Favorite stations are read from the same remote preferences JSON the SPA syncs (`favoriteStations`), not from IndexedDB. `HISTORY_GITHUB_OWNER`, `HISTORY_GITHUB_REPO`, and `HISTORY_PREFS_FILE_PATH` are fixed, kept in sync manually with whatever the user set in the Settings UI — the function does not discover them dynamically.
 
 **Scraping.** Same method as the SPA. If a station's page fails to scrape, or does not list a given fuel type that day, only that station (or that station/fuel pair) is omitted from the day's rows — every other favorite is still written normally.
 
