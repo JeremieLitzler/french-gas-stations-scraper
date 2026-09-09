@@ -91,7 +91,8 @@ done
 
 ## Documentation
 
-- `docs/specs/` — Project specifications and requirements
+- `CONTEXT.md` (repo root) — the feature map: what the app does, and where each feature is documented
+- `docs/features/` — one folder per user-facing feature: purpose, implementing code, and behaviour rules
 - `docs/decisions/` — Architecture Decision Records (a.k.a ADR)
 - `docs/prompts/` — Pipeline artifacts per issue; 
   - See `docs/prompts/README.md` for the full pipeline reference. NEVER READ THIS FILE UNLESS THE PIPELINE CHANGES
@@ -116,7 +117,7 @@ No need to congratulate or use language that use unnecessary output tokens. Go t
 
 1. **Pipeline-first**: When asked to tackle/work on/implement/fix a GitHub issue, use the manual `jli-` command chain, starting with `/jli-sets-up <issue-number>` and following each command's "Next" hint (see `AGENT-COMMAND-MIGRATION.md` at the project root). Never do git operations (branch, checkout, worktree) directly from the main conversation. All code changes go through a worktree. The old `/tackle` orchestrator flow is deprecated and kept only for history.
 2. **No hardcoded paths**: Never hardcode absolute paths or worktree-specific paths (e.g. `develop/`, `feat_foo/`) in any `.md` file under `.claude/`. Absolute paths break portability across machines; worktree paths are runtime values, not constants. Always use placeholders (`[worktree]`, `[task-folder]`) or derive paths at runtime.
-3. **Spec-first**: Before implementing anything, read the relevant spec files.
+3. **Spec-first**: Before implementing anything, read the relevant reference material — the feature's `docs/features/<slug>/README.md` and `CONTEXT.md`, plus, for an in-flight issue, its `docs/prompts/tasks/issue-*/business-specifications.md`.
 4. **ADR-first**: Before making any architectural decision, provide brief context why an ADR is needed before suggesting the full ADR. Once confirmed, create it in `docs/decisions/` and always update the index at `docs/decisions/README.md`.
 5. **Type-first**: Define or update types in `src/types/` before implementing logic that uses them.
 
@@ -134,10 +135,12 @@ Claude Code must be opened from the `develop/` worktree, not the bare repo root.
 
 Always read before starting any task:
 
+- `CONTEXT.md` — the feature map; which feature a task touches and where it is documented
 - `docs/prompts/workspace-context.md` — current phase, completed work, open decisions
 
 Read when relevant:
 
+- `docs/features/<slug>/README.md` — the touched feature's purpose, implementing code, and behaviour rules
 - ADRs in `docs/decisions/` — before touching a decided area
 
 ## When You Are Unsure

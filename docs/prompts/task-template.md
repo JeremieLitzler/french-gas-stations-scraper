@@ -20,7 +20,7 @@ Read before starting:
 
 ## Relevant Specs
 
-- [Link to relevant section in specs, e.g. `docs/specs/01-requirements.md` FR-3]
+- [Link to relevant reference, e.g. `docs/features/<feature>/README.md` or `CONTEXT.md`]
 - [Link to relevant ADR if touching a decided area]
 
 ## Acceptance Criteria
@@ -53,7 +53,7 @@ Read before starting:
 
 - `docs/prompts/system-prompt.md`
 - `docs/prompts/workspace-context.md`
-- `docs/specs/01-requirements.md` (TR-1)
+- `CONTEXT.md`
 - `docs/decisions/ADR-002-state-management.md`
 - `docs/decisions/ADR-003-ui-layer.md`
 
@@ -64,7 +64,7 @@ feature development begins.
 
 ## Relevant Specs
 
-- `docs/specs/01-requirements.md` TR-1
+- `CONTEXT.md` — cross-cutting cleanup; see the ADR index for decided areas
 
 ## Acceptance Criteria
 
