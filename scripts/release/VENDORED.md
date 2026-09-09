@@ -11,7 +11,7 @@
 
 One hunk diverges from upstream, applied on 2026-09-09 for the single-trunk release migration (ADR-016):
 
-- **Preflight branch check** (near line 133). Upstream warns unless `CURRENT_BRANCH == "main"`. This repo's single long-lived branch is `develop`, and a release is cut from a pushed `release/*` branch (checked out detached in CI, so `git rev-parse --abbrev-ref HEAD` reports `HEAD`). The check is widened to a `case` that accepts `develop`, `release/*`, and `HEAD` without warning. No other behaviour changes.
+- **Preflight branch check** (the `CURRENT_BRANCH` test in the preflight section). Upstream warns unless `CURRENT_BRANCH == "main"`. This repo's single long-lived branch is `develop`, and a release is cut from a pushed `release/*` branch (checked out detached in CI, so `git rev-parse --abbrev-ref HEAD` reports `HEAD`). The check is widened to a `case` that accepts `develop`, `release/*`, and `HEAD` without warning. No other behaviour changes.
 
 When syncing a deliberate upstream update, re-apply this hunk on top of the new copy.
 

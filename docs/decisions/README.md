@@ -5,7 +5,7 @@ Each ADR documents a significant technical decision, its context, and consequenc
 
 ## Format
 
-Filename: `adr-XXX-short-title.md`
+Filename: `ADR-XXX-short-title.md` (early records ADR-001..005 use a lowercase `adr-` prefix; ADR-006 onward use `ADR-`)
 Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 
 ## Index

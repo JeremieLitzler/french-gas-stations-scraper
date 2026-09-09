@@ -1,6 +1,6 @@
 # CI and releases
 
-Operational notes for working on `.github/workflows/` and `scripts/release/`. The settled decisions and their rationale live in `CONTEXT.md` (CI, Deploy, Releases, Branch model); this file is the how-to and the gotchas that cost time to rediscover.
+Operational notes for working on `.github/workflows/` and `scripts/release/`. The settled decisions and their rationale live in `CONTEXT.md` § "Non-product work" (Branch model, Release automation, CI and build config) and in ADR-016; this file is the how-to and the gotchas that cost time to rediscover.
 
 ## Changing the release pipeline
 

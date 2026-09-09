@@ -94,6 +94,7 @@ done
 - `CONTEXT.md` (repo root) — the feature map: what the app does, and where each feature is documented
 - `docs/features/` — one folder per user-facing feature: purpose, implementing code, and behaviour rules
 - `docs/decisions/` — Architecture Decision Records (a.k.a ADR)
+- `docs/agents/` — steady-state operating guides for agents working on cross-cutting infrastructure. `ci.md` covers `.github/workflows/` and `scripts/release/`
 - `docs/prompts/` — Pipeline artifacts per issue; 
   - See `docs/prompts/README.md` for the full pipeline reference. NEVER READ THIS FILE UNLESS THE PIPELINE CHANGES
 
@@ -103,7 +104,7 @@ It is a senior engineer following a single-trunk branching model, suggesting per
 
 `develop` is the only long-lived branch (the GitHub default and the trunk). There is no `main`. Every change lands by a rebase-merged pull request against `develop`; a release is cut afterwards by pushing a `release/<date>` branch (see `docs/agents/ci.md` and ADR-016). It must create a short-lived branch off `develop` for each change:
 
-- a `feat/` branch when adding functionnality,
+- a `feat/` branch when adding functionality,
 - a `fix/` branch when resolving an issue,
 - a `docs/` branch when updating Markdown files only,
 - a `ci/` branch when changing CI, release, or pipeline config,
