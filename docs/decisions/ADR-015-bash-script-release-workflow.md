@@ -1,7 +1,7 @@
 # ADR-015: Bash Script (`release.sh`) as a Second Release Workflow
 
 **Date:** 2026-08-11
-**Status:** Accepted
+**Status:** Superseded by ADR-016
 
 ## Context
 
@@ -46,5 +46,6 @@ The existing `semantic-release` workflow (`release.yml`) was a candidate for dep
 
 ## Notes
 
+- **Superseded by [ADR-016](./ADR-016-single-trunk-release-model.md) (2026-09-09):** the `develop` > `main` pull-request trigger described here caused permanent branch divergence and misreported `git describe` versions. ADR-016 moves to a single trunk (`develop` only, `main` retired) with a push-triggered pipeline, and drops the GitHub App token and the second ruleset.
 - Deprecating `release.yml` in favor of `release-bash.yml` was anticipated but not decided here. That follow-up decision was made and executed in issue #148 (2026-08-11): `release.yml`, `.releaserc`, and the `semantic-release` npm dependency chain (ADR-004) were removed; `release-bash.yml` is now the sole release pipeline.
 - `tibdex/github-app-token` (used by the now-removed `release.yml`) was unmaintained; `release-bash.yml` uses `actions/create-github-app-token` instead. It no longer needs to coexist with `release.yml`'s auth pattern.

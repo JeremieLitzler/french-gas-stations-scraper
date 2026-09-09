@@ -1,91 +1,85 @@
 name: Release (release.sh)
-run-name: ${{ github.actor }} runs release.sh (${{ github.event.pull_request.merged && 'publish' || 'preview' }}) on #${{ github.event.pull_request.number }}
+run-name: >-
+  release.sh (${{ (github.event_name == 'push' && github.ref == 'refs/heads/develop') && 'preview' || (github.event_name == 'workflow_dispatch' && inputs.mode) || 'publish' }})
+  on ${{ github.ref_name }} · ${{ github.actor }}
 
-# Sole release pipeline (ADR-015). Runs the vendored scripts/release/release.sh, replacing the
-# npm-based semantic-release workflow (ADR-004, release.yml), which has been retired (#148).
+# The sole release pipeline (issues #13, #54). Runs the vendored
+# `scripts/release/release.sh`, which reads the conventional commits in the
+# range, decides the next version, writes the notes, tags and publishes.
+#
+# Single-trunk model (issue #54): `develop` is the only long-lived branch.
+#   - a push to `develop` runs a dry-run preview and writes the pending
+#     version + notes to the job summary;
+#   - a release is cut by branching `release/<date>` off `develop` and pushing
+#     it — that runs the real publish (tag + GitHub release) on that ref;
+#   - `workflow_dispatch` runs from the Actions tab against a chosen branch:
+#     `mode=publish` cuts the release and is refused from anything but `develop`
+#     or a `release/*` branch; `mode=preview` (the default) only dry-runs, and
+#     is allowed from any branch since it writes nothing.
+# There is no target branch and no `develop` > `main` pull request any more.
+#
+# The publish job guards itself before running release.sh (issues #63, #64):
+# it refuses a `release/*` ref that `develop` does not contain, and if an
+# earlier run left an orphaned tag on the remote (pushed, but no release) it
+# deletes that tag so a re-push re-cuts the release cleanly instead of dying.
+# After a push-triggered publish succeeds it deletes the triggering `release/*`
+# branch from `origin` (issue #72) — a disposable trigger ref with nothing to
+# merge back — so those refs do not accumulate and a later push to a stale one
+# cannot re-fire a publish. A `workflow_dispatch` publish never deletes its ref.
+#
+# `release.sh`'s `gate()` prompts abort in any non-TTY environment, so every CI
+# run — preview or publish — passes `--yes`. `--dry-run` only skips the
+# destructive remote steps (tag push, release publish); it does not skip the
+# gates, which is why both modes carry `--yes`.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-
-# Source/target branch pair as easily-changed configuration (`on:` triggers cannot reference
-# expressions, so the actual filtering happens in the determine-mode job below). Validated
-# against temp-source-branch/temp-target-branch (issue #133); now pointed at the real pair.
-env:
-  RELEASE_SOURCE_BRANCH: develop
-  RELEASE_TARGET_BRANCH: main
+  push:
+    branches:
+      - develop
+      - 'release/**'
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'preview = dry run only; publish = cut the release from the selected branch'
+        type: choice
+        options: [preview, publish]
+        default: preview
 
 permissions:
   contents: read
 
 jobs:
-  determine-mode:
-    name: Determine release mode
-    runs-on: ubuntu-latest
-    outputs:
-      is_preview: ${{ steps.decide.outputs.is_preview }}
-      is_publish: ${{ steps.decide.outputs.is_publish }}
-      target_branch: ${{ steps.decide.outputs.target_branch }}
-    steps:
-      - name: Decide preview vs publish vs skip
-        id: decide
-        shell: bash
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.ref }}
-          EVENT_ACTION: ${{ github.event.action }}
-          PULL_REQUEST_MERGED: ${{ github.event.pull_request.merged }}
-          RELEASE_TARGET_BRANCH: ${{ env.RELEASE_TARGET_BRANCH }}
-        run: |
-          emit_outputs() {
-            echo "is_preview=$is_preview" >>"$GITHUB_OUTPUT"
-            echo "is_publish=$is_publish" >>"$GITHUB_OUTPUT"
-            echo "target_branch=$RELEASE_TARGET_BRANCH" >>"$GITHUB_OUTPUT"
-          }
-
-          is_preview=false
-          is_publish=false
-
-          if [[ "$BASE_REF" != "$RELEASE_TARGET_BRANCH" ]]; then
-            emit_outputs
-            exit 0
-          fi
-
-          if [[ "$EVENT_ACTION" != "closed" ]]; then
-            is_preview=true
-            emit_outputs
-            exit 0
-          fi
-
-          [[ "$PULL_REQUEST_MERGED" == "true" ]] && is_publish=true
-          emit_outputs
-
   preview:
     name: Preview release
-    needs: determine-mode
-    if: needs.determine-mode.outputs.is_preview == 'true'
+    # A push to the trunk, or a manual dispatch left on the default mode: show
+    # what the next release would be, change nothing.
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/develop') ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'preview')
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      # release.sh resolves issue references to titles via the issues endpoint.
       issues: read
       pull-requests: read
     concurrency:
-      group: release-bash-preview-${{ github.event.pull_request.number }}
+      group: release-preview-${{ github.ref }}
       cancel-in-progress: true
     steps:
-      - name: Checkout PR head
-        uses: actions/checkout@v4
+      - name: Check out ${{ github.ref_name }}
+        uses: actions/checkout@v7
         with:
-          ref: ${{ github.event.pull_request.head.sha }}
+          # release.sh reads the whole commit range back to the last v* tag.
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Run release.sh --dry-run
+      - name: Preview the release (dry run)
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
-          bash scripts/release/release.sh --yes --dry-run 2>&1 | tee release-output.log
+          bash scripts/release/release.sh --yes --dry-run --notes release-notes.md 2>&1 | tee release-output.log
           script_exit_code=${PIPESTATUS[0]}
           set -e
           if [[ $script_exit_code -ne 0 ]] && grep -q "no commit to release in range" release-output.log; then
@@ -94,46 +88,137 @@ jobs:
           fi
           exit "$script_exit_code"
 
+      - name: Write the preview to the job summary
+        if: always()
+        shell: bash
+        run: |
+          # release.sh's dry run prints the version decision and, past the notes
+          # gate, the notes themselves. Rather than scrape its human-formatted
+          # output, surface the notes file it wrote and attach the whole log.
+          {
+            echo "## Release preview"
+            echo
+            if [[ -f release-output.log ]] && grep -q "no commit to release in range" release-output.log; then
+              echo "No releasable commits since the last tag — nothing to release yet."
+            elif [[ -s release-notes.md ]]; then
+              echo "The next release would carry these notes:"
+              echo
+              cat release-notes.md
+            else
+              echo "No release notes were produced — see the full output below."
+            fi
+            echo
+            if [[ -f release-output.log ]]; then
+              echo "<details><summary>Full <code>release.sh --dry-run</code> output</summary>"
+              echo
+              echo '```'
+              cat release-output.log
+              echo '```'
+              echo
+              echo "</details>"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
   publish:
     name: Publish release
-    needs: determine-mode
-    if: needs.determine-mode.outputs.is_publish == 'true'
+    # A pushed `release/*` branch, or a manual dispatch with mode=publish from
+    # `develop` or a `release/*` branch: cut the release.
+    #
+    # `github.event.deleted != true` drops the `push` event GitHub fires when a
+    # `release/*` branch is deleted — otherwise the job starts on an all-zero
+    # `github.sha` and the checkout dies. The pipeline's own delete step pushes
+    # with GITHUB_TOKEN, which starts no workflow (#56), so this only bites a
+    # manual deletion.
+    if: >-
+      github.event.deleted != true &&
+      ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')) ||
+      (github.event_name == 'workflow_dispatch' && inputs.mode == 'publish' &&
+      (github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/'))))
     runs-on: ubuntu-latest
+    # A named environment so the release step has somewhere to hang required
+    # reviewers or a wait timer later, without editing this file.
     environment:
       name: CI
     permissions:
-      contents: read
+      # release.sh pushes the new tag and creates the GitHub release. Under the
+      # single trunk nothing protects tags (no tag ruleset, no classic tag
+      # protection) and no workflow triggers on `push: tags` or `release`, so the
+      # default GITHUB_TOKEN with write access is enough — the GitHub App token
+      # this job used to mint is gone (issue #56). The unused GH_APP_ID /
+      # GH_APP_KEY repo secrets can now be deleted.
+      #
+      # Trade-off: a tag or release created with GITHUB_TOKEN does not trigger
+      # further workflows. If one is ever added (`on: release`, `on: push: tags`
+      # — npm publish, deploy, changelog sync), restore an App or PAT token here.
+      contents: write
+      # release.sh step 2 resolves issue references to titles via the issues
+      # endpoint, in publish mode too — same as the preview job.
+      issues: read
+      pull-requests: read
     concurrency:
-      group: release-bash-publish-${{ needs.determine-mode.outputs.target_branch }}
+      # One publish at a time, and never cancel one in flight.
+      group: release-publish
       cancel-in-progress: false
     steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v3
+      - name: Check out ${{ github.ref_name }}
+        uses: actions/checkout@v7
         with:
-          app-id: ${{ secrets.GH_APP_ID }}
-          private-key: ${{ secrets.GH_APP_KEY }}
-
-      - name: Checkout target branch
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.determine-mode.outputs.target_branch }}
           fetch-depth: 0
-          token: ${{ steps.app-token.outputs.token }}
           persist-credentials: true
 
-      - name: Configure git identity for the GitHub App
-        env:
-          APP_ID: ${{ secrets.GH_APP_ID }}
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+      - name: Configure git identity
         run: |
-          git config user.name "${APP_SLUG}[bot]"
-          git config user.email "${APP_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Run release.sh
+      - name: Verify the release ref is on develop
+        # #64: release.sh tags the HEAD of whatever ref was pushed, and nothing
+        # else checks that ref is contained in develop. A commit added on
+        # release/<date> before the push — a bump, a note, a hotfix — would put
+        # the tag on a commit develop does not carry, and `git describe` on
+        # develop would stop seeing it: the tag/version drift #54 removed. A
+        # manual publish dispatch from develop passes this trivially.
+        shell: bash
+        run: |
+          git fetch origin develop --quiet
+          if ! git merge-base --is-ancestor HEAD origin/develop; then
+            echo "::error::release ref $(git rev-parse --short HEAD) is not contained in origin/develop — rebase or re-cut release/<date> off develop"
+            exit 1
+          fi
+
+      - name: Reset a half-published release
+        # #63: release.sh pushes the tag, then creates the GitHub release. If an
+        # earlier run died between the two, the tag is on the remote with no
+        # release, and a plain re-push of release/<date> just dies inside
+        # release.sh — the orphaned tag now sits on HEAD, so its commit range is
+        # empty (or, with later commits, the recomputed tag "already exists
+        # locally"), both before the release step is reached. Delete that tag so
+        # the publish step below re-cuts it cleanly, release.sh notes and all.
+        # #63 lists deleting the tag as an accepted recovery; this automates it,
+        # for the plain re-push where the orphaned tag sits on HEAD.
         shell: bash
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git fetch --tags --quiet origin
+          # release.sh only ever creates annotated vMAJOR.MINOR.PATCH tags.
+          tag=$(git tag --points-at HEAD --list 'v[0-9]*.[0-9]*.[0-9]*' | sort -V | tail -n1)
+          if [[ -z $tag ]]; then
+            echo "No release tag on this commit — nothing to reset."
+            exit 0
+          fi
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::release $tag already exists for this commit; the publish step will find nothing to release"
+            exit 0
+          fi
+          echo "Tag $tag is pushed with no release attached — deleting it so the release is re-cut."
+          git push origin ":refs/tags/$tag"
+          git tag -d "$tag"
+
+      - name: Publish the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set +e
           bash scripts/release/release.sh --yes 2>&1 | tee release-output.log
@@ -144,3 +229,24 @@ jobs:
             exit 0
           fi
           exit "$script_exit_code"
+
+      - name: Delete the published release branch
+        # #72: once the tag and release exist the `release/<date>` branch is
+        # spent — nothing merges back, the #64 check having already gated it on
+        # `develop`; the file header carries the why. The guards keep it to a
+        # real publish: `success()` drops a hard failure, the `push` check
+        # spares a `workflow_dispatch` publish (which may sit on `develop`), and
+        # the `v*`-tag-on-HEAD test drops a no-op run where "Publish the
+        # release" exited 0 without tagging. The publish checkout persists
+        # GITHUB_TOKEN, so `git push` is authenticated; `|| echo` absorbs a
+        # branch that is already gone.
+        if: success() && github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/')
+        shell: bash
+        run: |
+          branch="${GITHUB_REF#refs/heads/}"
+          if [[ -z "$(git tag --points-at HEAD --list 'v[0-9]*.[0-9]*.[0-9]*')" ]]; then
+            echo "No v* tag on HEAD — nothing was published; leaving $branch for a retry."
+            exit 0
+          fi
+          git push origin --delete "$branch" \
+            || echo "Branch $branch was already absent from origin — nothing to delete."

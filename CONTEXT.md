@@ -27,8 +27,9 @@ Each feature has a folder under `docs/features/` with a `README.md` covering its
 Documented work that is not a user-facing feature. It stays where it already lives:
 
 - **Architecture decisions** — `docs/decisions/` (`README.md` is the index). Foundational: ADR-001 (Vue 3), ADR-002 (singleton composables), ADR-003 (Tailwind + shadcn-vue), ADR-005 (Vitest), ADR-010 (Mentions Légales rendering).
-- **Release automation** — `release.sh` at the repo root; ADR-004 (superseded) and ADR-015.
-- **CI and build config** — `.github/workflows/`, `netlify.toml`, `vite.config.ts`, `vitest` setup.
+- **Branch model** — one long-lived branch, `develop` (the GitHub default and the trunk). Every change lands by a rebase-merged pull request against `develop`; `feat/`, `fix/`, `docs/`, and `ci/` branches all branch off it and merge back into it. There is no `main` (ADR-016, superseding ADR-015).
+- **Release automation** — the vendored `scripts/release/release.sh`, driven by `.github/workflows/release-bash.yml`: a push to `develop` runs a dry-run preview to the run summary; a release is cut by pushing a `release/<date>` branch, which tags the commit, publishes the GitHub release, and deletes the spent branch. ADR-004 and ADR-015 are superseded by ADR-016. Day-to-day operating guide: `docs/agents/ci.md`.
+- **CI and build config** — `.github/workflows/` (`pr-build.yml` runs tests + build on every PR to `develop`), `netlify.toml`, `vite.config.ts`, `vitest` setup.
 - **UI/UX polish history** — captured in git history and closed issues, superseded by the feature docs above.
 
 ## Glossary
