@@ -20,7 +20,14 @@ Lets the user download their current preferences as `preferences.json` and re-im
 
 **Export.** Serialises the current IndexedDB state — station list plus default fuel type — into the `PreferencesFile` shape and downloads it under a fixed filename: `preferences.json`.
 
-**Import — validation first.** Before any UI is shown, the file is parsed and validated. It is rejected, with a user-visible error and no diff UI, if: it is not valid JSON; a required key is missing; `favoriteStations` is not an array; a station entry is missing `name` or `url`; a station URL fails the origin + path-prefix check; or a station name fails the name check (the same rules as Feature 5).
+**Import — validation first.** Before any UI is shown, the file is parsed and validated. It is rejected, with a user-visible error and no diff UI, if:
+
+- it is not valid JSON;
+- a required key is missing;
+- `favoriteStations` is not an array;
+- a station entry is missing `name` or `url`;
+- a station URL fails the origin + path-prefix check;
+- or a station name fails the name check (the same rules as Feature 5).
 
 **Import — diff UI.** After successful validation, and before writing anything: a station comparison table plus one line for the default fuel type. Only items that differ are shown; identical items are omitted; the fuel-type line appears only when its value differs.
 

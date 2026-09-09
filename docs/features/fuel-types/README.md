@@ -16,7 +16,7 @@ Derives the set of fuel types actually offered across the scraped stations, lets
 
 **Derivation.** Fuel types come exclusively from `useStationPrices` `results` — only types present in at least one station's fuel list, in first-encountered order, deduplicated. A type whose price is `null` is still included.
 
-**Default selection on load.** When results first arrive: if a default is stored and present in the derived list, select it. If none is stored, select the first derived type. If a default is stored but absent from the list (the station set changed), fall back to first-available and leave the stored default untouched. Feature 6 applies the same rule.
+**Default selection on load.** When results first arrive: if a user's default is stored and present in the derived list, select it. If none is stored, select the first derived type. If a default is stored but absent from the list (the station set changed), fall back to first-available and leave the stored default untouched. Feature 6 applies the same rule.
 
 **Button visibility matrix.**
 

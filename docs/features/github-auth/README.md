@@ -2,7 +2,11 @@
 
 ## Purpose
 
-Lets a user connect the app to a GitHub repository they own so their preferences can be synced there (Feature 2, Feature 7, Feature 9's counterpart). It owns two things: the GitHub OAuth App login/logout flow, and the repo-configuration form — `owner/repo`, the preferences file path, and `revalidate-cache-days` — whose three fields must all be valid before login is offered and which lock once the user is authenticated. Everything downstream consumes an already-resolved repo config and a known auth state.
+Lets a user connect the app to a GitHub repository they own so their preferences can be synced there (Feature 2, Feature 7, Feature 9's counterpart). It owns two things: the GitHub OAuth App login/logout flow, and the repo-configuration form — `owner/repo`, the preferences file path, and `revalidate-cache-days` — whose three fields must all be valid before login is offered.
+
+Values for `owner/repo` and the preferences file path lock once the user is authenticated.
+
+Everything downstream consumes an already-resolved repo config and a known auth state.
 
 ## Implementing code
 

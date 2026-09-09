@@ -20,7 +20,7 @@ Owns the preferences payload — the default fuel type plus the list of favorite
 
 ## Behaviour & rules
 
-**Payload shape.** `{ "fuelTypeDefault": string | null, "favoriteStations": [{ "name": string, "url": string }] }` — the "preferences file". Repo config (`owner`, `repo`, `revalidate-cache-days`) is never part of it; those live only in IndexedDB.
+**Payload shape.** The default fuel type plus the favorite-station list — the "preferences file" (see the [glossary](../../../CONTEXT.md#glossary) for the exact JSON shape). Repo config never travels in it; it lives only in IndexedDB.
 
 **Unauthenticated.** IndexedDB is the whole story — one device, no remote. The list persists across reloads and sessions under a single key, overwritten atomically.
 
