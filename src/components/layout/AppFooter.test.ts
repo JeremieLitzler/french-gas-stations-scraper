@@ -22,11 +22,11 @@ describe('AppFooter', () => {
     expect(wrapper.find('footer').exists()).toBe(true)
   })
 
-  it('renders exactly four external anchor elements (Jeremie, Claude, License, Netlify)', () => {
+  it('renders exactly five external anchor elements (Jeremie, Claude, License, Netlify, deploy badge)', () => {
     const wrapper = mount(AppFooter, globalConfig)
     const links = wrapper.findAll('a.external-link')
-    // Three logical sections: attribution (2 links: Jeremie + Claude), license, Netlify hosting
-    expect(links).toHaveLength(4)
+    // Four logical sections: attribution (2 links: Jeremie + Claude), license, Netlify hosting, deploy status badge
+    expect(links).toHaveLength(5)
   })
 
   // TC-08 — Mentions légales link
@@ -77,6 +77,21 @@ describe('AppFooter', () => {
       .find((a) => a.attributes('href') === 'https://www.netlify.com/')
     expect(netlifyLink).toBeDefined()
     expect(netlifyLink!.text()).toBe('Hébergé sur Netlify')
+  })
+
+  it('renders the Netlify deploy status badge linking to the site deploys page', () => {
+    const wrapper = mount(AppFooter, globalConfig)
+    const badgeLink = wrapper
+      .findAll('a.external-link')
+      .find(
+        (a) => a.attributes('href') === 'https://app.netlify.com/projects/coup-de-pompe/deploys',
+      )
+    expect(badgeLink).toBeDefined()
+    const badge = badgeLink!.find('img')
+    expect(badge.attributes('src')).toBe(
+      'https://api.netlify.com/api/v1/badges/36800925-289c-4bed-9ee5-6aaec9dcfdf9/deploy-status',
+    )
+    expect(badge.attributes('alt')).toBe('Statut du déploiement Netlify')
   })
 
   it('all links have target="_blank"', () => {

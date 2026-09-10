@@ -1,5 +1,7 @@
 # Scrap Price Info From Gas Stations
 
+[![Netlify Status](https://api.netlify.com/api/v1/badges/36800925-289c-4bed-9ee5-6aaec9dcfdf9/deploy-status)](https://app.netlify.com/projects/coup-de-pompe/deploys)
+
 Using the list of stations below, scrap the HTML using a Netlify function and presents it to a SPA with Vue.js.
 
 The presentation should use a table.
