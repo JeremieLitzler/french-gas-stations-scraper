@@ -14,5 +14,13 @@
     <AppLink to="https://www.netlify.com/">Hébergé sur Netlify</AppLink>
     <span>|</span>
     <AppLink to="/mentions-legales">Mentions légales</AppLink>
+    <span>|</span>
+    <AppLink to="https://app.netlify.com/projects/coup-de-pompe/deploys">
+      <img
+        src="https://api.netlify.com/api/v1/badges/36800925-289c-4bed-9ee5-6aaec9dcfdf9/deploy-status"
+        alt="Statut du déploiement Netlify"
+        class="inline-block h-5 align-middle"
+      />
+    </AppLink>
   </footer>
 </template>
