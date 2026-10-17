@@ -12,6 +12,12 @@ function Fail([string]$Message) {
   exit 1
 }
 
+# Windows PowerShell 5.1 drops the double quotes of an argument passed to a
+# native program, so JSON given to `netlify api --data` must have them escaped.
+function ConvertTo-NativeJson($Object) {
+  return ($Object | ConvertTo-Json -Compress) -replace '"', '\"'
+}
+
 function Invoke-NetlifyJson([string[]]$CliArgs) {
   $output = & netlify @CliArgs
   if ($LASTEXITCODE -ne 0) { Fail "netlify $($CliArgs[0]) failed." }
@@ -23,8 +29,9 @@ if (-not (Get-Command netlify -ErrorAction SilentlyContinue)) { Fail 'netlify CL
 & netlify status | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail 'Not logged in to Netlify. Run: netlify login' }
 
-$siteInfo = Invoke-NetlifyJson @('api', 'getSite', '--data', (@{ site_id = "$Site.netlify.app" } | ConvertTo-Json -Compress))
+$siteInfo = Invoke-NetlifyJson @('api', 'getSite', '--data', (ConvertTo-NativeJson @{ site_id = "$Site.netlify.app" }))
 $siteId = $siteInfo.id
+$accountId = $siteInfo.account_id
 if (-not $siteId) { Fail "Site '$Site' not found." }
 Write-Host "Site: $($siteInfo.name) ($siteId)"
 
@@ -36,13 +43,14 @@ finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
 if (-not $pat) { Fail 'Empty token.' }
 if ($pat -notmatch '^(github_pat_|ghp_)[A-Za-z0-9_]+$') { Fail 'Value does not look like a GitHub PAT (expected github_pat_... or ghp_...).' }
 
-# --- 2. Set it in Netlify (production context, Functions scope) -------------
-& netlify env:set HISTORY_GITHUB_PAT $pat --context production --scope functions --site $siteId --force | Out-Null
+# --- 2. Set it in Netlify (production context) -------------------------------
+# No --scope: the variable keeps the scopes it already has. --secret keeps its value unreadable.
+& netlify env:set HISTORY_GITHUB_PAT $pat --context production --secret --site $siteId --force | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail 'netlify env:set failed.' }
-Write-Host 'HISTORY_GITHUB_PAT updated (production, functions).'
+Write-Host 'HISTORY_GITHUB_PAT updated (production).'
 
 # --- 3. Redeploy production and wait -----------------------------------------
-$build = Invoke-NetlifyJson @('api', 'createSiteBuild', '--data', (@{ site_id = $siteId; clear_cache = $false } | ConvertTo-Json -Compress))
+$build = Invoke-NetlifyJson @('api', 'createSiteBuild', '--data', (ConvertTo-NativeJson @{ site_id = $siteId; clear_cache = $false }))
 $deployId = $build.deploy_id
 if (-not $deployId) { Fail 'Build triggered but no deploy id returned.' }
 Write-Host "Build triggered (deploy $deployId). Waiting..."
@@ -50,7 +58,7 @@ Write-Host "Build triggered (deploy $deployId). Waiting..."
 $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
 do {
   Start-Sleep -Seconds 10
-  $deploy = Invoke-NetlifyJson @('api', 'getDeploy', '--data', (@{ deploy_id = $deployId } | ConvertTo-Json -Compress))
+  $deploy = Invoke-NetlifyJson @('api', 'getDeploy', '--data', (ConvertTo-NativeJson @{ deploy_id = $deployId }))
   Write-Host "  state: $($deploy.state)"
   if ($deploy.state -eq 'error') { Fail "Deploy failed: $($deploy.error_message)" }
 } until ($deploy.state -eq 'ready' -or (Get-Date) -gt $deadline)
@@ -58,8 +66,14 @@ if ($deploy.state -ne 'ready') { Fail "Deploy not ready after $TimeoutMinutes mi
 Write-Host 'Deploy ready.'
 
 # --- 4. Verify the token against the history repo ----------------------------
-$owner = (& netlify env:get HISTORY_GITHUB_OWNER --context production --site $siteId | Out-String).Trim()
-$repo = (& netlify env:get HISTORY_GITHUB_REPO --context production --site $siteId | Out-String).Trim()
+# `netlify env:get` does not resolve the site outside a linked folder, so read through the API.
+function Get-ProductionEnvValue([string]$Key) {
+  $variable = Invoke-NetlifyJson @('api', 'getEnvVar', '--data', (ConvertTo-NativeJson @{ account_id = $accountId; site_id = $siteId; key = $Key }))
+  $production = $variable.values | Where-Object { $_.context -in @('production', 'all') } | Sort-Object { $_.context -ne 'production' } | Select-Object -First 1
+  return "$($production.value)".Trim()
+}
+$owner = Get-ProductionEnvValue 'HISTORY_GITHUB_OWNER'
+$repo = Get-ProductionEnvValue 'HISTORY_GITHUB_REPO'
 if (-not $owner -or -not $repo) { Fail 'Could not read HISTORY_GITHUB_OWNER / HISTORY_GITHUB_REPO from Netlify.' }
 
 $uri = "https://api.github.com/repos/$([uri]::EscapeDataString($owner))/$([uri]::EscapeDataString($repo))/contents/history.csv"

@@ -9,7 +9,7 @@ A regenerated PAT only reaches the scheduled function after it is saved in Netli
 
 ## Why PowerShell, not Git Bash
 
-Git Bash rewrites arguments that look like paths (MSYS path conversion) and mangles quoting around JSON, which breaks `netlify api --data '{...}'`. The bundled script runs in PowerShell, where neither happens. Always run it through `powershell`, never `bash`.
+Git Bash rewrites arguments that look like paths (MSYS path conversion) and mangles quoting around JSON, which breaks `netlify api --data '{...}'`. Windows PowerShell 5.1 also strips the quotes of JSON passed to native programs, so the script escapes them first. The bundled script runs in PowerShell, where neither happens. Always run it through `powershell`, never `bash`.
 
 ## Steps
 
@@ -21,7 +21,7 @@ Git Bash rewrites arguments that look like paths (MSYS path conversion) and mang
    ```
 
    Never ask the user to paste the token into chat, and never put it in a command Claude runs.
-3. The script then: reads the PAT as a hidden SecureString and trims it; sets `HISTORY_GITHUB_PAT` for the production context and Functions scope on site `coup-de-pompe`; triggers a production build through the Netlify API and polls until the deploy is `ready` (fails loudly on `error`); reads `HISTORY_GITHUB_OWNER` and `HISTORY_GITHUB_REPO` from Netlify and calls the GitHub Contents API for `history.csv` with the token.
+3. The script then: reads the PAT as a hidden SecureString and trims it; sets `HISTORY_GITHUB_PAT` for the production context on site `coup-de-pompe` (keeping the variable's existing scopes, and secret); triggers a production build through the Netlify API and polls until the deploy is `ready` (fails loudly on `error`); reads `HISTORY_GITHUB_OWNER` and `HISTORY_GITHUB_REPO` from Netlify through the API and calls the GitHub Contents API for `history.csv` with the token.
 4. Interpret the result: HTTP 200 or 404 means GitHub accepts the token (404 only means `history.csv` does not exist yet). 401 means the token value itself is wrong, so regenerate it and copy it again (GitHub shows it once). 403 or a 404 on the repo with a valid token means the PAT lacks Contents read/write on that repository.
 5. If the user wants proof end to end, the next scheduled run is 19:00 UTC; its log will show success or GitHub's reason (issue #174 made the error message explicit).
 
