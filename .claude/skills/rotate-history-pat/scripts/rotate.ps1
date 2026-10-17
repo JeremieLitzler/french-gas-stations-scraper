@@ -26,7 +26,8 @@ function Invoke-NetlifyJson([string[]]$CliArgs) {
 
 # --- 0. Prerequisites -------------------------------------------------------
 if (-not (Get-Command netlify -ErrorAction SilentlyContinue)) { Fail 'netlify CLI not found. Install it: npm i -g netlify-cli' }
-& netlify status | Out-Null
+# `netlify status` exits non-zero outside a linked folder even when logged in, so test the login with an API call.
+& netlify api listAccountsForUser | Out-Null
 if ($LASTEXITCODE -ne 0) { Fail 'Not logged in to Netlify. Run: netlify login' }
 
 $siteInfo = Invoke-NetlifyJson @('api', 'getSite', '--data', (ConvertTo-NativeJson @{ site_id = "$Site.netlify.app" }))

@@ -13,7 +13,7 @@ Git Bash rewrites arguments that look like paths (MSYS path conversion) and mang
 
 ## Steps
 
-1. Check prerequisites: `netlify status` must show a logged-in user. If not, ask the user to run `! netlify login` (interactive, so Claude cannot do it). `gh` is not needed for the script, which verifies with an in-process HTTPS call so the token never lands on a command line.
+1. Check prerequisites: the Netlify CLI must be logged in (`netlify api listAccountsForUser` succeeds; `netlify status` is unreliable outside a linked folder). If not, ask the user to run `! netlify login` (interactive, so Claude cannot do it). `gh` is not needed for the script, which verifies with an in-process HTTPS call so the token never lands on a command line.
 2. Ask the user to run the script themselves from the repo root (any worktree) with the `!` prefix, so the hidden token prompt works in their terminal and the token never enters the conversation:
 
    ```
