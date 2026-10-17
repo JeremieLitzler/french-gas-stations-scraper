@@ -36,6 +36,19 @@ describe('readHistoryConfig', () => {
     expect(readHistoryConfig()?.githubPat).toBe('github_pat_abc')
   })
 
+  it('trims whitespace around owner, repo and preferences path', () => {
+    stubHistoryEnv({
+      HISTORY_GITHUB_OWNER: ' JeremieLitzler\n',
+      HISTORY_GITHUB_REPO: 'my-gas-stations ',
+      HISTORY_PREFS_FILE_PATH: '\npreferences.json',
+    })
+    expect(readHistoryConfig()).toMatchObject({
+      owner: 'JeremieLitzler',
+      repo: 'my-gas-stations',
+      preferencesFilePath: 'preferences.json',
+    })
+  })
+
   it('treats a whitespace-only PAT as missing', () => {
     stubHistoryEnv({ HISTORY_GITHUB_PAT: ' \n' })
     expect(readHistoryConfig()).toBeNull()

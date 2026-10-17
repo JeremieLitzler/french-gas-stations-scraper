@@ -35,8 +35,9 @@ describe('scheduled run when GitHub rejects the PAT', () => {
     const response = await handler(SCHEDULED_EVENT, {} as HandlerContext)
 
     expect(response).toMatchObject({ statusCode: 500 })
-    const loggedError = errorSpy.mock.calls.flat().find((arg) => arg instanceof Error) as Error
-    expect(loggedError.message).toBe('GitHub read failed with status 401: Bad credentials')
+    const loggedError = errorSpy.mock.calls.flat().find((arg) => arg instanceof Error)
+    expect(loggedError).toBeInstanceOf(Error)
+    expect((loggedError as Error).message).toBe('GitHub read failed with status 401: Bad credentials')
     const sentHeaders = fetchSpy.mock.calls[0][1].headers as Record<string, string>
     expect(sentHeaders.Authorization).toBe('Bearer github_pat_abc')
   })

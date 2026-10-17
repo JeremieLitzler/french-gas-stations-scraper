@@ -5,11 +5,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readRemoteFile, writeRemoteFile } from './githubContentsClient'
 
+// A string body is sent as-is (e.g. a non-JSON error page); anything else is JSON-encoded.
 function stubFetchResponse(status: number, body: unknown): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status })),
-  )
+  const payload = typeof body === 'string' ? body : JSON.stringify(body)
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(payload, { status })))
 }
 
 afterEach(() => {
@@ -30,9 +29,18 @@ describe('readRemoteFile', () => {
   })
 
   it('keeps the status-only error when the body is not JSON', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('oops', { status: 502 })))
+    stubFetchResponse(502, 'oops')
     await expect(readRemoteFile('pat', 'o', 'r', 'history.csv')).rejects.toThrow(
       'GitHub read failed with status 502.',
+    )
+  })
+})
+
+describe('readRemoteFile with a JSON body lacking a message', () => {
+  it('keeps the status-only error', async () => {
+    stubFetchResponse(500, { error: 'boom' })
+    await expect(readRemoteFile('pat', 'o', 'r', 'history.csv')).rejects.toThrow(
+      'GitHub read failed with status 500.',
     )
   })
 })
@@ -45,5 +53,12 @@ describe('writeRemoteFile', () => {
     ).rejects.toThrow(
       'GitHub write failed with status 403: Resource not accessible by personal access token',
     )
+  })
+
+  it('keeps the status-only error when the body is not JSON', async () => {
+    stubFetchResponse(502, 'oops')
+    await expect(
+      writeRemoteFile('pat', 'o', 'r', 'history.csv', 'msg', 'Yw==', undefined),
+    ).rejects.toThrow('GitHub write failed with status 502.')
   })
 })
