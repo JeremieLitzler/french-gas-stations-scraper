@@ -1,5 +1,10 @@
 # Rotates HISTORY_GITHUB_PAT end to end (ADR-014): set in Netlify, redeploy
 # production, verify GitHub accepts the token. Never prints or stores the token.
+#
+# Usage (repo root, own terminal so the token never enters a chat transcript):
+#   powershell -NoProfile -ExecutionPolicy Bypass -File scripts/rotate-history-pat.ps1
+# Requires the Netlify CLI, logged in (`netlify login`). Written for PowerShell,
+# not Git Bash, which rewrites path-like arguments and mangles JSON quoting.
 param(
   [string]$Site = 'coup-de-pompe',
   [int]$TimeoutMinutes = 10
