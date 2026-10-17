@@ -45,6 +45,21 @@ function contentsUrl(owner: string, repo: string, path: string): string {
   return `${GITHUB_API_BASE}/repos/${encodedOwner}/${encodedRepo}/contents/${encodedPath}`
 }
 
+// GitHub explains a rejection in the JSON `message` field (e.g. "Bad
+// credentials" vs "Resource not accessible by personal access token"); keeping
+// it in the error makes a 401/403 in the Netlify logs diagnosable (issue #174).
+// The message is GitHub's own text and never contains the token.
+async function failure(action: 'read' | 'write', response: Response): Promise<Error> {
+  const prefix = `GitHub ${action} failed with status ${response.status}`
+  try {
+    const body = (await response.json()) as Record<string, unknown>
+    if (typeof body.message === 'string') return new Error(`${prefix}: ${body.message}`)
+  } catch {
+    // Non-JSON body: fall through to the status-only message.
+  }
+  return new Error(`${prefix}.`)
+}
+
 export async function readRemoteFile(
   githubPat: string,
   owner: string,
@@ -54,7 +69,7 @@ export async function readRemoteFile(
   const url = contentsUrl(owner, repo, path)
   const response = await fetch(url, { headers: authHeaders(githubPat) })
   if (response.status === 404) return { found: false }
-  if (!response.ok) throw new Error(`GitHub read failed with status ${response.status}.`)
+  if (!response.ok) throw await failure('read', response)
   return { found: true, file: await parseRemoteFile(response) }
 }
 
@@ -84,5 +99,5 @@ export async function writeRemoteFile(
     headers: { ...authHeaders(githubPat), 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, content: base64Content, sha }),
   })
-  if (!response.ok) throw new Error(`GitHub write failed with status ${response.status}.`)
+  if (!response.ok) throw await failure('write', response)
 }
