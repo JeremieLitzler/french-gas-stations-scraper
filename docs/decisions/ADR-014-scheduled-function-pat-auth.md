@@ -109,22 +109,37 @@ mechanism with the single fixed entry described above.
 
 ### PAT Setup Guide
 
-1. Go to **github.com/settings/personal-access-tokens/new** (Fine-grained tokens), signed in as
-   the account that owns the target repository.
+Two procedures: the first time (no token, no Netlify variables yet), and every later regeneration. The recurring failure is a missed redeploy: Netlify environment variable changes only reach a function on a new deploy, so a rotated token keeps failing with `401 Bad credentials` until the site is redeployed. This caused both 401 incidents of issue #174 (2026-09-18 and 2026-10-17).
+
+#### From Scratch Setup
+
+1. Go to **github.com/settings/personal-access-tokens/new** (Fine-grained tokens), signed in as the account that owns the target repository.
 2. **Token name**: something identifiable, e.g. `french-gas-stations-history-writer`.
-3. **Expiration**: the maximum allowed (1 year). Set a calendar reminder ~2 weeks before expiry
-   to regenerate and update the Netlify environment variable ahead of time — done early enough,
-   this causes no downtime.
+3. **Expiration**: the maximum allowed (1 year). Set a calendar reminder ~2 weeks before expiry to regenerate ahead of time (see "On Each PAT Regeneration"); done early enough, this causes no downtime.
 4. **Resource owner**: the user/org that owns the target repository.
 5. **Repository access**: "Only select repositories" > choose exactly the one target repository.
-6. **Permissions** > Repository permissions > **Contents: Read and write**. Leave every other
-   permission at "No access".
+6. **Permissions** > Repository permissions > **Contents: Read and write**. Leave every other permission at "No access".
 7. Click **Generate token** and copy the value immediately — GitHub shows it only once. Save it to the password manager right away (Proton Pass, "Common" vault, item "(pat) French Gas Stations Auto Scrapper"), so a failed later step never forces a regeneration.
-8. **Rotation (token already exists in Netlify): run the `rotate-history-pat` skill's script** from the repo root, in your own terminal so the token never enters a chat transcript: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/rotate-history-pat/scripts/rotate.ps1`. It needs the Netlify CLI logged in (`netlify login`). It reads the token with a hidden prompt, sets `HISTORY_GITHUB_PAT` for the production context, triggers a production build and waits for it, then calls GitHub with the token. It never prints or stores the token. Steps 9 to 11 below describe what it automates.
-9. **Manual alternative / first-time setup**: in Netlify, Site settings > Environment variables > set `HISTORY_GITHUB_PAT` to the copied value, production context, Functions scope (keep it secret so it is not exposed to the client bundle). On first setup also add `HISTORY_GITHUB_OWNER`, `HISTORY_GITHUB_REPO`, and `HISTORY_PREFS_FILE_PATH` alongside it. Paste the value with no trailing space or newline, although the function now trims it.
-10. **Redeploy production — saving the variable is not enough.** Netlify environment variable changes only reach a function on a new deploy, so a rotated token keeps failing with `401 Bad credentials` until the site is redeployed. This was the cause of both 401 incidents in issue #174 (2026-09-18 and 2026-10-17). Trigger it with Deploys > Trigger deploy > Deploy site, or let the rotation script do it.
-11. **Verify.** Confirm GitHub accepts the token: a request for `history.csv` with it must return 200 (or 404 if the file does not exist yet), never 401 or 403 (the script does this check). Then, after the next 19:00 UTC run, check the function log in Netlify (Logs > Functions > `scheduled-price-history`): a failure now reads `GitHub read failed with status <code>: <GitHub's message>`, e.g. `Bad credentials` for a wrong or stale token and `Resource not accessible by personal access token` for missing Contents permission.
-12. **If the token is ever leaked or the repo target changes**: revoke it immediately from the same GitHub settings page, generate a replacement, and update the Netlify variable (steps 7 to 11) — there is no automatic revocation.
+8. In Netlify: Site settings > Environment variables > add `HISTORY_GITHUB_PAT` with the copied value, production context, Functions scope, marked secret so it is not exposed to the client bundle. Paste it with no trailing space or newline (the function trims it, but do not rely on that). Add `HISTORY_GITHUB_OWNER`, `HISTORY_GITHUB_REPO`, and `HISTORY_PREFS_FILE_PATH` alongside it.
+9. **Redeploy production** — saving the variables is not enough. Deploys > Trigger deploy > Deploy site.
+10. **Verify** (see "Verifying" below).
+
+#### On Each PAT Regeneration
+
+Use this when the token expires, is leaked, or is replaced. The Netlify variables other than `HISTORY_GITHUB_PAT` do not change.
+
+1. On github.com/settings/personal-access-tokens, open the token and click **Regenerate token** (name, repository access and permissions are kept; pick a new expiration, ideally the maximum). If the token was leaked, revoke it first. Copy the new value immediately — GitHub shows it only once.
+2. Save it to Proton Pass in the same item ("Common" vault, "(pat) French Gas Stations Auto Scrapper") before doing anything else.
+3. **Run the rotation script** from the repo root, in your own terminal so the token never enters a chat transcript: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/rotate-history-pat/scripts/rotate.ps1`. It needs the Netlify CLI logged in (`netlify login`). It reads the token with a hidden prompt, sets `HISTORY_GITHUB_PAT` for the production context, triggers a production build and waits for it, then calls GitHub with the token. It never prints or stores the token, and it covers steps 4 to 6 below.
+4. *Manual alternative to the script*: in Netlify, replace the value of `HISTORY_GITHUB_PAT` (production, secret, no surrounding whitespace).
+5. *Manual alternative*: **redeploy production** (Deploys > Trigger deploy > Deploy site) and wait for it to be ready.
+6. **Verify** (see "Verifying" below).
+
+#### Verifying
+
+- Confirm GitHub accepts the token: a request for `history.csv` with it must return 200 (or 404 if the file does not exist yet), never 401 or 403. The rotation script does this check.
+- After the next 19:00 UTC run, check the function log in Netlify (Logs > Functions > `scheduled-price-history`). A failure reads `GitHub read failed with status <code>: <GitHub's message>`: `Bad credentials` means a wrong, stale or not-yet-deployed token; `Resource not accessible by personal access token` means the token lacks Contents read/write on the repository.
+- If the token is ever leaked or the repo target changes, revoke it immediately from the same GitHub settings page and run "On Each PAT Regeneration" — there is no automatic revocation.
 
 - This ADR extends ADR-011 (browser-session OAuth) and ADR-012 (GitHub repo as sync backend) with
   a second, independent auth path for server-only, unattended writes. The two paths never share a
