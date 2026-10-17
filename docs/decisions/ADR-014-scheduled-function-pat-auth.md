@@ -131,8 +131,8 @@ Use this when the token expires, is leaked, or is replaced. The Netlify variable
 1. On github.com/settings/personal-access-tokens, open the token and click **Regenerate token** (name, repository access and permissions are kept; pick a new expiration, ideally the maximum). If the token was leaked, revoke it first. Copy the new value immediately — GitHub shows it only once.
 2. Save it to Proton Pass in the same item ("Common" vault, "(pat) French Gas Stations Auto Scrapper") before doing anything else.
 3. **Run the rotation script** from the repo root, in your own terminal so the token never enters a chat transcript: `powershell -NoProfile -ExecutionPolicy Bypass -File .claude/skills/rotate-history-pat/scripts/rotate.ps1`. It needs the Netlify CLI logged in (`netlify login`). It reads the token with a hidden prompt, sets `HISTORY_GITHUB_PAT` for the production context, triggers a production build and waits for it, then calls GitHub with the token. It never prints or stores the token, and it covers steps 4 to 6 below.
-4. *Manual alternative to the script*: in Netlify, replace the value of `HISTORY_GITHUB_PAT` (production, secret, no surrounding whitespace).
-5. *Manual alternative*: **redeploy production** (Deploys > Trigger deploy > Deploy site) and wait for it to be ready.
+4. _Manual alternative to the script_: in Netlify, replace the value of `HISTORY_GITHUB_PAT` (production, secret, no surrounding whitespace).
+5. _Manual alternative_: **redeploy production** (Deploys > Trigger deploy > Deploy site) and wait for it to be ready.
 6. **Verify** (see "Verifying" below).
 
 #### Verifying
@@ -141,11 +141,9 @@ Use this when the token expires, is leaked, or is replaced. The Netlify variable
 - After the next 19:00 UTC run, check the function log in Netlify (Logs > Functions > `scheduled-price-history`). A failure reads `GitHub read failed with status <code>: <GitHub's message>`: `Bad credentials` means a wrong, stale or not-yet-deployed token; `Resource not accessible by personal access token` means the token lacks Contents read/write on the repository.
 - If the token is ever leaked or the repo target changes, revoke it immediately from the same GitHub settings page and run "On Each PAT Regeneration" — there is no automatic revocation.
 
-- This ADR extends ADR-011 (browser-session OAuth) and ADR-012 (GitHub repo as sync backend) with
-  a second, independent auth path for server-only, unattended writes. The two paths never share a
-  credential.
-- Should the app ever need to generalize to multiple users, this ADR's single-PAT/env-var design
-  would need to be superseded — see Alternatives Considered, item 4.
+This ADR extends ADR-011 (browser-session OAuth) and ADR-012 (GitHub repo as sync backend) with a second, independent auth path for server-only, unattended writes. The two paths never share a credential.
+
+Should the app ever need to generalize to multiple users, this ADR's single-PAT/env-var design would need to be superseded — see Alternatives Considered, item 4.
 
 ## References
 
