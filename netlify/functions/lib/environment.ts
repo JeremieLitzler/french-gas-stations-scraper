@@ -24,12 +24,12 @@ export interface HistoryConfig {
 }
 
 export function readHistoryConfig(): HistoryConfig | null {
-  // A token pasted into the Netlify UI often carries a trailing newline or
-  // space, which GitHub rejects as bad credentials (issue #174).
+  // Values pasted into the Netlify UI often carry a trailing newline or
+  // space; for the PAT, GitHub rejects that as bad credentials (issue #174).
   const githubPat = process.env.HISTORY_GITHUB_PAT?.trim()
-  const owner = process.env.HISTORY_GITHUB_OWNER
-  const repo = process.env.HISTORY_GITHUB_REPO
-  const preferencesFilePath = process.env.HISTORY_PREFS_FILE_PATH
+  const owner = process.env.HISTORY_GITHUB_OWNER?.trim()
+  const repo = process.env.HISTORY_GITHUB_REPO?.trim()
+  const preferencesFilePath = process.env.HISTORY_PREFS_FILE_PATH?.trim()
   if (!githubPat || !owner || !repo || !preferencesFilePath) {
     return null
   }

@@ -49,7 +49,7 @@ function contentsUrl(owner: string, repo: string, path: string): string {
 // credentials" vs "Resource not accessible by personal access token"); keeping
 // it in the error makes a 401/403 in the Netlify logs diagnosable (issue #174).
 // The message is GitHub's own text and never contains the token.
-async function failure(action: 'read' | 'write', response: Response): Promise<Error> {
+async function githubError(action: 'read' | 'write', response: Response): Promise<Error> {
   const prefix = `GitHub ${action} failed with status ${response.status}`
   try {
     const body = (await response.json()) as Record<string, unknown>
@@ -69,7 +69,7 @@ export async function readRemoteFile(
   const url = contentsUrl(owner, repo, path)
   const response = await fetch(url, { headers: authHeaders(githubPat) })
   if (response.status === 404) return { found: false }
-  if (!response.ok) throw await failure('read', response)
+  if (!response.ok) throw await githubError('read', response)
   return { found: true, file: await parseRemoteFile(response) }
 }
 
@@ -99,5 +99,5 @@ export async function writeRemoteFile(
     headers: { ...authHeaders(githubPat), 'Content-Type': 'application/json' },
     body: JSON.stringify({ message, content: base64Content, sha }),
   })
-  if (!response.ok) throw await failure('write', response)
+  if (!response.ok) throw await githubError('write', response)
 }
