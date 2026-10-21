@@ -37,7 +37,7 @@
     "@netlify/functions": "^5.1.5",
     "@tsconfig/node22": "^22.0.6",
     "@types/dompurify": "^3.2.0",
-    "@types/node": "^25.3.3",
+    "@types/node": "^26.5.0",
     "@vitejs/plugin-vue": "^6.0.4",
     "@vitest/coverage-v8": "^4.1.2",
     "@vitest/ui": "^4.1.2",
