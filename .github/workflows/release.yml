@@ -26,7 +26,8 @@ on:
 # released, so a bug in a commit cannot break its own release.
 #
 # To move the pin:
-#   1. Pick the commit of main to run, or the commit of a version tag:
+#   1. Pick the commit of the script repository's main to run, or the commit of
+#      one of its version tags:
 #        git rev-parse 'vX.Y.Z^{commit}'
 #   2. Change RELEASE_SCRIPT_REF below to that SHA, and the comment above it
 #      to name that commit or tag.

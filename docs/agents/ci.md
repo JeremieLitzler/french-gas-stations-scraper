@@ -10,7 +10,7 @@ The `publish` job runs after `guard` (the ref must be `develop` or `release/*`) 
 
 ## Cutting a release
 
-A release is cut by pushing a `release/<date>` branch off the tip of `develop` — not by a pull request, and not from `develop` itself (a push to `develop` only ever runs the dry-run preview to the run summary). The `release/*` push runs the `publish` job, which tags that commit and creates the GitHub release; the `deploy-site` job then calls `NETLIFY_BUILD_HOOK`. A `deploy-site` dispatch from `develop` redeploys the site without a release. A `workflow_dispatch` run with `mode=publish` does the same from `develop` or a `release/*` branch.
+A release is cut by pushing a `release/<date>` branch off the tip of `develop` — not by a pull request, and not from `develop` itself (a push to `develop` only ever runs the dry-run preview to the run summary). The `release/*` push runs the `publish` job, which tags that commit and creates the GitHub release; the `deploy-site` job then calls `NETLIFY_BUILD_HOOK`. A `deploy-site` dispatch from `develop` redeploys the site without a release. A `workflow_dispatch` run with `action=publish` cuts the release from `develop` or a `release/*` branch.
 
 The release branch is disposable: it carries nothing to merge back, and once the `publish` job has tagged and released, its final step deletes the `release/*` branch from `origin`. Cut a fresh `release/<date>` for the next release rather than reusing one. A `workflow_dispatch` publish never deletes its ref, and a failed publish leaves the branch in place for a retry.
 
