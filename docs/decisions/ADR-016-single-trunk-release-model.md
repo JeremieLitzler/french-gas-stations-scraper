@@ -1,7 +1,7 @@
 # ADR-016: Single-Trunk, Push-Triggered Release Model
 
 **Date:** 2026-09-09
-**Status:** Accepted
+**Status:** Superseded by ADR-017
 
 ## Context
 

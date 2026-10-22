@@ -1,7 +1,7 @@
 # ADR-015: Bash Script (`release.sh`) as a Second Release Workflow
 
 **Date:** 2026-08-11
-**Status:** Superseded by ADR-016
+**Status:** Superseded by ADR-016 and ADR-017
 
 ## Context
 
