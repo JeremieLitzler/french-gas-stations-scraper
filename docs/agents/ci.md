@@ -6,7 +6,7 @@ Operational notes for working on `.github/workflows/`. The settled decisions and
 
 To add or change pipeline behaviour — a guard, a preflight check, a recovery path — add a step to the relevant job in `release.yml`, around the script. `release.sh` is never edited here; to move to a newer one, change `RELEASE_SCRIPT_REF` as the comment above it describes.
 
-The `publish` job is gated by `guard` and `test`, refuses a `release/*` ref that `origin/develop` does not contain, and deletes an orphaned tag left by a half-finished run so the release re-cuts. The step comments in `release.yml` explain each.
+The `publish` job's guards and recovery steps are explained by the step comments in `release.yml`.
 
 ## Cutting a release
 
@@ -16,7 +16,7 @@ The release branch is disposable: it carries nothing to merge back, and once the
 
 ## GITHUB_TOKEN and downstream workflows
 
-The publish job tags and releases with the default `GITHUB_TOKEN`, which by design does not trigger further workflow runs. Before adding a workflow that keys on `on: release` or `on: push: tags` (npm publish, a deploy, changelog sync), restore a GitHub App or PAT token in the `publish` job, or the release will not trigger it.
+A release created with `GITHUB_TOKEN` triggers no further workflow; the trade-off and the fix are in ADR-017.
 
 ## Rulesets
 
