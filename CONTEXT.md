@@ -29,7 +29,7 @@ Documented work that is not a user-facing feature. It stays where it already liv
 - **Architecture decisions** — `docs/decisions/` (`README.md` is the index). Foundational: ADR-001 (Vue 3), ADR-002 (singleton composables), ADR-003 (Tailwind + shadcn-vue), ADR-005 (Vitest), ADR-010 (Mentions Légales rendering).
 - **Branch model** — one long-lived branch, `develop` (the GitHub default and the trunk). Every change lands by a rebase-merged pull request against `develop`; `feat/`, `fix/`, `docs/`, and `ci/` branches all branch off it and merge back into it. There is no `main` (ADR-017).
 - **Release automation** — `.github/workflows/release.yml`, running a pinned external `release.sh` (ADR-017, superseding ADR-015, ADR-016 and, before them, ADR-004). Operating guide: `docs/agents/ci.md`.
-- **CI and build config** — `.github/workflows/` (`pr-build.yml` runs tests + build on every PR to `develop`), `netlify.toml`, `vite.config.ts`, `vitest` setup.
+- **CI and build config** — `.github/workflows/` (`pr-build.yml` runs tests + build on every PR to `develop`), `netlify.toml` (production builds only from the release build hook; previews still build), `vite.config.ts`, `vitest` setup.
 - **UI/UX polish history** — captured in git history and closed issues, superseded by the feature docs above.
 
 ## Glossary
