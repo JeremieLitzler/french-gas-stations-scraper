@@ -4,19 +4,19 @@ Operational notes for working on `.github/workflows/` and `scripts/release/`. Th
 
 ## Changing the release pipeline
 
-`scripts/release/release.sh` is vendored byte-for-byte. To add or change pipeline behaviour — a guard, a preflight check, a recovery path — add a step to the `publish` or `preview` job in `release-bash.yml`, around the script. Leave the script matching upstream; `scripts/release/VENDORED.md` carries the one allowed local hunk and the procedure for syncing a deliberate upstream update.
+`release.sh` is not stored in this repo: `.github/workflows/release.yml` downloads it from JeremieLitzler/semantic-release-script at the SHA pinned in `RELEASE_SCRIPT_REF` (tag v1.0.0). To add or change pipeline behaviour — a guard, a preflight check, a recovery path — add a step to the relevant job in `release.yml`, around the script. To move to a newer script, change the pin as the comment above `RELEASE_SCRIPT_REF` describes.
 
-The publish job already wraps the script with two preflight guards (issues #63, #64): the pushed `release/*` ref must be contained in `origin/develop`, and an orphaned tag from a half-finished run is deleted so the release re-cuts. The job's step comments and `VENDORED.md` explain both.
+The `publish` job runs after `guard` (the ref must be `develop` or `release/*`) and `test` (`npm ci`, `npm audit signatures`, `npm run test`, `npm run build`). It refuses a `release/*` ref that `origin/develop` does not contain, and deletes an orphaned tag left by a half-finished run so the release re-cuts.
 
 ## Cutting a release
 
-A release is cut by pushing a `release/<date>` branch off the tip of `develop` — not by a pull request, and not from `develop` itself (a push to `develop` only ever runs the dry-run preview to the run summary). The `release/*` push runs the `publish` job, which tags that commit and creates the GitHub release. A `workflow_dispatch` run with `mode=publish` does the same from `develop` or a `release/*` branch.
+A release is cut by pushing a `release/<date>` branch off the tip of `develop` — not by a pull request, and not from `develop` itself (a push to `develop` only ever runs the dry-run preview to the run summary). The `release/*` push runs the `publish` job, which tags that commit and creates the GitHub release; the `deploy-site` job then calls `NETLIFY_BUILD_HOOK`. A `deploy-site` dispatch from `develop` redeploys the site without a release. A `workflow_dispatch` run with `mode=publish` does the same from `develop` or a `release/*` branch.
 
 The release branch is disposable: it carries nothing to merge back, and once the `publish` job has tagged and released, its final step deletes the `release/*` branch from `origin`. Cut a fresh `release/<date>` for the next release rather than reusing one. A `workflow_dispatch` publish never deletes its ref, and a failed publish leaves the branch in place for a retry.
 
 ## GITHUB_TOKEN and downstream workflows
 
-The publish job tags and releases with the default `GITHUB_TOKEN`, which by design does not trigger further workflow runs. Before adding a workflow that keys on `on: release` or `on: push: tags` (npm publish, a deploy, changelog sync), read the `permissions:` comment in `release-bash.yml`'s publish job — it needs a GitHub App or PAT token restored for the release to be visible to that workflow.
+The publish job tags and releases with the default `GITHUB_TOKEN`, which by design does not trigger further workflow runs. Before adding a workflow that keys on `on: release` or `on: push: tags` (npm publish, a deploy, changelog sync), note that the `publish` job in `release.yml` runs on `GITHUB_TOKEN` (`contents: write`) — it needs a GitHub App or PAT token restored for the release to be visible to that workflow.
 
 ## Rulesets
 
