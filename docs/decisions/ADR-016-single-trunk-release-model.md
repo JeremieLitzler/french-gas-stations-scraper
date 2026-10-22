@@ -22,7 +22,7 @@ Move to a **single-trunk, push-triggered** release model, per the `single-trunk-
   - `workflow_dispatch` offers `mode=preview|publish` from the Actions tab.
 - **Auth is the default `GITHUB_TOKEN`.** Nothing protects tags and no workflow keys on `on: release` or `on: push: tags`, so `contents: write` is enough. The GitHub App token is gone; `GH_APP_ID` / `GH_APP_KEY` can be deleted. Trade-off: a release created with `GITHUB_TOKEN` triggers no further workflow — if one is added later, restore an App or PAT token (documented in the workflow's `permissions:` comment and `docs/agents/ci.md`).
 - **One branch ruleset**, `protect-develop`, targeting `refs/heads/develop` only: rebase-merge allowed, force-push and deletion blocked. `release/**` is intentionally ungated. `protect-main` is deleted.
-- **`release.sh` stays vendored** at the ADR-015 pin (`de0a43a7`), with one recorded local hunk: its preflight branch check is widened from `== "main"` to a `case` accepting `develop`, `release/*`, and `HEAD` (`scripts/release/VENDORED.md`).
+- **`release.sh` stays vendored** at the ADR-015 pin (`de0a43a7`), with one recorded local hunk: its preflight branch check is widened from `== "main"` to a `case` accepting `develop`, `release/*`, and `HEAD`.
 - **`docs/agents/ci.md`** is the steady-state operating guide for the pipeline.
 
 This supersedes ADR-015 (and, transitively, ADR-004).
