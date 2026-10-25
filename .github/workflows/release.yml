@@ -35,8 +35,8 @@ on:
 #      with the new script before anything is published.
 # Pin the SHA, not the tag name: a tag can be moved, a SHA cannot.
 env:
-  # Tag v1.0.0 (commit 3a803a8): the first major
-  RELEASE_SCRIPT_REF: 3a803a8290aeae72e404cab7b2d655d0e2e81ea4
+  # Tag v1.0.1 (commit 29b910f): the half-published release guarantee, docs only
+  RELEASE_SCRIPT_REF: 29b910f4b0693b28f36a5afddef07df7bf64ff67
 
 permissions:
   contents: read
@@ -157,24 +157,6 @@ jobs:
             echo "::error::$GITHUB_REF_NAME is not contained in develop; merge it or cut a new release branch from develop"
             exit 1
           fi
-
-      - name: Delete an orphaned tag a failed run left on this commit
-        run: |
-          git fetch --tags --force origin
-          for tag in $(git tag --points-at HEAD --list 'v*'); do
-            if gh release view "$tag" >"$RUNNER_TEMP/rv.out" 2>&1; then
-              continue
-            fi
-            # Only "not found" proves an orphan; any other failure is an API
-            # or auth problem, and deleting on it could strand a real release.
-            if ! grep -q "release not found" "$RUNNER_TEMP/rv.out"; then
-              echo "::error::could not tell whether $tag has a release: $(cat "$RUNNER_TEMP/rv.out")"
-              exit 1
-            fi
-            echo "Deleting orphaned tag $tag (no GitHub release carries it)"
-            git push origin --delete "refs/tags/$tag"
-            git tag -d "$tag"
-          done
 
       - name: Fetch the pinned release.sh
         run: |
