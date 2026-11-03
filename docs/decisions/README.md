@@ -29,6 +29,7 @@ Status values: `Proposed` | `Accepted` | `Deprecated` | `Superseded by ADR-XXX`
 | [ADR-015](./ADR-015-bash-script-release-workflow.md)              | Bash Script (`release.sh`) as a Second Release Workflow                     | Superseded by ADR-016 and ADR-017 | 2026-08-11 |
 | [ADR-016](./ADR-016-single-trunk-release-model.md)               | Single-Trunk, Push-Triggered Release Model                                 | Superseded by ADR-017 | 2026-09-09 |
 | [ADR-017](./ADR-017-pinned-external-release-script.md)           | Pinned External `release.sh`, Single-Trunk Push-Triggered Release          | Accepted | 2026-10-22 |
+| [ADR-018](./ADR-018-auto-reconnect-github-on-load.md)           | Auto-Reconnect to GitHub on Load for Previously-Authenticated Users        | Accepted | 2026-11-03 |
 
 ## How to Add a New ADR
 

@@ -78,11 +78,19 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
 // Mock useGitHubAuth, useRepoConfig
 // ---------------------------------------------------------------------------
 
+// The auto-reconnect members (issue #158) report "no reconnect needed" here;
+// that behaviour is covered in HomePageContent.reconnect.spec.ts.
 vi.mock('@/composables/useGitHubAuth', () => ({
+  AUTO_RECONNECT_DELAY_MS: 2000,
+  SESSION_EXPIRED_MESSAGE: 'Votre session GitHub a expiré. Merci de vous reconnecter.',
   useGitHubAuth: () => ({
     isAuthenticated: ref(true),
     initializeAuthState: vi.fn().mockResolvedValue(undefined),
     handleUnauthorized: vi.fn().mockResolvedValue(undefined),
+    needsReconnect: () => false,
+    canAutoReconnect: () => false,
+    recordAutoReconnectAttempt: vi.fn().mockResolvedValue(undefined),
+    login: vi.fn(),
   }),
 }))
 

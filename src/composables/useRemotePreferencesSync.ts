@@ -58,7 +58,9 @@ import { parseJsonFile } from '@/utils/preferencesImport'
 
 const PROXY_PATH = '/.netlify/functions/github-api-proxy'
 const REMOTE_FETCH_TIMEOUT_MS = 10_000
-const ACCESS_REVOKED_MESSAGE = "L'accès à GitHub a été révoqué. Vos données locales sont utilisées."
+// Exported so HomePageContent.vue can hide this strip while the GitHub
+// reconnect notice (issue #158) already says the session lapsed.
+export const ACCESS_REVOKED_MESSAGE = "L'accès à GitHub a été révoqué. Vos données locales sont utilisées."
 const REMOTE_FETCH_FAILED_MESSAGE =
   'Impossible de récupérer vos préférences depuis GitHub. Merci de vous reconnecter.'
 const INVALID_REMOTE_CONTENT_MESSAGE =

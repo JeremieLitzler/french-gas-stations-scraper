@@ -35,6 +35,7 @@ declare module 'vue' {
     CopyButton: typeof import('./src/components/ui/CopyButton.vue')['default']
     EmptyStationsMessage: typeof import('./src/components/EmptyStationsMessage.vue')['default']
     Files: typeof import('./src/components/ui/icon/Files.vue')['default']
+    GitHubReconnectNotice: typeof import('./src/components/GitHubReconnectNotice.vue')['default']
     GitHubSyncSettings: typeof import('./src/components/GitHubSyncSettings.vue')['default']
     GuestLayout: typeof import('./src/components/layout/GuestLayout.vue')['default']
     Home: typeof import('./src/components/ui/icon/Home.vue')['default']

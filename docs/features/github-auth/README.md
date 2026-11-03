@@ -15,11 +15,13 @@ Everything downstream consumes an already-resolved repo config and a known auth 
 - `netlify/functions/github-auth-logout/` — clears the token cookie.
 - `netlify/functions/lib/cookies.ts` — cookie serialization/parsing helpers.
 - `netlify/functions/lib/environment.ts` — reads `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`.
-- `src/composables/useGitHubAuth.ts` — auth-state detection, the login-readiness check, and the login/logout actions the Settings page calls.
+- `src/composables/useGitHubAuth.ts` — auth-state detection, the login-readiness check, the login/logout actions the Settings page calls, and the auto-reconnect state (`githubWasAuthenticated` marker, `githubAutoReconnectAttempts` loop guard, `needsReconnect` / `canAutoReconnect`).
 - `src/composables/useRepoConfig.ts` — reactive state and validation for the three config fields; the authenticated-only reachability check against the Netlify proxy (`classifyProxyResponse` / `checkProxyReachable`).
 - `src/components/GitHubSyncSettings.vue` — the Settings "GitHub Sync" section: login/logout control and the three fields with their enabled/disabled logic. The login/logout button pair is marked for extraction into its own component (`<!-- GitHub Auth compoment start (to extract) -->`).
 - `src/components/OrgRestrictionNotice.vue`, `src/utils/orgRestrictionNotice.ts`, `src/types/org-restriction-notice.ts` — the org-OAuth-restriction (HTTP 403) message and its settings-page link.
 - `src/types/repo-config.ts` — the `RepoConfig` shape.
+- `src/components/GitHubReconnectNotice.vue`, `src/types/github-reconnect.ts` — the auto-reconnect notice (2-second countdown, then fallback banner) for a previously-authenticated user whose session expired.
+- `src/components/HomePageContent.vue` — runs the auto-reconnect check right after `syncOnLoad`, owns the countdown timer and the in-memory banner dismissal.
 
 ## Behaviour & rules
 
@@ -31,7 +33,16 @@ Everything downstream consumes an already-resolved repo config and a known auth 
 
 **Logout.** Clears the cookie only. It does not revoke the app on GitHub and does not touch stored data: repo config and station data both remain in IndexedDB.
 
-**Silent when unauthenticated.** If the cookie is absent or expired on load, the user is simply treated as unauthenticated. No error is shown unless they attempt a sync, add, update, or delete that needs GitHub.
+**Silent when unauthenticated, except after an expiry.** A user who never logged in, or who logged out on purpose, is simply treated as unauthenticated on load. No error is shown unless they attempt a sync, add, update, or delete that needs GitHub. The one exception is the auto-reconnect below.
+
+**Auto-reconnect after an expiry (ADR-018).** A second IndexedDB key, `githubWasAuthenticated`, is set on a successful OAuth callback and cleared only on logout; it is backfilled on load whenever `githubAuthenticated` is read back `true`. On the home page only, right after `syncOnLoad` (an expired cookie is only discovered by its 401), when the user is not authenticated, the marker is set and the login-readiness check passes, the app shows "Votre session GitHub a expiré. Reconnexion automatique dans 2 secondes…" with an "Annuler" button, then navigates to the OAuth start endpoint.
+
+- One automatic attempt per expiry: `githubAutoReconnectAttempts` is incremented when the countdown starts (so cancel, closing the tab or reloading during the countdown all use it up). It is reset on logout and on a proven session, meaning a later plain load that still finds `githubAuthenticated` set. It is never reset on the OAuth callback itself, so neither a declined login nor a login whose token the API still rejects can redirect again.
+- Once the attempt is used, or after a 401 later in the session, the same notice shows as a banner: the session-expired message, a "Se reconnecter à GitHub" button that starts the login without touching the counter, and a "×" that hides it for the current page session. It comes back on the next load.
+- A 401 later in the session never auto-redirects, so in-progress edits are not lost.
+- While the notice is visible, the "L'accès à GitHub a été révoqué" sync strip is hidden; other sync errors still show.
+- "Se déconnecter" stays available after an expiry (not authenticated, marker set), next to "Se connecter avec GitHub", so the user can opt out of sync without logging in first.
+- Known gap: `syncOnLoad` only calls GitHub when the cache is stale, so with a fresh cache an expired cookie is not detected on load and no countdown shows.
 
 **Org OAuth restriction (403).** When the configured repo sits under a GitHub organization that blocks third-party OAuth Apps, GitHub returns 403 with a recognisable `message`. That specific case is surfaced identically at all three call sites (`useRepoConfig`, `useRemotePreferencesSync`, `useRemotePreferencesWrite`) as a distinct, non-retryable error with this exact French text:
 
@@ -42,6 +53,7 @@ Everything downstream consumes an already-resolved repo config and a known auth 
 ## Related ADRs
 
 - [ADR-011](../../decisions/ADR-011-github-oauth-app-auth.md) — GitHub OAuth App authentication via Netlify functions with an HTTP-only cookie.
+- [ADR-018](../../decisions/ADR-018-auto-reconnect-github-on-load.md) — auto-reconnect to GitHub on load for previously-authenticated users whose session expired.
 - [ADR-006](../../decisions/ADR-006-netlify-functions-for-cors-proxy.md) — the Netlify-function-as-proxy pattern these auth functions and the API proxy share.
 
 ## See also

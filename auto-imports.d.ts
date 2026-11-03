@@ -6,6 +6,8 @@
 // biome-ignore lint: disable
 export {}
 declare global {
+  const ACCESS_REVOKED_MESSAGE: typeof import('./src/composables/useRemotePreferencesSync').ACCESS_REVOKED_MESSAGE
+  const AUTO_RECONNECT_DELAY_MS: typeof import('./src/composables/useGitHubAuth').AUTO_RECONNECT_DELAY_MS
   const Avatar: typeof import('./src/components/ui/avatar/index').Avatar
   const AvatarFallback: typeof import('./src/components/ui/avatar/index').AvatarFallback
   const AvatarImage: typeof import('./src/components/ui/avatar/index').AvatarImage
@@ -21,6 +23,7 @@ declare global {
   const Input: typeof import('./src/components/ui/input/index').Input
   const Label: typeof import('./src/components/ui/label/index').Label
   const RouterPathEnum: typeof import('./src/types/RouterPathEnum').RouterPathEnum
+  const SESSION_EXPIRED_MESSAGE: typeof import('./src/composables/useGitHubAuth').SESSION_EXPIRED_MESSAGE
   const Separator: typeof import('./src/components/ui/separator/index').Separator
   const SideBarActionsEnum: typeof import('./src/types/SideBarActionsEnum').SideBarActionsEnum
   const Table: typeof import('./src/components/ui/table/index').Table
@@ -124,6 +127,9 @@ declare global {
   // @ts-ignore
   export type { FuelPrice } from './src/types/fuel-price'
   import('./src/types/fuel-price')
+  // @ts-ignore
+  export type { ReconnectNoticeState } from './src/types/github-reconnect'
+  import('./src/types/github-reconnect')
   // @ts-ignore
   export type { OrgRestrictionNotice } from './src/types/org-restriction-notice'
   import('./src/types/org-restriction-notice')

@@ -29,6 +29,7 @@ const CACHE_DAYS_ERROR_MESSAGE = 'Le nombre de jours doit être un entier positi
 
 const {
   isAuthenticated,
+  wasAuthenticated,
   authError,
   initializeAuthState,
   canInitiateLogin,
@@ -185,7 +186,14 @@ async function onLogout(): Promise<void> {
       >
         Se connecter avec GitHub
       </Button>
-      <Button v-else class="w-full sm:w-auto" variant="outline" @click="onLogout">
+      <!-- Also offered after an expiry (issue #158): logout is the only way to
+      clear the was-authenticated marker and stop the reconnect banner. -->
+      <Button
+        v-if="isAuthenticated || wasAuthenticated"
+        class="w-full sm:w-auto"
+        variant="outline"
+        @click="onLogout"
+      >
         Se déconnecter
       </Button>
     </div>
