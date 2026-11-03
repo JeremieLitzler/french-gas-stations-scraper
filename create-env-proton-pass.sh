@@ -9,7 +9,7 @@ EXAMPLE_FILE="$REPO_ROOT/.env.proton-pass-example"
 TARGET_FILE="$REPO_ROOT/.env.proton-pass"
 
 VAULT_NAME="Common"
-ITEM_TITLE="(local) French Gas Stations Scrapper GitHub OAuth"
+ITEM_TITLE="local-french-gas-stations-scrapper-github-oauth"
 
 command -v pass-cli >/dev/null || { echo "pass-cli not found in PATH. Install it and run 'pass-cli login' first." >&2; exit 1; }
 command -v jq >/dev/null || { echo "jq not found in PATH." >&2; exit 1; }
@@ -25,7 +25,7 @@ SHARE_ID=$(pass-cli vault list --output json | jq -r --arg name "$VAULT_NAME" '.
 [ -n "$SHARE_ID" ] || { echo "Could not resolve share id for vault '$VAULT_NAME'." >&2; exit 1; }
 
 echo "Resolving item id for '$ITEM_TITLE'..."
-ITEM_ID=$(pass-cli item list "$VAULT_NAME" --output json | jq -r --arg title "$ITEM_TITLE" '.items[] | select(.content.title == $title) | .id')
+ITEM_ID=$(pass-cli item list "$VAULT_NAME" --output json | jq -r --arg title "$ITEM_TITLE" '.items[] | select(.title == $title) | .id')
 [ -n "$ITEM_ID" ] || { echo "Could not resolve item id for '$ITEM_TITLE' in vault '$VAULT_NAME'." >&2; exit 1; }
 
 echo "SHARE_ID=$SHARE_ID"
