@@ -41,7 +41,7 @@
  * auto width) in both auth states.
  */
 
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises, type VueWrapper } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import type { Ref } from 'vue'
@@ -54,6 +54,7 @@ import type { OrgRestrictionNotice } from '@/types/org-restriction-notice'
 // ---------------------------------------------------------------------------
 
 const mockIsAuthenticated: Ref<boolean> = ref(false)
+const mockWasAuthenticated: Ref<boolean> = ref(false)
 const mockAuthError: Ref<string | null> = ref(null)
 const mockInitializeAuthState = vi.fn().mockResolvedValue(undefined)
 const mockLogin = vi.fn()
@@ -63,7 +64,8 @@ const mockLogout = vi.fn().mockImplementation(async () => {
 const mockHandleUnauthorized = vi.fn().mockResolvedValue(undefined)
 
 function canInitiateLoginImpl(config: RepoConfigDraft): boolean {
-  const hasRequiredRepoConfig = config.ownerRepo.trim().length > 0 && config.filePath.trim().length > 0
+  const hasRequiredRepoConfig =
+    config.ownerRepo.trim().length > 0 && config.filePath.trim().length > 0
   const hasValidCacheDays = config.revalidateCacheDays !== null && config.revalidateCacheDays > 0
   return hasRequiredRepoConfig && hasValidCacheDays
 }
@@ -72,6 +74,7 @@ const mockCanInitiateLogin = vi.fn(canInitiateLoginImpl)
 vi.mock('@/composables/useGitHubAuth', () => ({
   useGitHubAuth: () => ({
     isAuthenticated: mockIsAuthenticated,
+    wasAuthenticated: mockWasAuthenticated,
     authError: mockAuthError,
     initializeAuthState: mockInitializeAuthState,
     canInitiateLogin: mockCanInitiateLogin,
@@ -163,7 +166,11 @@ beforeEach(() => {
 
 describe('E-1: revalidate-cache-days field accepts valid positive integer', () => {
   it('saves successfully with no validation error shown', async () => {
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: null }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: null,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -186,7 +193,11 @@ describe('E-1: revalidate-cache-days field accepts valid positive integer', () =
 
 describe('E-2: revalidate-cache-days field rejects zero', () => {
   it('shows an inline validation error and does not save', async () => {
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -207,7 +218,11 @@ describe('E-2: revalidate-cache-days field rejects zero', () => {
 
 describe('E-3: revalidate-cache-days field rejects negative numbers', () => {
   it('shows an inline validation error and does not save', async () => {
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -245,14 +260,20 @@ describe('E-4: all GitHub Sync fields enabled when unauthenticated', () => {
 describe('E-5: owner/repo and file path fields disabled after login', () => {
   it('disables owner/repo and file path but keeps revalidate-cache-days enabled', async () => {
     mockIsAuthenticated.value = true
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
     expect(inputElement(wrapper, 'ownerRepo').disabled).toBe(true)
     expect(inputElement(wrapper, 'filePath').disabled).toBe(true)
     expect(inputElement(wrapper, 'revalidateCacheDays').disabled).toBe(false)
-    expect(wrapper.text()).toContain('Déconnectez-vous pour modifier le dépôt et le chemin du fichier.')
+    expect(wrapper.text()).toContain(
+      'Déconnectez-vous pour modifier le dépôt et le chemin du fichier.',
+    )
   })
 })
 
@@ -263,7 +284,11 @@ describe('E-5: owner/repo and file path fields disabled after login', () => {
 describe('E-6: owner/repo and file path fields re-enabled after logout', () => {
   it('re-enables owner/repo and file path, retaining their values, after clicking logout', async () => {
     mockIsAuthenticated.value = true
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -285,7 +310,11 @@ describe('E-6: owner/repo and file path fields re-enabled after logout', () => {
 
 describe('E-7: login button reflects the login-readiness check', () => {
   it('is disabled while revalidate-cache-days is empty, and enabled once it is filled in', async () => {
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: null }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: null,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -294,7 +323,9 @@ describe('E-7: login button reflects the login-readiness check', () => {
 
     await wrapper.find('#revalidateCacheDays').setValue('7')
 
-    expect(findButtonByText(wrapper, 'Se connecter avec GitHub').attributes('disabled')).toBeUndefined()
+    expect(
+      findButtonByText(wrapper, 'Se connecter avec GitHub').attributes('disabled'),
+    ).toBeUndefined()
   })
 })
 
@@ -303,13 +334,13 @@ describe('E-7: login button reflects the login-readiness check', () => {
 // ---------------------------------------------------------------------------
 
 describe('Scenario 1 (rendering): an org-restriction validationError renders OrgRestrictionNotice, not raw text', () => {
-  it('renders the fixed sentence with a link to the configured owner\'s settings page', async () => {
+  it("renders the fixed sentence with a link to the configured owner's settings page", async () => {
     mockValidationError.value = { owner: 'acme-corp' }
     const wrapper = mountComponent()
     await flushPromises()
 
     const alert = wrapper.find('[role="alert"]')
-    expect(alert.text()).toContain("Veuillez visiter ce")
+    expect(alert.text()).toContain('Veuillez visiter ce')
     expect(alert.text()).not.toContain('[object Object]')
     const link = alert.find('a')
     expect(link.attributes('href')).toBe(
@@ -344,7 +375,11 @@ describe('TC-01: save and connect buttons stack vertically and span full width o
 describe('TC-02: save and disconnect buttons stack vertically and span full width on mobile (authenticated)', () => {
   it('renders "Enregistrer la fréquence" and "Se déconnecter" as full-width buttons in a flex-col row', async () => {
     mockIsAuthenticated.value = true
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
@@ -374,12 +409,63 @@ describe('TC-03: the button row carries the sm: classes that keep buttons side b
 
   it('authenticated: the row is sm:flex-row and both buttons are sm:w-auto', async () => {
     mockIsAuthenticated.value = true
-    mockRepoConfig.value = { ownerRepo: 'alice/repo', filePath: 'stations.json', revalidateCacheDays: 7 }
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
     const wrapper = mountComponent()
     await flushPromises()
 
     expect(buttonRowContainer(wrapper).classList.contains('sm:flex-row')).toBe(true)
     expect(findButtonByText(wrapper, 'Enregistrer la fréquence').classes()).toContain('sm:w-auto')
     expect(findButtonByText(wrapper, 'Se déconnecter').classes()).toContain('sm:w-auto')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Issue #158: opting out of sync after the session expired
+// ---------------------------------------------------------------------------
+
+describe('#158: a previously-authenticated user whose session expired can still log out', () => {
+  beforeEach(() => {
+    mockIsAuthenticated.value = false
+    mockRepoConfig.value = {
+      ownerRepo: 'alice/repo',
+      filePath: 'stations.json',
+      revalidateCacheDays: 7,
+    }
+  })
+
+  afterEach(() => {
+    mockWasAuthenticated.value = false
+  })
+
+  it('shows both the login and the logout buttons', async () => {
+    mockWasAuthenticated.value = true
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(findButtonByText(wrapper, 'Se connecter avec GitHub').exists()).toBe(true)
+    expect(findButtonByText(wrapper, 'Se déconnecter').exists()).toBe(true)
+  })
+
+  it('clicking logout calls logout', async () => {
+    mockWasAuthenticated.value = true
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    await findButtonByText(wrapper, 'Se déconnecter').trigger('click')
+
+    expect(mockLogout).toHaveBeenCalledTimes(1)
+  })
+
+  it('a user who never logged in sees no logout button', async () => {
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Se déconnecter')).toBe(
+      false,
+    )
   })
 })

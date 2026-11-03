@@ -83,7 +83,14 @@ vi.mock('@/composables/useDefaultFuelType', () => ({
 // ---------------------------------------------------------------------------
 
 vi.mock('@/composables/useGitHubAuth', () => ({
+  AUTO_RECONNECT_DELAY_MS: 2000,
+  SESSION_EXPIRED_MESSAGE: 'Votre session GitHub a expiré. Merci de vous reconnecter.',
   useGitHubAuth: () => ({
+    // Auto-reconnect members (issue #158), read by HomePageContent.vue —
+    // "no reconnect needed" here; covered in HomePageContent.reconnect.spec.ts.
+    needsReconnect: () => false,
+    canAutoReconnect: () => false,
+    recordAutoReconnectAttempt: vi.fn().mockResolvedValue(undefined),
     isAuthenticated: ref(false),
     authError: ref(null),
     initializeAuthState: vi.fn().mockResolvedValue(undefined),

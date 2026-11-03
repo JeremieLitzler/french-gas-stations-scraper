@@ -302,3 +302,179 @@ describe('A-10: a 401 from a GitHub API call clears the authenticated state and 
     expect(store.has(AUTH_STATE_KEY)).toBe(false)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Issue #158 — auto-reconnect for a previously-authenticated user
+// ---------------------------------------------------------------------------
+
+// Simulates a full page reload: the in-memory IndexedDB map survives, the
+// module-level refs do not.
+async function reloadWith(search: string) {
+  stubLocation(search)
+  spyOnReplaceState()
+  const auth = await freshComposable()
+  await auth.initializeAuthState()
+  return auth
+}
+
+async function loginThenExpire() {
+  const auth = await reloadWith('?auth=success')
+  await auth.handleUnauthorized()
+}
+
+describe('#158: needsReconnect identifies a previously-authenticated user whose session expired', () => {
+  it('is true after a reload once a successful login was followed by a 401', async () => {
+    await loginThenExpire()
+
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('is false for a user who never logged in, even with a complete repo config', async () => {
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('is false after an explicit logout', async () => {
+    const auth = await reloadWith('?auth=success')
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+    await auth.logout()
+
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('is false while the user is still authenticated', async () => {
+    await reloadWith('?auth=success')
+
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('is false when the repo config would not allow a login', async () => {
+    await loginThenExpire()
+
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect({ ...VALID_CONFIG, filePath: '' })).toBe(false)
+  })
+
+  it('stays true after a failed OAuth callback', async () => {
+    await loginThenExpire()
+
+    const { needsReconnect } = await reloadWith('?auth=error')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('covers a user who was already authenticated before the marker existed', async () => {
+    store.set(AUTH_STATE_KEY, true)
+    const auth = await reloadWith('')
+    await auth.handleUnauthorized()
+
+    const { needsReconnect } = await reloadWith('')
+
+    expect(needsReconnect(VALID_CONFIG)).toBe(true)
+  })
+})
+
+describe('#158: canAutoReconnect allows one automatic attempt per expired session', () => {
+  it('is true for an expired session that has not used its automatic attempt yet', async () => {
+    await loginThenExpire()
+
+    const { canAutoReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('is false on later loads once the attempt was recorded, while the banner case remains', async () => {
+    await loginThenExpire()
+    const auth = await reloadWith('')
+    await auth.recordAutoReconnectAttempt()
+
+    const { canAutoReconnect, needsReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(false)
+    expect(needsReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('is false immediately after the attempt is recorded, without a reload', async () => {
+    await loginThenExpire()
+    const { canAutoReconnect, recordAutoReconnectAttempt } = await reloadWith('')
+
+    await recordAutoReconnectAttempt()
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('stays used after a failed OAuth callback, so a declined login never loops', async () => {
+    await loginThenExpire()
+    const auth = await reloadWith('')
+    await auth.recordAutoReconnectAttempt()
+
+    const { canAutoReconnect } = await reloadWith('?auth=error')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('is available again for the next expiry once the reconnected session was proven to work', async () => {
+    await loginThenExpire()
+    const auth = await reloadWith('')
+    await auth.recordAutoReconnectAttempt()
+    await reloadWith('?auth=success')
+    const proven = await reloadWith('')
+    await proven.handleUnauthorized()
+
+    const { canAutoReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('stays used when a successful login is immediately followed by a 401, so it never loops', async () => {
+    await loginThenExpire()
+    const auth = await reloadWith('')
+    await auth.recordAutoReconnectAttempt()
+    await loginThenExpire()
+
+    const { canAutoReconnect, needsReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(false)
+    expect(needsReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('is reset by an explicit logout', async () => {
+    await loginThenExpire()
+    const auth = await reloadWith('')
+    await auth.recordAutoReconnectAttempt()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })))
+    await auth.logout()
+    store.set(AUTH_STATE_KEY, true)
+    const restored = await reloadWith('')
+    await restored.handleUnauthorized()
+
+    const { canAutoReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(true)
+  })
+
+  it('treats a non-numeric stored attempt count as no attempt, and counts from there', async () => {
+    await loginThenExpire()
+    store.set('githubAutoReconnectAttempts', 'corrupted')
+    const auth = await reloadWith('')
+    expect(auth.canAutoReconnect(VALID_CONFIG)).toBe(true)
+
+    await auth.recordAutoReconnectAttempt()
+
+    expect(auth.canAutoReconnect(VALID_CONFIG)).toBe(false)
+  })
+
+  it('is false whenever no reconnect is needed', async () => {
+    const { canAutoReconnect } = await reloadWith('')
+
+    expect(canAutoReconnect(VALID_CONFIG)).toBe(false)
+  })
+})
