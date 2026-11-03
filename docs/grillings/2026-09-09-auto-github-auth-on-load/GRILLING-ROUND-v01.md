@@ -67,7 +67,7 @@ c. **Hybrid.** Automatic only for the "session expired" case from Q2, banner oth
 
 ### Answer to Q3
 
-After auth happened, the callback already returns use to the home page and we're on a SPA so. But I like banner idea so go for (b).
+After auth happened, the callback already returns use to the home page and we're on a SPA so. But I like banner idea, but as a user, I'd like the automatic redirect when everything is present to preform it so (c). The IndexedDB can store the attempts of automatic redirect to avoid the infinite redirect loop.
 
 ---
 
